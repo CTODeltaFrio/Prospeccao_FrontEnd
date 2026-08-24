@@ -79,7 +79,6 @@ document.addEventListener('DOMContentLoaded', function() {
     let filteredData = [];
     let currentItems = [];
 
-    // Função para fechar TODOS os modais (usada pelo ESC)
     function closeAllModals() {
         if (detailsModal.style.display === 'flex') detailsModal.style.display = 'none';
         if (genericModal.style.display === 'flex') genericModal.style.display = 'none';
@@ -88,22 +87,17 @@ document.addEventListener('DOMContentLoaded', function() {
         confirmCallback = null;
     }
 
-    // Evento global para fechar com a tecla ESC
     document.addEventListener('keydown', function(event) {
         if (event.key === 'Escape') {
             closeAllModals();
         }
     });
 
-    // ==========================================
-    // CLIQUE NOS "X" PADRONIZADOS
-    // ==========================================
     detailsClose.addEventListener('click', function() { detailsModal.style.display = 'none'; });
     genericClose.addEventListener('click', function() { genericModal.style.display = 'none'; });
     segmentClose.addEventListener('click', function() { segmentModal.style.display = 'none'; });
     confirmClose.addEventListener('click', function() { confirmModal.style.display = 'none'; });
 
-    // Fechar clicando fora
     detailsModal.addEventListener('click', function(e) { if(e.target === this) detailsModal.style.display = 'none'; });
     genericModal.addEventListener('click', function(e) { if(e.target === this) genericModal.style.display = 'none'; });
     segmentModal.addEventListener('click', function(e) { if(e.target === this) segmentModal.style.display = 'none'; });
@@ -201,7 +195,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Segmentos
     function resetSegmentForm() {
         segmentNome.value = '';
         segmentDesc.value = '';
@@ -292,7 +285,6 @@ document.addEventListener('DOMContentLoaded', function() {
         segmentSearch.value = ''; renderSegments(); resetSegmentForm(); segmentModal.style.display = 'flex';
     });
 
-    // Pesquisa Genérica
     const ufData = [
         { sigla: 'AC', nome: 'Acre' }, { sigla: 'AL', nome: 'Alagoas' }, { sigla: 'AP', nome: 'Amapá' },
         { sigla: 'AM', nome: 'Amazonas' }, { sigla: 'BA', nome: 'Bahia' }, { sigla: 'CE', nome: 'Ceará' },
@@ -403,7 +395,6 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('menu-municipios').addEventListener('click', () => openGenericModal('Pesquisa Município', 'Informe o município:', auxData.municipios, 'municipio'));
     document.getElementById('menu-natureza').addEventListener('click', () => openGenericModal('Pesquisa Natureza Jurídica', 'Informe a natureza:', auxData.natureza, 'natureza'));
 
-    // Filtros principais
     function applyFilters() {
         const uf = document.getElementById('filter-uf').value;
         const status = document.getElementById('filter-status').value;
