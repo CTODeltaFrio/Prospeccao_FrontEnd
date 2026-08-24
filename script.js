@@ -9,6 +9,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const btnPrev = document.getElementById('btn-prev');
     const btnNext = document.getElementById('btn-next');
 
+    // Elementos de filtros
+    const filterCnae = document.getElementById('filter-cnae');
+    const cnaeDescText = document.getElementById('cnae-desc-text');
+    const filterMunicipio = document.getElementById('filter-municipio');
+
+    // Modais
     const modalOverlay = document.getElementById('details-modal');
     const closeModal = document.querySelector('.close-modal');
     const genericModalOverlay = document.getElementById('generic-modal');
@@ -18,6 +24,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const genericSearch = document.getElementById('generic-search');
     const closeGenericModal = document.getElementById('close-generic-modal');
 
+    // Segmentos
     const segmentModal = document.getElementById('segment-modal');
     const closeSegmentModal = document.getElementById('close-segment-modal');
     const segmentSearch = document.getElementById('segment-search');
@@ -30,6 +37,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const segmentListContainer = document.getElementById('segment-list-container');
     const filterSegmento = document.getElementById('filter-segmento');
 
+    // Confirmação
     const confirmModal = document.getElementById('confirm-modal');
     const confirmTitle = document.getElementById('confirm-title');
     const confirmMessage = document.getElementById('confirm-message');
@@ -40,13 +48,20 @@ document.addEventListener('DOMContentLoaded', function() {
     let editingSegmentId = null;
     let currentGenericContext = null;
 
-    // Simulando dados com CNAE Principal e Secundário
+    const cnaeData = [
+        { codigo: '1011201', descricao: 'Frigorífico - abate de bovinos' },
+        { codigo: '1011202', descricao: 'Frigorífico - abate de suínos' },
+        { codigo: '1011301', descricao: 'Fabricação de produtos de carne' },
+        { codigo: '4637101', descricao: 'Comércio atacadista de carnes' },
+        { codigo: '4711301', descricao: 'Comércio varejista de mercadorias' }
+    ];
+
     const mockData = [
-        { cnpj: '06.771.019/0001-31', fantasia: 'MATADOURO FICAGNA', razao: 'ZELO FICAGNA', situacao: 'ATIVA', uf: 'RS', telefone: '(51) 3722-4664', ddd: '51', segmento: 'Frigorífico', tipo: 'FILIAL', natureza: 'Sociedade Empresária Limitada', porte: 'Demais', capital: 'R$ 0,00', inicio: '02/05/2002', dataSit: '02/05/2002', cnae_principal: '1011201', cnae_secundario: '4637101', logradouro: 'LOCALIDADE DE TRES VENDAS', numero: 'S/N', complemento: '-', bairro: 'TRES VENDAS', cep: '96501-035', municipio: 'CACHOEIRA DO SUL - RS', tel2: '-', email: '-' },
-        { cnpj: '01.234.172/0001-82', fantasia: 'FRIGORIFICO BONNA', razao: 'FRIGORIFICO BONNA CARNE LTDA', situacao: 'ATIVA', uf: 'RS', telefone: '(54) 3231-0000', ddd: '54', segmento: 'Frigorífico', tipo: 'MATRIZ', natureza: 'Sociedade Empresária Limitada', porte: 'Demais', capital: 'R$ 100.000,00', inicio: '15/08/1999', dataSit: '15/08/1999', cnae_principal: '1011201', cnae_secundario: '1013901', logradouro: 'ROD BR 116', numero: 'KM 45', complemento: 'SALA 1', bairro: 'ZONA RURAL', cep: '95000-000', municipio: 'CAXIAS DO SUL - RS', tel2: '-', email: 'contato@bonnacarne.com.br' },
-        { cnpj: '01.246.405/0001-58', fantasia: 'IMAOS SCHMALITZ', razao: 'IRMAOS SCHMALITZ LTDA', situacao: 'ATIVA', uf: 'RS', telefone: '', ddd: '', segmento: 'Atacado', tipo: 'MATRIZ', natureza: 'Sociedade Empresária Limitada', porte: 'Demais', capital: 'R$ 50.000,00', inicio: '10/01/1995', dataSit: '10/01/1995', cnae_principal: '1011201', cnae_secundario: '4637101', logradouro: 'AV BRASIL', numero: '1000', complemento: '-', bairro: 'CENTRO', cep: '95000-000', municipio: 'CAXIAS DO SUL - RS', tel2: '(54) 9999-0000', email: 'contato@schmalitz.com.br' },
-        { cnpj: '01.323.689/0001-58', fantasia: 'MATADOURO PINHAL', razao: 'IRMAOS SALVATI LTDA', situacao: 'ATIVA', uf: 'RS', telefone: '', ddd: '', segmento: 'Varejo', tipo: 'FILIAL', natureza: 'Sociedade Empresária Limitada', porte: 'Demais', capital: 'R$ 0,00', inicio: '01/06/2001', dataSit: '01/06/2001', cnae_principal: '1011201', cnae_secundario: '4711301', logradouro: 'ESTRADA DO PINHAL', numero: '500', complemento: '-', bairro: 'INTERIOR', cep: '96000-000', municipio: 'PELOTAS - RS', tel2: '-', email: '-' },
-        { cnpj: '01.332.595/0001-02', fantasia: 'FRIGORIFICO COOPES', razao: 'COOPERATIVA AGROPECUARIA SUL CARNE LTDA', situacao: 'ATIVA', uf: 'RS', telefone: '(51) 37224664', ddd: '51', segmento: 'Cooperativa', tipo: 'FILIAL', natureza: 'Cooperativa', porte: 'Demais', capital: 'R$ 0,00', inicio: '02/05/2002', dataSit: '02/05/2002', cnae_principal: '1011201', cnae_secundario: '4711301', logradouro: 'LOCALIDADE DE TRES VENDAS', numero: 'S/N', complemento: '-', bairro: 'TRES VENDAS', cep: '96501-035', municipio: 'CACHOEIRA DO SUL - RS', tel2: '-', email: 'financeiro@coopes.com.br' }
+        { cnpj: '06.771.019/0001-31', fantasia: 'MATADOURO FICAGNA', razao: 'ZELO FICAGNA', situacao: 'ATIVA', uf: 'RS', telefone: '(51) 3722-4664', ddd: '51', segmento: 'Frigorífico', municipio: 'Cachoeira do Sul', tipo: 'FILIAL', natureza: 'Sociedade Empresária Limitada', porte: 'Demais', capital: 'R$ 0,00', inicio: '02/05/2002', dataSit: '02/05/2002', cnae_principal: '1011201', cnae_secundario: '4637101', logradouro: 'LOCALIDADE DE TRES VENDAS', numero: 'S/N', complemento: '-', bairro: 'TRES VENDAS', cep: '96501-035', municipio: 'CACHOEIRA DO SUL - RS', tel2: '-', email: '-' },
+        { cnpj: '01.234.172/0001-82', fantasia: 'FRIGORIFICO BONNA', razao: 'FRIGORIFICO BONNA CARNE LTDA', situacao: 'ATIVA', uf: 'RS', telefone: '(54) 3231-0000', ddd: '54', segmento: 'Frigorífico', municipio: 'Caxias do Sul', tipo: 'MATRIZ', natureza: 'Sociedade Empresária Limitada', porte: 'Demais', capital: 'R$ 100.000,00', inicio: '15/08/1999', dataSit: '15/08/1999', cnae_principal: '1011201', cnae_secundario: '1013901', logradouro: 'ROD BR 116', numero: 'KM 45', complemento: 'SALA 1', bairro: 'ZONA RURAL', cep: '95000-000', municipio: 'CAXIAS DO SUL - RS', tel2: '-', email: 'contato@bonnacarne.com.br' },
+        { cnpj: '01.246.405/0001-58', fantasia: 'IMAOS SCHMALITZ', razao: 'IRMAOS SCHMALITZ LTDA', situacao: 'ATIVA', uf: 'RS', telefone: '', ddd: '', segmento: 'Atacado', municipio: 'Caxias do Sul', tipo: 'MATRIZ', natureza: 'Sociedade Empresária Limitada', porte: 'Demais', capital: 'R$ 50.000,00', inicio: '10/01/1995', dataSit: '10/01/1995', cnae_principal: '1011201', cnae_secundario: '4637101', logradouro: 'AV BRASIL', numero: '1000', complemento: '-', bairro: 'CENTRO', cep: '95000-000', municipio: 'CAXIAS DO SUL - RS', tel2: '(54) 9999-0000', email: 'contato@schmalitz.com.br' },
+        { cnpj: '01.323.689/0001-58', fantasia: 'MATADOURO PINHAL', razao: 'IRMAOS SALVATI LTDA', situacao: 'ATIVA', uf: 'RS', telefone: '', ddd: '', segmento: 'Varejo', municipio: 'Pelotas', tipo: 'FILIAL', natureza: 'Sociedade Empresária Limitada', porte: 'Demais', capital: 'R$ 0,00', inicio: '01/06/2001', dataSit: '01/06/2001', cnae_principal: '1011201', cnae_secundario: '4711301', logradouro: 'ESTRADA DO PINHAL', numero: '500', complemento: '-', bairro: 'INTERIOR', cep: '96000-000', municipio: 'PELOTAS - RS', tel2: '-', email: '-' },
+        { cnpj: '01.332.595/0001-02', fantasia: 'FRIGORIFICO COOPES', razao: 'COOPERATIVA AGROPECUARIA SUL CARNE LTDA', situacao: 'ATIVA', uf: 'RS', telefone: '(51) 37224664', ddd: '51', segmento: 'Cooperativa', municipio: 'Cachoeira do Sul', tipo: 'FILIAL', natureza: 'Cooperativa', porte: 'Demais', capital: 'R$ 0,00', inicio: '02/05/2002', dataSit: '02/05/2002', cnae_principal: '1011201', cnae_secundario: '4711301', logradouro: 'LOCALIDADE DE TRES VENDAS', numero: 'S/N', complemento: '-', bairro: 'TRES VENDAS', cep: '96501-035', municipio: 'CACHOEIRA DO SUL - RS', tel2: '-', email: 'financeiro@coopes.com.br' }
     ];
 
     let segmentData = [
@@ -63,6 +78,19 @@ document.addEventListener('DOMContentLoaded', function() {
     let filteredData = [];
     let currentItems = [];
 
+    // Atualizar descrição do CNAE dentro do campo
+    function updateCnaeDescription(valor) {
+        const found = cnaeData.find(c => c.codigo.includes(valor));
+        if (found) {
+            cnaeDescText.innerText = `- ${found.descricao}`;
+        } else {
+            cnaeDescText.innerText = '';
+        }
+    }
+    filterCnae.addEventListener('input', function() {
+        updateCnaeDescription(this.value);
+    });
+
     function showConfirm(title, message, callback) {
         confirmTitle.innerText = title;
         confirmMessage.innerText = message;
@@ -71,9 +99,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     btnConfirmOk.addEventListener('click', function() {
-        if (confirmCallback) {
-            confirmCallback();
-        }
+        if (confirmCallback) confirmCallback();
         confirmModal.style.display = 'none';
         confirmCallback = null;
     });
@@ -139,7 +165,11 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('det-capital').innerText = company.capital;
         document.getElementById('det-inicio').innerText = company.inicio;
         document.getElementById('det-data-sit').innerText = company.dataSit;
-        document.getElementById('det-cnae').innerText = company.cnae_principal + " - Principal";
+        
+        const cnaeDesc = cnaeData.find(c => c.codigo === company.cnae_principal);
+        const cnaeDisplay = cnaeDesc ? `${company.cnae_principal} - ${cnaeDesc.descricao}` : company.cnae_principal;
+        document.getElementById('det-cnae').innerText = cnaeDisplay;
+
         document.getElementById('det-logradouro').innerText = company.logradouro;
         document.getElementById('det-numero').innerText = company.numero;
         document.getElementById('det-complemento').innerText = company.complemento;
@@ -165,6 +195,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if(e.target === this) { modalOverlay.style.display = 'none'; }
     });
 
+    // Segmentos
     function resetSegmentForm() {
         segmentNome.value = '';
         segmentDesc.value = '';
@@ -215,15 +246,11 @@ document.addEventListener('DOMContentLoaded', function() {
             segmentData = segmentData.filter(seg => seg.id !== id);
             renderSegments(segmentSearch.value);
             updateSegmentFilter();
-            if(editingSegmentId === id) {
-                resetSegmentForm();
-            }
+            if(editingSegmentId === id) resetSegmentForm();
         });
     };
 
-    segmentSearch.addEventListener('input', function() {
-        renderSegments(this.value);
-    });
+    segmentSearch.addEventListener('input', function() { renderSegments(this.value); });
 
     btnSaveSegment.addEventListener('click', function() {
         const nome = segmentNome.value.trim();
@@ -241,20 +268,14 @@ document.addEventListener('DOMContentLoaded', function() {
         if(editingSegmentId !== null) {
             showConfirm('Salvar Alteração', 'Você deseja salvar a alteração no cadastro?', function() {
                 const index = segmentData.findIndex(seg => seg.id === editingSegmentId);
-                if(index !== -1) { segmentData[index] = { id: editingSegmentId, nome, descricao }; }
-                resetSegmentForm();
-                segmentSearch.value = '';
-                renderSegments();
-                updateSegmentFilter();
+                if(index !== -1) segmentData[index] = { id: editingSegmentId, nome, descricao };
+                resetSegmentForm(); segmentSearch.value = ''; renderSegments(); updateSegmentFilter();
             });
         } else {
             showConfirm('Salvar Cadastro', 'Você deseja salvar o cadastro?', function() {
                 segmentData.push({ id: nextSegmentId, nome, descricao });
                 nextSegmentId++;
-                resetSegmentForm();
-                segmentSearch.value = '';
-                renderSegments();
-                updateSegmentFilter();
+                resetSegmentForm(); segmentSearch.value = ''; renderSegments(); updateSegmentFilter();
             });
         }
     });
@@ -262,18 +283,13 @@ document.addEventListener('DOMContentLoaded', function() {
     btnCancelSegment.addEventListener('click', function() { resetSegmentForm(); });
 
     document.getElementById('menu-segmentos').addEventListener('click', function() {
-        segmentSearch.value = '';
-        renderSegments();
-        resetSegmentForm();
-        segmentModal.style.display = 'flex';
+        segmentSearch.value = ''; renderSegments(); resetSegmentForm(); segmentModal.style.display = 'flex';
     });
 
     closeSegmentModal.addEventListener('click', () => { segmentModal.style.display = 'none'; });
-    segmentModal.addEventListener('click', function(e) {
-        if(e.target === this) { segmentModal.style.display = 'none'; }
-    });
+    segmentModal.addEventListener('click', function(e) { if(e.target === this) segmentModal.style.display = 'none'; });
 
-    // PESQUISA GENÉRICA
+    // Pesquisa Genérica
     const ufData = [
         { sigla: 'AC', nome: 'Acre' }, { sigla: 'AL', nome: 'Alagoas' }, { sigla: 'AP', nome: 'Amapá' },
         { sigla: 'AM', nome: 'Amazonas' }, { sigla: 'BA', nome: 'Bahia' }, { sigla: 'CE', nome: 'Ceará' },
@@ -286,13 +302,16 @@ document.addEventListener('DOMContentLoaded', function() {
         { sigla: 'SP', nome: 'São Paulo' }, { sigla: 'SE', nome: 'Sergipe' }, { sigla: 'TO', nome: 'Tocantins' }
     ];
 
+    const municipiosData = ['São Paulo - SP', 'Rio de Janeiro - RJ', 'Belo Horizonte - MG', 'Porto Alegre - RS', 'Cachoeira do Sul - RS'];
+
     const auxData = {
-        'cnaes': ['1011201', '1011202', '1011301'],
-        'municipios': ['São Paulo - SP', 'Rio de Janeiro - RJ', 'Belo Horizonte - MG', 'Porto Alegre - RS'],
+        'cnaes': cnaeData,
+        'municipios': municipiosData,
         'natureza': ['Sociedade Empresária Limitada', 'Empresa Individual de Responsabilidade Limitada', 'Sociedade Anônima']
     };
 
     function formatAsCard(item) {
+        if (item && typeof item === 'object' && item.codigo) return { sigla: item.codigo, nome: item.descricao, full: `${item.codigo} - ${item.descricao}` };
         if (typeof item === 'string') return { sigla: '', nome: item, full: item };
         return { sigla: item.sigla || '', nome: item.nome || '', full: item.sigla ? `${item.sigla} - ${item.nome}` : item.nome };
     }
@@ -315,7 +334,7 @@ document.addEventListener('DOMContentLoaded', function() {
         let html = '<ul class="generic-list">';
         items.forEach((item, index) => {
             const card = formatAsCard(item);
-            const cardHtml = card.sigla ? `<div class="card-info"><span class="card-sigla">${card.sigla}</span><span class="card-nome">${card.nome}</span><span class="card-full">${card.full}</span></div>` : `<div class="card-info"><span class="card-nome" style="font-weight:bold;">${card.nome}</span></div>`;
+            const cardHtml = card.sigla ? `<div class="card-info"><span class="card-sigla">${card.sigla}</span><span class="card-nome" style="color: #9ca3af; font-size: 12px;">${card.nome}</span></div>` : `<div class="card-info"><span class="card-nome" style="font-weight:bold;">${card.nome}</span></div>`;
             html += `<li class="generic-card" data-index="${index}">${cardHtml}<button class="card-btn">OK</button></li>`;
         });
         html += '</ul>';
@@ -337,11 +356,15 @@ document.addEventListener('DOMContentLoaded', function() {
             genericModalBody.querySelectorAll('.generic-card').forEach(item => item.classList.remove('selected'));
             li.classList.add('selected');
             if (e.target.classList.contains('card-btn')) {
-                if (currentGenericContext === 'uf') {
-                    const selectedSigla = li.querySelector('.card-sigla').innerText;
-                    document.getElementById('filter-uf').value = selectedSigla;
+                if (currentGenericContext === 'cnae') {
+                    const codigo = li.querySelector('.card-sigla').innerText;
+                    document.getElementById('filter-cnae').value = codigo;
+                    updateCnaeDescription(codigo);
+                    setTimeout(() => { genericModalOverlay.style.display = 'none'; }, 200);
+                } else if (currentGenericContext === 'municipio') {
+                    const municipio = li.querySelector('.card-nome').innerText;
+                    filterMunicipio.value = municipio;
                     applyFilters();
-                } else {
                     setTimeout(() => { genericModalOverlay.style.display = 'none'; }, 200);
                 }
             }
@@ -349,19 +372,23 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     closeGenericModal.addEventListener('click', () => { genericModalOverlay.style.display = 'none'; });
-    genericModalOverlay.addEventListener('click', function(e) {
-        if(e.target === this) { genericModalOverlay.style.display = 'none'; }
-    });
+    genericModalOverlay.addEventListener('click', function(e) { if(e.target === this) genericModalOverlay.style.display = 'none'; });
 
     document.getElementById('menu-cnaes').addEventListener('click', () => openGenericModal('Pesquisa CNAE', 'Informe o CNAE:', auxData.cnaes, 'cnae'));
     document.getElementById('menu-municipios').addEventListener('click', () => openGenericModal('Pesquisa Município', 'Informe o município:', auxData.municipios, 'municipio'));
     document.getElementById('menu-natureza').addEventListener('click', () => openGenericModal('Pesquisa Natureza Jurídica', 'Informe a natureza:', auxData.natureza, 'natureza'));
 
-    // FILTROS PRINCIPAIS
+    // Campo Município abre o modal ao clicar
+    filterMunicipio.addEventListener('click', function() {
+        openGenericModal('Pesquisa Município', 'Informe o município:', auxData.municipios, 'municipio');
+    });
+
+    // Filtros principais
     function applyFilters() {
         const uf = document.getElementById('filter-uf').value;
         const status = document.getElementById('filter-status').value;
         const ddd = document.getElementById('filter-ddd').value.trim();
+        const municipio = filterMunicipio.value.trim();
         const segmento = document.getElementById('filter-segmento').value;
         const cnae = document.getElementById('filter-cnae').value.trim();
         const tipoCnae = document.getElementById('filter-tipo-cnae').value;
@@ -373,21 +400,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 const matchUF = uf ? item.uf === uf : true;
                 const matchStatus = status ? item.situacao === status : true;
                 const matchDDD = ddd ? item.ddd === ddd : true;
+                const matchMunicipio = municipio ? item.municipio.includes(municipio.split(' - ')[0]) : true;
                 const matchSegmento = segmento ? item.segmento === segmento : true;
                 
-                // Lógica do Escopo do CNAE
                 let matchCnae = true;
                 if (cnae) {
-                    if (tipoCnae === 'principal') {
-                        matchCnae = item.cnae_principal.includes(cnae);
-                    } else if (tipoCnae === 'secundario') {
-                        matchCnae = item.cnae_principal.includes(cnae) || item.cnae_secundario.includes(cnae);
-                    } else {
-                        matchCnae = item.cnae_principal.includes(cnae) || item.cnae_secundario.includes(cnae);
-                    }
+                    if (tipoCnae === 'principal') matchCnae = item.cnae_principal.includes(cnae);
+                    else matchCnae = item.cnae_principal.includes(cnae) || item.cnae_secundario.includes(cnae);
                 }
 
-                return matchUF && matchStatus && matchDDD && matchSegmento && matchCnae; 
+                return matchUF && matchStatus && matchDDD && matchMunicipio && matchSegmento && matchCnae; 
             });
             currentPage = 1;
             renderTable(filteredData);
@@ -398,8 +420,10 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('filter-uf').value = '';
         document.getElementById('filter-status').value = 'ATIVA';
         document.getElementById('filter-ddd').value = '';
+        filterMunicipio.value = '';
         document.getElementById('filter-segmento').value = '';
         document.getElementById('filter-cnae').value = '';
+        cnaeDescText.innerText = '';
         document.getElementById('filter-tipo-cnae').value = '';
         applyFilters();
     }

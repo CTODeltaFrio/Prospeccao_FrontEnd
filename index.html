@@ -72,7 +72,6 @@
             <div class="filters-row">
                 <div class="filter-group">
                     <label>UF</label>
-                    <!-- VOLTANDO PARA A LISTA SUSPENSA -->
                     <select id="filter-uf">
                         <option value="">Todos</option>
                         <option value="AC">AC</option>
@@ -112,26 +111,29 @@
                         <option value="SUSPENSA">SUSPENSA</option>
                     </select>
                 </div>
-                <!-- FILTRO: DDD -->
                 <div class="filter-group">
                     <label>DDD</label>
                     <input type="text" id="filter-ddd" placeholder="Ex: 51" maxlength="2">
                 </div>
-                <!-- FILTRO: Segmento -->
+                <!-- NOVO FILTRO: Município -->
+                <div class="filter-group">
+                    <label>Município</label>
+                    <input type="text" id="filter-municipio" placeholder="Clique para buscar..." readonly>
+                </div>
                 <div class="filter-group">
                     <label>Segmento</label>
                     <select id="filter-segmento">
                         <option value="">Todos</option>
                     </select>
                 </div>
-                <div class="filter-group" style="flex: 1.5;">
-                    <label>CNAE</label>
-                    <div class="input-with-icon">
-                        <input type="text" id="filter-cnae" value="1011201" placeholder="Pesquisar...">
+                <div class="filter-group" style="flex: 2;">
+                    <label>CNAE (Código + Descrição)</label>
+                    <div class="cnae-container">
+                        <input type="text" id="filter-cnae" value="1011201" placeholder="Código...">
+                        <span id="cnae-desc-text" class="cnae-desc-text"></span>
                         <i class="fas fa-search"></i>
                     </div>
                 </div>
-                <!-- NOVO FILTRO: Escopo CNAE -->
                 <div class="filter-group">
                     <label>Escopo do CNAE</label>
                     <select id="filter-tipo-cnae">
