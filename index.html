@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prospecção de Empresas</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app-container">
+    <nav class="sidebar">
+        <div class="brand"><i class="fas fa-search"></i> Prospecção</div>
+        
+        <ul class="menu">
+            <li class="menu-category">CADASTROS AUXILIARES</li>
+            <li class="menu-item" id="menu-cnpjs"><i class="fas fa-list-ul"></i> CNPJs</li>
+            <li class="menu-item" id="menu-municipios"><i class="fas fa-map-marker-alt"></i> Municípios</li>
+            <li class="menu-item" id="menu-natureza"><i class="fas fa-balance-scale"></i> Natureza Jurídica</li>
+            <li class="menu-item" id="menu-qualificacoes"><i class="fas fa-user-tie"></i> Qualificações</li>
+            <li class="menu-item" id="menu-paises"><i class="fas fa-globe"></i> Países</li>
+            <li class="menu-item" id="menu-motivos"><i class="fas fa-truck"></i> Motivos</li>
+        </ul>
+    </nav>
+
+    <main class="main-content">
+        <header class="header">
+            <div class="header-left">
+                <h1>Prospecção de Empresas e Estabelecimentos</h1>
+                <p>Base RFB CNPJ - Dados Atualizados em 09/08/2026 16:34</p>
+            </div>
+            <div class="header-right">Compartilhar<br>2026-08</div>
+        </header>
+
+        <!-- KPI's com Ícones Coloridos -->
+        <section class="kpi-container">
+            <div class="kpi-card">
+                <div class="kpi-icon icon-blue"><i class="fas fa-city"></i></div>
+                <div class="kpi-info">
+                    <span class="kpi-label">Empresas</span>
+                    <span class="kpi-value">69.062.849</span>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon icon-green"><i class="fas fa-store"></i></div>
+                <div class="kpi-info">
+                    <span class="kpi-label">Estabelecimentos</span>
+                    <span class="kpi-value">72.318.961</span>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon icon-purple"><i class="fas fa-users"></i></div>
+                <div class="kpi-info">
+                    <span class="kpi-label">Sócios</span>
+                    <span class="kpi-value">27.992.378</span>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon icon-orange"><i class="fas fa-sack-dollar"></i></div>
+                <div class="kpi-info">
+                    <span class="kpi-label">Simples (MEI)</span>
+                    <span class="kpi-value">49.445.426</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="filters-section">
+            <div class="filters-header">
+                <h3><i class="fas fa-filter" style="color:#2563eb;"></i> Filtros de Pesquisa</h3>
+                <a id="btn-clear-filters"><i class="fas fa-sync-alt"></i> Limpar Filtros</a>
+            </div>
+
+            <div class="filters-row">
+                <div class="filter-group">
+                    <label>UF</label>
+                    <select id="filter-uf">
+                        <option value="">Todos</option>
+                        <option value="AC">AC</option>
+                        <option value="AL">AL</option>
+                        <option value="AP">AP</option>
+                        <option value="AM">AM</option>
+                        <option value="BA">BA</option>
+                        <option value="CE">CE</option>
+                        <option value="DF">DF</option>
+                        <option value="ES">ES</option>
+                        <option value="GO">GO</option>
+                        <option value="MA">MA</option>
+                        <option value="MT">MT</option>
+                        <option value="MS">MS</option>
+                        <option value="MG">MG</option>
+                        <option value="PA">PA</option>
+                        <option value="PB">PB</option>
+                        <option value="PR">PR</option>
+                        <option value="PE">PE</option>
+                        <option value="PI">PI</option>
+                        <option value="RJ">RJ</option>
+                        <option value="RN">RN</option>
+                        <option value="RS" selected>RS</option>
+                        <option value="RO">RO</option>
+                        <option value="RR">RR</option>
+                        <option value="SC">SC</option>
+                        <option value="SP">SP</option>
+                        <option value="SE">SE</option>
+                        <option value="TO">TO</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Situação Cadastral</label>
+                    <select id="filter-status">
+                        <option value="ATIVA" selected>ATIVA</option>
+                        <option value="INATIVA">INATIVA</option>
+                        <option value="SUSPENSA">SUSPENSA</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>CNAE</label>
+                    <div class="cnae-helper">
+                        <span>Pesquisar CNAE em:</span>
+                        <a href="#" style="color: #2563eb; text-decoration: none;">Principal</a>
+                        <span>ou</span>
+                        <a href="#" style="color: #2563eb; text-decoration: none;">secundário</a>
+                    </div>
+                    <div class="input-with-icon">
+                        <input type="text" id="filter-cnae" value="1011201" placeholder="Pesquisar...">
+                        <i class="fas fa-search"></i>
+                    </div>
+                </div>
+                <div class="btn-search-container">
+                    <button class="btn-primary" id="btn-search">Pesquisar</button>
+                </div>
+            </div>
+        </section>
+
+        <section class="results-section">
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>CNPJ</th>
+                            <th>Nome Fantasia</th>
+                            <th>Razão Social</th>
+                            <th>Situação</th>
+                            <th>UF</th>
+                            <th>Telefone</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body"></tbody>
+                </table>
+            </div>
+            
+            <div class="pagination-container">
+                <span id="records-text">Exibindo 0 registros</span>
+                <div class="pagination-controls">
+                    <button id="btn-prev">&lt;</button>
+                    <span class="page-item" id="page-indicator">Página 1</span>
+                    <button id="btn-next">&gt;</button>
+                    <span style="margin-left: 10px; border:none; background:none;">50 por página</span>
+                </div>
+            </div>
+        </section>
+    </main>
+</div>
+
+<!-- MODAL DETALHES DO ESTABELECIMENTO -->
+<div id="details-modal" class="modal-overlay">
+    <div class="modal-content large-modal">
+        <div class="modal-header">
+            <div>
+                <h2>Detalhes do Estabelecimento</h2>
+                <p>Informações cadastrais e comerciais do estabelecimento</p>
+            </div>
+            <span class="close-modal">&times;</span>
+        </div>
+
+        <div class="modal-scroll-area">
+            <div class="card principal-card">
+                <span class="cnpj-label" id="det-cnpj"></span>
+                <h3 id="det-razao"></h3>
+                <span class="fantasia-label" id="det-fantasia"></span>
+                <div class="badges">
+                    <span class="badge badge-green" id="det-situacao"></span>
+                    <span class="badge badge-blue" id="det-tipo">FILIAL</span>
+                </div>
+            </div>
+
+            <div class="info-grid">
+                <div class="card info-card">
+                    <h4>Dados da Empresa</h4>
+                    <div class="info-line"><span>Natureza Jurídica</span><strong id="det-natureza"></strong></div>
+                    <div class="info-line"><span>Porte</span><strong id="det-porte"></strong></div>
+                    <div class="info-line"><span>Capital Social</span><strong id="det-capital"></strong></div>
+                </div>
+
+                <div class="card info-card">
+                    <h4>Estabelecimento</h4>
+                    <div class="info-line"><span>Início da Atividade</span><strong id="det-inicio"></strong></div>
+                    <div class="info-line"><span>Data da Situação Cadastral</span><strong id="det-data-sit"></strong></div>
+                    <div class="info-line"><span>CNAE Principal</span><strong id="det-cnae"></strong></div>
+                </div>
+
+                <div class="card info-card full-width">
+                    <h4>Endereço</h4>
+                    <div class="info-line"><span>Logradouro</span><strong id="det-logradouro"></strong></div>
+                    <div class="info-line"><span>Número</span><strong id="det-numero"></strong></div>
+                    <div class="info-line"><span>Complemento</span><strong id="det-complemento"></strong></div>
+                    <div class="info-line"><span>Bairro</span><strong id="det-bairro"></strong></div>
+                    <div class="info-line"><span>CEP</span><strong id="det-cep"></strong></div>
+                    <div class="info-line"><span>Município / UF</span><strong id="det-municipio"></strong></div>
+                </div>
+
+                <div class="card info-card full-width">
+                    <h4>Contatos</h4>
+                    <div class="info-line"><span>Telefone 1</span><strong id="det-tel1"></strong></div>
+                    <div class="info-line"><span>Telefone 2</span><strong id="det-tel2"></strong></div>
+                    <div class="info-line"><span>E-mail</span><strong id="det-email"></strong></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal-footer">
+            <button class="btn-secondary">Ignorar Cadastro</button>
+            <div class="footer-actions">
+                <button class="btn-light-blue">Dados com IA</button>
+                <button class="btn-primary btn-register">Registro CRM</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JANELA MODAL GENÉRICA (PESQUISAS) -->
+<div id="generic-modal" class="modal-overlay">
+    <div class="modal-content generic-content">
+        <span class="close-modal" id="close-generic-modal">&times;</span>
+        <h2 id="generic-modal-title" style="margin-bottom: 5px; text-transform: capitalize;"></h2>
+        <p id="generic-modal-subtitle" style="color: #666; font-size: 14px; margin-bottom: 20px;"></p>
+        
+        <div class="input-with-icon generic-search-box">
+            <input type="text" id="generic-search" placeholder="Pesquisar...">
+            <i class="fas fa-search" style="font-size: 18px; color: #9ca3af; position: absolute; right: 15px; top: 50%; transform: translateY(-50%);"></i>
+        </div>
+
+        <div id="generic-modal-body" class="generic-modal-list-container">
+            <!-- Conteúdo dinâmico dos itens do menu -->
+        </div>
+    </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
