@@ -9,24 +9,33 @@ document.addEventListener('DOMContentLoaded', function() {
     const btnPrev = document.getElementById('btn-prev');
     const btnNext = document.getElementById('btn-next');
 
-    // Elementos de filtros
     const filterCnae = document.getElementById('filter-cnae');
-    const cnaeDescText = document.getElementById('cnae-desc-text');
     const filterMunicipio = document.getElementById('filter-municipio');
 
-    // Modais
-    const modalOverlay = document.getElementById('details-modal');
-    const closeModal = document.querySelector('.close-modal');
-    const genericModalOverlay = document.getElementById('generic-modal');
+    // Elementos dos Modais
+    const detailsModal = document.getElementById('details-modal');
+    const detailsClose = document.getElementById('close-details-modal');
+
+    const genericModal = document.getElementById('generic-modal');
+    const genericClose = document.getElementById('close-generic-modal');
+
+    const segmentModal = document.getElementById('segment-modal');
+    const segmentClose = document.getElementById('close-segment-modal');
+
+    const confirmModal = document.getElementById('confirm-modal');
+    const confirmClose = document.getElementById('close-confirm-modal');
+    const confirmTitle = document.getElementById('confirm-title');
+    const confirmMessage = document.getElementById('confirm-message');
+    const btnConfirmOk = document.getElementById('btn-confirm-ok');
+    const btnConfirmCancel = document.getElementById('btn-confirm-cancel');
+    let confirmCallback = null;
+
+    // Outros elementos
     const genericModalBody = document.getElementById('generic-modal-body');
     const genericModalTitle = document.getElementById('generic-modal-title');
     const genericModalSubtitle = document.getElementById('generic-modal-subtitle');
     const genericSearch = document.getElementById('generic-search');
-    const closeGenericModal = document.getElementById('close-generic-modal');
 
-    // Segmentos
-    const segmentModal = document.getElementById('segment-modal');
-    const closeSegmentModal = document.getElementById('close-segment-modal');
     const segmentSearch = document.getElementById('segment-search');
     const segmentNome = document.getElementById('segment-nome');
     const segmentDesc = document.getElementById('segment-desc');
@@ -36,14 +45,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const segmentFormTitle = document.getElementById('segment-form-title');
     const segmentListContainer = document.getElementById('segment-list-container');
     const filterSegmento = document.getElementById('filter-segmento');
-
-    // Confirmação
-    const confirmModal = document.getElementById('confirm-modal');
-    const confirmTitle = document.getElementById('confirm-title');
-    const confirmMessage = document.getElementById('confirm-message');
-    const btnConfirmOk = document.getElementById('btn-confirm-ok');
-    const btnConfirmCancel = document.getElementById('btn-confirm-cancel');
-    let confirmCallback = null;
 
     let editingSegmentId = null;
     let currentGenericContext = null;
@@ -78,18 +79,35 @@ document.addEventListener('DOMContentLoaded', function() {
     let filteredData = [];
     let currentItems = [];
 
-    // Atualizar descrição do CNAE dentro do campo
-    function updateCnaeDescription(valor) {
-        const found = cnaeData.find(c => c.codigo.includes(valor));
-        if (found) {
-            cnaeDescText.innerText = `- ${found.descricao}`;
-        } else {
-            cnaeDescText.innerText = '';
-        }
+    // Função para fechar TODOS os modais (usada pelo ESC)
+    function closeAllModals() {
+        if (detailsModal.style.display === 'flex') detailsModal.style.display = 'none';
+        if (genericModal.style.display === 'flex') genericModal.style.display = 'none';
+        if (segmentModal.style.display === 'flex') segmentModal.style.display = 'none';
+        if (confirmModal.style.display === 'flex') confirmModal.style.display = 'none';
+        confirmCallback = null;
     }
-    filterCnae.addEventListener('input', function() {
-        updateCnaeDescription(this.value);
+
+    // Evento global para fechar com a tecla ESC
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            closeAllModals();
+        }
     });
+
+    // ==========================================
+    // CLIQUE NOS "X" PADRONIZADOS
+    // ==========================================
+    detailsClose.addEventListener('click', function() { detailsModal.style.display = 'none'; });
+    genericClose.addEventListener('click', function() { genericModal.style.display = 'none'; });
+    segmentClose.addEventListener('click', function() { segmentModal.style.display = 'none'; });
+    confirmClose.addEventListener('click', function() { confirmModal.style.display = 'none'; });
+
+    // Fechar clicando fora
+    detailsModal.addEventListener('click', function(e) { if(e.target === this) detailsModal.style.display = 'none'; });
+    genericModal.addEventListener('click', function(e) { if(e.target === this) genericModal.style.display = 'none'; });
+    segmentModal.addEventListener('click', function(e) { if(e.target === this) segmentModal.style.display = 'none'; });
+    confirmModal.addEventListener('click', function(e) { if(e.target === this) confirmModal.style.display = 'none'; });
 
     function showConfirm(title, message, callback) {
         confirmTitle.innerText = title;
@@ -107,13 +125,6 @@ document.addEventListener('DOMContentLoaded', function() {
     btnConfirmCancel.addEventListener('click', function() {
         confirmModal.style.display = 'none';
         confirmCallback = null;
-    });
-
-    confirmModal.addEventListener('click', function(e) {
-        if(e.target === this) {
-            confirmModal.style.display = 'none';
-            confirmCallback = null;
-        }
     });
 
     function renderTable(data) {
@@ -179,7 +190,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('det-tel1').innerText = company.telefone || '-';
         document.getElementById('det-tel2').innerText = company.tel2 || '-';
         document.getElementById('det-email').innerText = company.email || '-';
-        modalOverlay.style.display = 'flex'; 
+        detailsModal.style.display = 'flex'; 
     }
 
     tbody.addEventListener('click', function(e) {
@@ -188,11 +199,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const cnpj = row.cells[0].innerText;
             openDetailsModal(cnpj);
         }
-    });
-
-    closeModal.addEventListener('click', () => { modalOverlay.style.display = 'none'; });
-    modalOverlay.addEventListener('click', function(e) {
-        if(e.target === this) { modalOverlay.style.display = 'none'; }
     });
 
     // Segmentos
@@ -286,9 +292,6 @@ document.addEventListener('DOMContentLoaded', function() {
         segmentSearch.value = ''; renderSegments(); resetSegmentForm(); segmentModal.style.display = 'flex';
     });
 
-    closeSegmentModal.addEventListener('click', () => { segmentModal.style.display = 'none'; });
-    segmentModal.addEventListener('click', function(e) { if(e.target === this) segmentModal.style.display = 'none'; });
-
     // Pesquisa Genérica
     const ufData = [
         { sigla: 'AC', nome: 'Acre' }, { sigla: 'AL', nome: 'Alagoas' }, { sigla: 'AP', nome: 'Amapá' },
@@ -310,6 +313,24 @@ document.addEventListener('DOMContentLoaded', function() {
         'natureza': ['Sociedade Empresária Limitada', 'Empresa Individual de Responsabilidade Limitada', 'Sociedade Anônima']
     };
 
+    function updateMunicipioFilter() {
+        let options = '<option value="">Todos</option>';
+        municipiosData.forEach(mun => {
+            const nomeMun = mun.split(' - ')[0];
+            options += `<option value="${nomeMun}">${mun}</option>`;
+        });
+        filterMunicipio.innerHTML = options;
+    }
+
+    function updateCnaeFilter() {
+        let options = '<option value="">Todos</option>';
+        cnaeData.forEach(cnae => {
+            const descricaoFormatada = `${cnae.codigo} - ${cnae.descricao}`;
+            options += `<option value="${cnae.codigo}">${descricaoFormatada}</option>`;
+        });
+        filterCnae.innerHTML = options;
+    }
+
     function formatAsCard(item) {
         if (item && typeof item === 'object' && item.codigo) return { sigla: item.codigo, nome: item.descricao, full: `${item.codigo} - ${item.descricao}` };
         if (typeof item === 'string') return { sigla: '', nome: item, full: item };
@@ -323,7 +344,7 @@ document.addEventListener('DOMContentLoaded', function() {
         currentItems = items; 
         genericSearch.value = ''; 
         renderGenericList(items); 
-        genericModalOverlay.style.display = 'flex';
+        genericModal.style.display = 'flex';
     }
 
     function renderGenericList(items) {
@@ -356,32 +377,31 @@ document.addEventListener('DOMContentLoaded', function() {
             genericModalBody.querySelectorAll('.generic-card').forEach(item => item.classList.remove('selected'));
             li.classList.add('selected');
             if (e.target.classList.contains('card-btn')) {
+                const index = li.getAttribute('data-index');
+                const originalItem = currentItems[index];
+
                 if (currentGenericContext === 'cnae') {
-                    const codigo = li.querySelector('.card-sigla').innerText;
-                    document.getElementById('filter-cnae').value = codigo;
-                    updateCnaeDescription(codigo);
-                    setTimeout(() => { genericModalOverlay.style.display = 'none'; }, 200);
+                    if (originalItem && originalItem.codigo) {
+                        filterCnae.value = originalItem.codigo;
+                    }
+                    genericModal.style.display = 'none';
                 } else if (currentGenericContext === 'municipio') {
-                    const municipio = li.querySelector('.card-nome').innerText;
-                    filterMunicipio.value = municipio;
+                    if (originalItem) {
+                        const nomeMun = originalItem.split(' - ')[0];
+                        filterMunicipio.value = nomeMun;
+                    }
                     applyFilters();
-                    setTimeout(() => { genericModalOverlay.style.display = 'none'; }, 200);
+                    genericModal.style.display = 'none';
+                } else {
+                    genericModal.style.display = 'none';
                 }
             }
         }
     });
 
-    closeGenericModal.addEventListener('click', () => { genericModalOverlay.style.display = 'none'; });
-    genericModalOverlay.addEventListener('click', function(e) { if(e.target === this) genericModalOverlay.style.display = 'none'; });
-
     document.getElementById('menu-cnaes').addEventListener('click', () => openGenericModal('Pesquisa CNAE', 'Informe o CNAE:', auxData.cnaes, 'cnae'));
     document.getElementById('menu-municipios').addEventListener('click', () => openGenericModal('Pesquisa Município', 'Informe o município:', auxData.municipios, 'municipio'));
     document.getElementById('menu-natureza').addEventListener('click', () => openGenericModal('Pesquisa Natureza Jurídica', 'Informe a natureza:', auxData.natureza, 'natureza'));
-
-    // Campo Município abre o modal ao clicar
-    filterMunicipio.addEventListener('click', function() {
-        openGenericModal('Pesquisa Município', 'Informe o município:', auxData.municipios, 'municipio');
-    });
 
     // Filtros principais
     function applyFilters() {
@@ -390,7 +410,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const ddd = document.getElementById('filter-ddd').value.trim();
         const municipio = filterMunicipio.value.trim();
         const segmento = document.getElementById('filter-segmento').value;
-        const cnae = document.getElementById('filter-cnae').value.trim();
+        const cnae = filterCnae.value.trim();
         const tipoCnae = document.getElementById('filter-tipo-cnae').value;
 
         tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:20px;">Carregando dados...</td></tr>`;
@@ -400,13 +420,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 const matchUF = uf ? item.uf === uf : true;
                 const matchStatus = status ? item.situacao === status : true;
                 const matchDDD = ddd ? item.ddd === ddd : true;
-                const matchMunicipio = municipio ? item.municipio.includes(municipio.split(' - ')[0]) : true;
+                const matchMunicipio = municipio ? item.municipio.toLowerCase().includes(municipio.toLowerCase()) : true;
                 const matchSegmento = segmento ? item.segmento === segmento : true;
                 
                 let matchCnae = true;
                 if (cnae) {
-                    if (tipoCnae === 'principal') matchCnae = item.cnae_principal.includes(cnae);
-                    else matchCnae = item.cnae_principal.includes(cnae) || item.cnae_secundario.includes(cnae);
+                    const codigoCnae = cnae.split(' - ')[0].trim();
+                    if (tipoCnae === 'principal') matchCnae = item.cnae_principal.includes(codigoCnae);
+                    else matchCnae = item.cnae_principal.includes(codigoCnae) || item.cnae_secundario.includes(codigoCnae);
                 }
 
                 return matchUF && matchStatus && matchDDD && matchMunicipio && matchSegmento && matchCnae; 
@@ -422,8 +443,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('filter-ddd').value = '';
         filterMunicipio.value = '';
         document.getElementById('filter-segmento').value = '';
-        document.getElementById('filter-cnae').value = '';
-        cnaeDescText.innerText = '';
+        filterCnae.value = '';
         document.getElementById('filter-tipo-cnae').value = '';
         applyFilters();
     }
@@ -436,6 +456,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     updateSegmentFilter();
+    updateMunicipioFilter();
+    updateCnaeFilter();
+    
     btnSearch.addEventListener('click', applyFilters);
     btnClear.addEventListener('click', clearFilters);
     btnPrev.addEventListener('click', function() { changePage('prev'); });

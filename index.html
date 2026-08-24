@@ -31,7 +31,6 @@
             <div class="header-right">Competência<br>2026-08</div>
         </header>
 
-        <!-- KPI's -->
         <section class="kpi-container">
             <div class="kpi-card">
                 <div class="kpi-icon icon-blue"><i class="fas fa-city"></i></div>
@@ -115,10 +114,11 @@
                     <label>DDD</label>
                     <input type="text" id="filter-ddd" placeholder="Ex: 51" maxlength="2">
                 </div>
-                <!-- NOVO FILTRO: Município -->
                 <div class="filter-group">
                     <label>Município</label>
-                    <input type="text" id="filter-municipio" placeholder="Clique para buscar..." readonly>
+                    <select id="filter-municipio">
+                        <option value="">Todos</option>
+                    </select>
                 </div>
                 <div class="filter-group">
                     <label>Segmento</label>
@@ -127,12 +127,10 @@
                     </select>
                 </div>
                 <div class="filter-group" style="flex: 2;">
-                    <label>CNAE (Código + Descrição)</label>
-                    <div class="cnae-container">
-                        <input type="text" id="filter-cnae" value="1011201" placeholder="Código...">
-                        <span id="cnae-desc-text" class="cnae-desc-text"></span>
-                        <i class="fas fa-search"></i>
-                    </div>
+                    <label>CNAE</label>
+                    <select id="filter-cnae">
+                        <option value="">Todos</option>
+                    </select>
                 </div>
                 <div class="filter-group">
                     <label>Escopo do CNAE</label>
@@ -187,7 +185,7 @@
                 <h2>Detalhes do Estabelecimento</h2>
                 <p>Informações cadastrais e comerciais do estabelecimento</p>
             </div>
-            <span class="close-modal">&times;</span>
+            <span class="close-modal" id="close-details-modal">&times;</span>
         </div>
         <div class="modal-scroll-area">
             <div class="card principal-card">
@@ -296,6 +294,9 @@
 <!-- MODAL DE CONFIRMAÇÃO -->
 <div id="confirm-modal" class="modal-overlay">
     <div class="modal-content confirm-content">
+        <!-- X PADRONIZADO ADICIONADO -->
+        <span class="close-modal" id="close-confirm-modal">&times;</span>
+        
         <div class="confirm-icon"><i class="fas fa-exclamation-triangle"></i></div>
         <h3 id="confirm-title">Confirmação</h3>
         <p id="confirm-message">Tem certeza que deseja continuar?</p>

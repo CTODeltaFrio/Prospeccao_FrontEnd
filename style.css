@@ -42,50 +42,6 @@ body { background-color: #f5f7fa; height: 100vh; overflow: hidden; }
 .input-with-icon input { padding-right: 35px; height: 40px; width: 100%; margin: 0; }
 .input-with-icon i { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #888; cursor: pointer; }
 
-/* Campo de Município (readonly) */
-#filter-municipio { cursor: pointer; }
-
-/* --- CAMPO CNAE AJUSTADO (Centralizado) --- */
-.cnae-container {
-    display: flex;
-    align-items: center;
-    border: 1px solid #d1d5db;
-    border-radius: 4px;
-    height: 40px;
-    width: 100%;
-    background: #fff;
-    overflow: hidden;
-}
-.cnae-container input {
-    border: none;
-    outline: none;
-    height: 100%;
-    width: 140px;
-    padding: 0 10px;
-    font-size: 14px;
-    font-weight: 600;
-    color: #111;
-    text-align: center;
-    background: transparent;
-    border-right: 1px solid #e5e7eb;
-}
-.cnae-container input:focus { box-shadow: none; }
-.cnae-desc-text {
-    flex: 1;
-    font-size: 12px;
-    color: #9ca3af;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    padding: 0 10px;
-    text-align: left;
-}
-.cnae-container i {
-    color: #888;
-    padding-right: 12px;
-    font-size: 14px;
-}
-
 .btn-search-container { display: flex; align-items: flex-end; }
 .btn-primary { height: 40px; background-color: #2563eb; color: white; border: none; padding: 0 25px; border-radius: 5px; font-weight: bold; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
 .btn-primary:hover { background-color: #1d4ed8; }
@@ -176,7 +132,8 @@ tr:hover { background-color: #f1f5f9; }
 .card-btn:hover { background-color: #1d4ed8; transform: scale(1.02); }
 
 /* --- MODAL DE CONFIRMAÇÃO --- */
-.confirm-content { width: 400px; padding: 30px; text-align: center; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+.confirm-content { width: 400px; padding: 30px; text-align: center; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); position: relative; }
+.confirm-content .close-modal { position: absolute; top: 15px; right: 15px; }
 .confirm-icon { font-size: 60px; color: #f59e0b; margin-bottom: 15px; }
 .confirm-content h3 { font-size: 22px; color: #111; margin-bottom: 10px; }
 .confirm-content p { font-size: 15px; color: #666; margin-bottom: 25px; }
