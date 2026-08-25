@@ -13,16 +13,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const filterMunicipio = document.getElementById('filter-municipio');
     const filterUf = document.getElementById('filter-uf');
 
-    // Elementos dos Modais
     const detailsModal = document.getElementById('details-modal');
     const detailsClose = document.getElementById('close-details-modal');
-
     const genericModal = document.getElementById('generic-modal');
     const genericClose = document.getElementById('close-generic-modal');
-
     const segmentModal = document.getElementById('segment-modal');
     const segmentClose = document.getElementById('close-segment-modal');
-
     const confirmModal = document.getElementById('confirm-modal');
     const confirmClose = document.getElementById('close-confirm-modal');
     const confirmTitle = document.getElementById('confirm-title');
@@ -31,7 +27,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const btnConfirmCancel = document.getElementById('btn-confirm-cancel');
     let confirmCallback = null;
 
-    // Outros elementos
     const genericModalBody = document.getElementById('generic-modal-body');
     const genericModalTitle = document.getElementById('generic-modal-title');
     const genericModalSubtitle = document.getElementById('generic-modal-subtitle');
@@ -75,7 +70,7 @@ document.addEventListener('DOMContentLoaded', function() {
     ];
     let nextSegmentId = 6;
 
-    let ufData = []; // Lista vazia inicialmente, preenchida 100% pela API
+    let ufData = [];
 
     let currentPage = 1;
     const rowsPerPage = 5;
@@ -83,36 +78,55 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentItems = [];
 
     // ==========================================
-    // INTEGRAÇÃO COM API DAS UFs (SOMENTE API, SEM FALLBACK)
+    // INTEGRAÇÃO COM API DAS UFs (COM TRATAMENTO DE ERRO E LOCALHOST)
     // ==========================================
     async function carregarUFsDaAPI() {
-        try {
-            console.log("Buscando UFs na API...");
-            const response = await fetch('http://192.168.1.230:8080/api/ufs');
-            if (!response.ok) throw new Error('Erro na resposta da API');
-            
-            const data = await response.json();
-            
-            // Mapear para o formato interno usando os campos exatos da API
-            ufData = data.map(item => ({
-                sigla: item.uf,        // Campo "uf"
-                nome: item.nome,       // Campo "nome"
-                full: item.ufNome      // Campo "ufNome"
-            })).filter(uf => uf.sigla);
+        const urls = [
+            'http://192.168.1.230:8080/api/ufs', // IP fornecido
+            'http://localhost:8080/api/ufs'      // Fallback caso o backend esteja na mesma máquina
+        ];
 
-            // Atualizar o dropdown de UF no filtro principal
-            filterUf.innerHTML = '<option value="">Todos</option>' + ufData.map(uf => `<option value="${uf.sigla}">${uf.sigla}</option>`).join('');
-            
-            // Atualizar o modal de pesquisa se estiver aberto
-            if (currentGenericContext === 'uf' && genericModal.style.display === 'flex') {
-                renderGenericList(ufData);
+        for (const url of urls) {
+            try {
+                console.log(`Tentando buscar UFs em: ${url}`);
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // Verificar se a API retorna um objeto com a lista dentro de 'data' ou 'results'
+                const lista = Array.isArray(data) ? data : (data.data || data.results || []);
+
+                // Mapear para o formato interno
+                ufData = lista.map(item => ({
+                    sigla: item.uf || item.sigla,
+                    nome: item.nome || item.descricao,
+                    full: item.ufNome || `${item.uf || item.sigla} - ${item.nome || item.descricao}`
+                })).filter(uf => uf.sigla);
+
+                // Atualizar o dropdown de UF
+                filterUf.innerHTML = '<option value="">Todos</option>' + ufData.map(uf => `<option value="${uf.sigla}">${uf.sigla}</option>`).join('');
+                
+                // Atualizar o modal se aberto
+                if (currentGenericContext === 'uf' && genericModal.style.display === 'flex') {
+                    renderGenericList(ufData);
+                }
+
+                console.log("✅ UFs carregadas da API com sucesso!");
+                return; // Se funcionou, para a execução
+
+            } catch (error) {
+                console.warn(`Falha ao tentar ${url}:`, error);
             }
-
-        } catch (error) {
-            console.error("Erro ao buscar UFs da API. Nenhuma UF será carregada.", error);
-            ufData = []; // Limpa a lista para não usar fallback
-            filterUf.innerHTML = '<option value="">Todos</option>';
         }
+
+        // Se todas as tentativas falharem
+        console.error("❌ Não foi possível carregar as UFs de nenhuma URL.");
+        alert("Não foi possível carregar as UFs da API. Verifique se o servidor está rodando e se o CORS está habilitado. Tente acessar: " + urls[0]);
+        ufData = [];
+        filterUf.innerHTML = '<option value="">Todos</option>';
     }
 
     function closeAllModals() {
@@ -480,7 +494,7 @@ document.addEventListener('DOMContentLoaded', function() {
     updateSegmentFilter();
     updateMunicipioFilter();
     updateCnaeFilter();
-    carregarUFsDaAPI(); // Chama a API para carregar as UFs
+    carregarUFsDaAPI(); // Tenta carregar da API
     
     btnSearch.addEventListener('click', applyFilters);
     btnClear.addEventListener('click', clearFilters);
