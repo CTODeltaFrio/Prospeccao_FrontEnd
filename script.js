@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const filterCnae = document.getElementById('filter-cnae');
     const filterMunicipio = document.getElementById('filter-municipio');
+    const filterUf = document.getElementById('filter-uf');
 
     // Elementos dos Modais
     const detailsModal = document.getElementById('details-modal');
@@ -74,10 +75,45 @@ document.addEventListener('DOMContentLoaded', function() {
     ];
     let nextSegmentId = 6;
 
+    let ufData = []; // Lista vazia inicialmente, preenchida 100% pela API
+
     let currentPage = 1;
     const rowsPerPage = 5;
     let filteredData = [];
     let currentItems = [];
+
+    // ==========================================
+    // INTEGRAÇÃO COM API DAS UFs (SOMENTE API, SEM FALLBACK)
+    // ==========================================
+    async function carregarUFsDaAPI() {
+        try {
+            console.log("Buscando UFs na API...");
+            const response = await fetch('http://192.168.1.230:8080/api/ufs');
+            if (!response.ok) throw new Error('Erro na resposta da API');
+            
+            const data = await response.json();
+            
+            // Mapear para o formato interno usando os campos exatos da API
+            ufData = data.map(item => ({
+                sigla: item.uf,        // Campo "uf"
+                nome: item.nome,       // Campo "nome"
+                full: item.ufNome      // Campo "ufNome"
+            })).filter(uf => uf.sigla);
+
+            // Atualizar o dropdown de UF no filtro principal
+            filterUf.innerHTML = '<option value="">Todos</option>' + ufData.map(uf => `<option value="${uf.sigla}">${uf.sigla}</option>`).join('');
+            
+            // Atualizar o modal de pesquisa se estiver aberto
+            if (currentGenericContext === 'uf' && genericModal.style.display === 'flex') {
+                renderGenericList(ufData);
+            }
+
+        } catch (error) {
+            console.error("Erro ao buscar UFs da API. Nenhuma UF será carregada.", error);
+            ufData = []; // Limpa a lista para não usar fallback
+            filterUf.innerHTML = '<option value="">Todos</option>';
+        }
+    }
 
     function closeAllModals() {
         if (detailsModal.style.display === 'flex') detailsModal.style.display = 'none';
@@ -285,18 +321,6 @@ document.addEventListener('DOMContentLoaded', function() {
         segmentSearch.value = ''; renderSegments(); resetSegmentForm(); segmentModal.style.display = 'flex';
     });
 
-    const ufData = [
-        { sigla: 'AC', nome: 'Acre' }, { sigla: 'AL', nome: 'Alagoas' }, { sigla: 'AP', nome: 'Amapá' },
-        { sigla: 'AM', nome: 'Amazonas' }, { sigla: 'BA', nome: 'Bahia' }, { sigla: 'CE', nome: 'Ceará' },
-        { sigla: 'DF', nome: 'Distrito Federal' }, { sigla: 'ES', nome: 'Espírito Santo' }, { sigla: 'GO', nome: 'Goiás' },
-        { sigla: 'MA', nome: 'Maranhão' }, { sigla: 'MT', nome: 'Mato Grosso' }, { sigla: 'MS', nome: 'Mato Grosso do Sul' },
-        { sigla: 'MG', nome: 'Minas Gerais' }, { sigla: 'PA', nome: 'Pará' }, { sigla: 'PB', nome: 'Paraíba' },
-        { sigla: 'PR', nome: 'Paraná' }, { sigla: 'PE', nome: 'Pernambuco' }, { sigla: 'PI', nome: 'Piauí' },
-        { sigla: 'RJ', nome: 'Rio de Janeiro' }, { sigla: 'RN', nome: 'Rio Grande do Norte' }, { sigla: 'RS', nome: 'Rio Grande do Sul' },
-        { sigla: 'RO', nome: 'Rondônia' }, { sigla: 'RR', nome: 'Roraima' }, { sigla: 'SC', nome: 'Santa Catarina' },
-        { sigla: 'SP', nome: 'São Paulo' }, { sigla: 'SE', nome: 'Sergipe' }, { sigla: 'TO', nome: 'Tocantins' }
-    ];
-
     const municipiosData = ['São Paulo - SP', 'Rio de Janeiro - RJ', 'Belo Horizonte - MG', 'Porto Alegre - RS', 'Cachoeira do Sul - RS'];
 
     const auxData = {
@@ -326,7 +350,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function formatAsCard(item) {
         if (item && typeof item === 'object' && item.codigo) return { sigla: item.codigo, nome: item.descricao, full: `${item.codigo} - ${item.descricao}` };
         if (typeof item === 'string') return { sigla: '', nome: item, full: item };
-        return { sigla: item.sigla || '', nome: item.nome || '', full: item.sigla ? `${item.sigla} - ${item.nome}` : item.nome };
+        return { sigla: item.sigla || '', nome: item.nome || '', full: item.full || `${item.sigla} - ${item.nome}` };
     }
 
     function openGenericModal(title, subtitle, items, context) {
@@ -384,6 +408,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     applyFilters();
                     genericModal.style.display = 'none';
+                } else if (currentGenericContext === 'uf') {
+                    if (originalItem && originalItem.sigla) {
+                        filterUf.value = originalItem.sigla;
+                    }
+                    applyFilters();
+                    genericModal.style.display = 'none';
                 } else {
                     genericModal.style.display = 'none';
                 }
@@ -396,7 +426,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('menu-natureza').addEventListener('click', () => openGenericModal('Pesquisa Natureza Jurídica', 'Informe a natureza:', auxData.natureza, 'natureza'));
 
     function applyFilters() {
-        const uf = document.getElementById('filter-uf').value;
+        const uf = filterUf.value;
         const status = document.getElementById('filter-status').value;
         const ddd = document.getElementById('filter-ddd').value.trim();
         const municipio = filterMunicipio.value.trim();
@@ -429,7 +459,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function clearFilters() {
-        document.getElementById('filter-uf').value = '';
+        filterUf.value = '';
         document.getElementById('filter-status').value = 'ATIVA';
         document.getElementById('filter-ddd').value = '';
         filterMunicipio.value = '';
@@ -446,9 +476,11 @@ document.addEventListener('DOMContentLoaded', function() {
         renderTable(filteredData);
     }
 
+    // Inicializações
     updateSegmentFilter();
     updateMunicipioFilter();
     updateCnaeFilter();
+    carregarUFsDaAPI(); // Chama a API para carregar as UFs
     
     btnSearch.addEventListener('click', applyFilters);
     btnClear.addEventListener('click', clearFilters);
