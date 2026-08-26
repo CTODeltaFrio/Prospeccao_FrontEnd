@@ -71,35 +71,9 @@
             <div class="filters-row">
                 <div class="filter-group">
                     <label>UF</label>
+                    <!-- Agora vazio, preenchido pela API -->
                     <select id="filter-uf">
                         <option value="">Todos</option>
-                        <option value="AC">AC</option>
-                        <option value="AL">AL</option>
-                        <option value="AP">AP</option>
-                        <option value="AM">AM</option>
-                        <option value="BA">BA</option>
-                        <option value="CE">CE</option>
-                        <option value="DF">DF</option>
-                        <option value="ES">ES</option>
-                        <option value="GO">GO</option>
-                        <option value="MA">MA</option>
-                        <option value="MT">MT</option>
-                        <option value="MS">MS</option>
-                        <option value="MG">MG</option>
-                        <option value="PA">PA</option>
-                        <option value="PB">PB</option>
-                        <option value="PR">PR</option>
-                        <option value="PE">PE</option>
-                        <option value="PI">PI</option>
-                        <option value="RJ">RJ</option>
-                        <option value="RN">RN</option>
-                        <option value="RS" selected>RS</option>
-                        <option value="RO">RO</option>
-                        <option value="RR">RR</option>
-                        <option value="SC">SC</option>
-                        <option value="SP">SP</option>
-                        <option value="SE">SE</option>
-                        <option value="TO">TO</option>
                     </select>
                 </div>
                 <div class="filter-group">
@@ -118,16 +92,14 @@
                         <option value="">Todos</option>
                     </select>
                 </div>
-                <!-- INICIO CAMPO CNAE AUTOCOMPLETE -->
                 <div class="filter-group" style="flex: 2;">
                     <label>CNAE (Buscar por código ou descrição)</label>
                     <div class="autocomplete-container">
-                        <input type="text" id="filter-cnae" placeholder="Digite ex: 1011201 ou Frigorificos..." autocomplete="off">
+                        <input type="text" id="filter-cnae" placeholder="Digite ex: 1012103 ou frutas..." autocomplete="off">
                         <i class="fas fa-search"></i>
                         <div id="cnae-suggestions" class="autocomplete-list"></div>
                     </div>
                 </div>
-                <!-- FIM CAMPO CNAE AUTOCOMPLETE -->
                 <div class="filter-group">
                     <label>Escopo do CNAE</label>
                     <select id="filter-tipo-cnae">
@@ -247,7 +219,7 @@
     </div>
 </div>
 
-<!-- MODAL CRUD SEGMENTOS -->
+<!-- MODAL CRUD SEGMENTOS (Sem campo de Descrição) -->
 <div id="segment-modal" class="modal-overlay">
     <div class="modal-content large-modal" style="width: 600px;">
         <span class="close-modal" id="close-segment-modal">&times;</span>
@@ -268,10 +240,6 @@
                     <div class="form-group" style="flex: 1;">
                         <label>Nome do Segmento</label>
                         <input type="text" id="segment-nome" placeholder="Ex: Varejo, Atacado...">
-                    </div>
-                    <div class="form-group" style="flex: 2;">
-                        <label>Descrição</label>
-                        <input type="text" id="segment-desc" placeholder="Descrição opcional...">
                     </div>
                 </div>
                 <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px;">

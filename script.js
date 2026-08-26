@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const segmentSearch = document.getElementById('segment-search');
     const segmentNome = document.getElementById('segment-nome');
-    const segmentDesc = document.getElementById('segment-desc');
+    // Removido segmentDesc
     const btnSaveSegment = document.getElementById('btn-save-segment');
     const btnCancelSegment = document.getElementById('btn-cancel-segment');
     const segmentFormCard = document.getElementById('segment-form-card');
@@ -49,10 +49,10 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentGenericContext = null;
 
     // Listas
-    let cnaeData = []; // Cache de todos os CNAEs para preencher o modal lateral
+    let cnaeData = [];
     let situacoesData = [];
     let ufData = [];
-    let selectedCnaeCode = null; // Guarda o código do CNAE selecionado no autocomplete
+    let selectedCnaeCode = null;
 
     // Mock inicial
     const mockData = [
@@ -63,12 +63,13 @@ document.addEventListener('DOMContentLoaded', function() {
         { cnpj: '01.332.595/0001-02', fantasia: 'FRIGORIFICO COOPES', razao: 'COOPERATIVA AGROPECUARIA SUL CARNE LTDA', situacao: 'ATIVA', uf: 'RS', telefone: '(51) 37224664', ddd: '51', segmento: 'Cooperativa', municipio: 'Cachoeira do Sul', tipo: 'FILIAL', natureza: 'Cooperativa', porte: 'Demais', capital: 'R$ 0,00', inicio: '02/05/2002', dataSit: '02/05/2002', cnae_principal: '1011201', cnae_secundario: '4711301', logradouro: 'LOCALIDADE DE TRES VENDAS', numero: 'S/N', complemento: '-', bairro: 'TRES VENDAS', cep: '96501-035', municipio: 'CACHOEIRA DO SUL - RS', tel2: '-', email: 'financeiro@coopes.com.br' }
     ];
 
+    // Segmentos (Sem descrição)
     let segmentData = [
-        { id: 1, nome: 'Varejo', descricao: 'Comércio varejista' },
-        { id: 2, nome: 'Atacado', descricao: 'Comércio atacadista' },
-        { id: 3, nome: 'Serviços', descricao: 'Prestação de serviços gerais' },
-        { id: 4, nome: 'Frigorífico', descricao: 'Abate e processamento de carnes' },
-        { id: 5, nome: 'Cooperativa', descricao: 'Cooperativa agropecuária' }
+        { id: 1, nome: 'Varejo' },
+        { id: 2, nome: 'Atacado' },
+        { id: 3, nome: 'Serviços' },
+        { id: 4, nome: 'Frigorífico' },
+        { id: 5, nome: 'Cooperativa' }
     ];
     let nextSegmentId = 6;
 
@@ -115,7 +116,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Função para buscar CNAEs dinamicamente pelo parâmetro "filtro"
     async function buscarCnaes(filtro) {
         const urls = [
             `http://192.168.1.230:8080/api/cnaes?filtro=${encodeURIComponent(filtro)}`,
@@ -129,15 +129,9 @@ document.addEventListener('DOMContentLoaded', function() {
         })).filter(c => c.codigo) : [];
     }
 
-    // Função inicial para carregar os primeiros 150 (sem filtro)
     async function carregarCnaesIniciais() {
-        const data = await buscarCnaes(''); // Busca sem filtro, retorna 150
-        if (data.length > 0) {
-            cnaeData = data;
-            // Preenche o dropdown do modal lateral com todos os 150
-            // Não preenche mais o input, pois ele virou autocomplete
-            console.log("CNAEs iniciais carregadas:", cnaeData.length);
-        }
+        const data = await buscarCnaes('');
+        if (data.length > 0) cnaeData = data;
     }
 
     // ==========================================
@@ -147,14 +141,11 @@ document.addEventListener('DOMContentLoaded', function() {
     filterCnaeInput.addEventListener('input', function() {
         clearTimeout(debounceTimer);
         const termo = this.value.trim();
-
         if (termo.length === 0) {
             cnaeSuggestions.classList.remove('active');
             selectedCnaeCode = null;
             return;
         }
-
-        // Aguarda 300ms após parar de digitar para chamar a API
         debounceTimer = setTimeout(async () => {
             const resultados = await buscarCnaes(termo);
             renderSuggestions(resultados);
@@ -167,7 +158,6 @@ document.addEventListener('DOMContentLoaded', function() {
             cnaeSuggestions.classList.remove('active');
             return;
         }
-
         resultados.forEach(item => {
             const div = document.createElement('div');
             div.classList.add('autocomplete-item');
@@ -176,19 +166,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 filterCnaeInput.value = `${item.codigo} - ${item.descricao}`;
                 selectedCnaeCode = item.codigo;
                 cnaeSuggestions.classList.remove('active');
-                applyFilters(); // Aplica o filtro imediatamente
+                applyFilters();
             });
             cnaeSuggestions.appendChild(div);
         });
-
         cnaeSuggestions.classList.add('active');
     }
 
-    // Fecha o dropdown de sugestões se clicar fora
     document.addEventListener('click', function(e) {
-        if (!e.target.closest('.autocomplete-container')) {
-            cnaeSuggestions.classList.remove('active');
-        }
+        if (!e.target.closest('.autocomplete-container')) cnaeSuggestions.classList.remove('active');
     });
 
     // ==========================================
@@ -290,7 +276,6 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('det-inicio').innerText = company.inicio;
         document.getElementById('det-data-sit').innerText = company.dataSit;
         
-        // Tenta encontrar a descrição do CNAE no cache
         const cnaeEncontrado = cnaeData.find(c => c.codigo === company.cnae_principal);
         const cnaeDisplay = cnaeEncontrado ? cnaeEncontrado.full : company.cnae_principal;
         document.getElementById('det-cnae').innerText = cnaeDisplay;
@@ -316,11 +301,10 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // ==========================================
-    // LÓGICA CRUD SEGMENTOS
+    // LÓGICA CRUD SEGMENTOS (SEM DESCRIÇÃO)
     // ==========================================
     function resetSegmentForm() {
         segmentNome.value = '';
-        segmentDesc.value = '';
         editingSegmentId = null;
         segmentFormTitle.innerText = 'Novo Segmento';
         btnSaveSegment.innerText = 'Salvar';
@@ -330,9 +314,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function renderSegments(filterText = '') {
         const term = filterText.toLowerCase();
-        let html = `<table class="segment-table"><thead><tr><th>Nome</th><th>Descrição</th><th>Ações</th></tr></thead><tbody>`;
+        let html = `<table class="segment-table"><thead><tr><th>Nome</th><th>Ações</th></tr></thead><tbody>`;
         segmentData.filter(seg => seg.nome.toLowerCase().includes(term)).forEach(seg => {
-            html += `<tr><td>${seg.nome}</td><td>${seg.descricao || '-'}</td><td>
+            html += `<tr><td>${seg.nome}</td><td>
                 <button class="action-btn edit" onclick="editSegment(${seg.id})"><i class="fas fa-pen"></i></button>
                 <button class="action-btn delete" onclick="deleteSegment(${seg.id})"><i class="fas fa-trash"></i></button>
             </td></tr>`;
@@ -354,7 +338,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if(!segment) return;
         editingSegmentId = id;
         segmentNome.value = segment.nome;
-        segmentDesc.value = segment.descricao;
         segmentFormTitle.innerText = 'Editar Segmento';
         btnSaveSegment.innerText = 'Atualizar';
         segmentFormCard.classList.add('edit-mode');
@@ -376,7 +359,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     btnSaveSegment.addEventListener('click', function() {
         const nome = segmentNome.value.trim();
-        const descricao = segmentDesc.value.trim();
         if(!nome) { alert('Por favor, informe o nome do segmento.'); return; }
         
         const duplicado = segmentData.find(seg => seg.nome.toLowerCase() === nome.toLowerCase());
@@ -390,12 +372,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if(editingSegmentId !== null) {
             showConfirm('Salvar Alteração', 'Você deseja salvar a alteração no cadastro?', function() {
                 const index = segmentData.findIndex(seg => seg.id === editingSegmentId);
-                if(index !== -1) segmentData[index] = { id: editingSegmentId, nome, descricao };
+                if(index !== -1) segmentData[index] = { id: editingSegmentId, nome };
                 resetSegmentForm(); segmentSearch.value = ''; renderSegments(); updateSegmentFilter();
             });
         } else {
             showConfirm('Salvar Cadastro', 'Você deseja salvar o cadastro?', function() {
-                segmentData.push({ id: nextSegmentId, nome, descricao });
+                segmentData.push({ id: nextSegmentId, nome });
                 nextSegmentId++;
                 resetSegmentForm(); segmentSearch.value = ''; renderSegments(); updateSegmentFilter();
             });
@@ -545,7 +527,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     carregarUFsDaAPI();
     carregarSituacoesDaAPI();
-    carregarCnaesIniciais(); // Carrega os 150 primeiros para o modal lateral
+    carregarCnaesIniciais();
     
     btnSearch.addEventListener('click', applyFilters);
     btnClear.addEventListener('click', clearFilters);
