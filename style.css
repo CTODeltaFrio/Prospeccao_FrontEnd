@@ -42,6 +42,67 @@ body { background-color: #f5f7fa; height: 100vh; overflow: hidden; }
 .input-with-icon input { padding-right: 35px; height: 40px; width: 100%; margin: 0; }
 .input-with-icon i { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #888; cursor: pointer; }
 
+/* -- ESTILOS AUTOCOMPLETE CNAE -- */
+.autocomplete-container {
+    position: relative;
+    width: 100%;
+}
+.autocomplete-container input {
+    width: 100%;
+    height: 40px;
+    padding: 0 10px;
+    padding-right: 35px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 14px;
+    background: #fff;
+    box-sizing: border-box;
+}
+.autocomplete-container i {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #888;
+    cursor: pointer;
+    pointer-events: none;
+}
+.autocomplete-list {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-top: none;
+    max-height: 250px;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+.autocomplete-list.active {
+    display: block;
+}
+.autocomplete-item {
+    padding: 10px 15px;
+    cursor: pointer;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 13px;
+    transition: background 0.2s;
+}
+.autocomplete-item:hover, .autocomplete-item.selected {
+    background: #f0f9ff;
+}
+.autocomplete-item .code {
+    font-weight: bold;
+    color: #111;
+}
+.autocomplete-item .desc {
+    color: #9ca3af;
+    font-size: 12px;
+}
+
 .btn-search-container { display: flex; align-items: flex-end; }
 .btn-primary { height: 40px; background-color: #2563eb; color: white; border: none; padding: 0 25px; border-radius: 5px; font-weight: bold; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
 .btn-primary:hover { background-color: #1d4ed8; }

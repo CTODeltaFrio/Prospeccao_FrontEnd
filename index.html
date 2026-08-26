@@ -105,9 +105,7 @@
                 <div class="filter-group">
                     <label>Situação Cadastral</label>
                     <select id="filter-status">
-                        <option value="ATIVA" selected>ATIVA</option>
-                        <option value="INATIVA">INATIVA</option>
-                        <option value="SUSPENSA">SUSPENSA</option>
+                        <option value="">Todas</option>
                     </select>
                 </div>
                 <div class="filter-group">
@@ -115,23 +113,21 @@
                     <input type="text" id="filter-ddd" placeholder="Ex: 51" maxlength="2">
                 </div>
                 <div class="filter-group">
-                    <label>Município</label>
-                    <select id="filter-municipio">
-                        <option value="">Todos</option>
-                    </select>
-                </div>
-                <div class="filter-group">
                     <label>Segmento</label>
                     <select id="filter-segmento">
                         <option value="">Todos</option>
                     </select>
                 </div>
+                <!-- INICIO CAMPO CNAE AUTOCOMPLETE -->
                 <div class="filter-group" style="flex: 2;">
-                    <label>CNAE</label>
-                    <select id="filter-cnae">
-                        <option value="">Todos</option>
-                    </select>
+                    <label>CNAE (Buscar por código ou descrição)</label>
+                    <div class="autocomplete-container">
+                        <input type="text" id="filter-cnae" placeholder="Digite ex: 1012103 ou Frigorificos..." autocomplete="off">
+                        <i class="fas fa-search"></i>
+                        <div id="cnae-suggestions" class="autocomplete-list"></div>
+                    </div>
                 </div>
+                <!-- FIM CAMPO CNAE AUTOCOMPLETE -->
                 <div class="filter-group">
                     <label>Escopo do CNAE</label>
                     <select id="filter-tipo-cnae">
