@@ -12,7 +12,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const filterCnae = document.getElementById('filter-cnae');
     const filterMunicipio = document.getElementById('filter-municipio');
     const filterUf = document.getElementById('filter-uf');
+    const filterStatus = document.getElementById('filter-status');
 
+    // Elementos dos Modais
     const detailsModal = document.getElementById('details-modal');
     const detailsClose = document.getElementById('close-details-modal');
     const genericModal = document.getElementById('generic-modal');
@@ -45,14 +47,12 @@ document.addEventListener('DOMContentLoaded', function() {
     let editingSegmentId = null;
     let currentGenericContext = null;
 
-    const cnaeData = [
-        { codigo: '1011201', descricao: 'Frigorífico - abate de bovinos' },
-        { codigo: '1011202', descricao: 'Frigorífico - abate de suínos' },
-        { codigo: '1011301', descricao: 'Fabricação de produtos de carne' },
-        { codigo: '4637101', descricao: 'Comércio atacadista de carnes' },
-        { codigo: '4711301', descricao: 'Comércio varejista de mercadorias' }
-    ];
+    // Listas que serão preenchidas pela API
+    let cnaeData = []; // Será preenchido pela API de CNAEs
+    let situacoesData = []; // Será preenchido pela API de Situações
+    let ufData = []; // Será preenchido pela API de UFs
 
+    // Mock inicial (será substituído pelos dados das APIs)
     const mockData = [
         { cnpj: '06.771.019/0001-31', fantasia: 'MATADOURO FICAGNA', razao: 'ZELO FICAGNA', situacao: 'ATIVA', uf: 'RS', telefone: '(51) 3722-4664', ddd: '51', segmento: 'Frigorífico', municipio: 'Cachoeira do Sul', tipo: 'FILIAL', natureza: 'Sociedade Empresária Limitada', porte: 'Demais', capital: 'R$ 0,00', inicio: '02/05/2002', dataSit: '02/05/2002', cnae_principal: '1011201', cnae_secundario: '4637101', logradouro: 'LOCALIDADE DE TRES VENDAS', numero: 'S/N', complemento: '-', bairro: 'TRES VENDAS', cep: '96501-035', municipio: 'CACHOEIRA DO SUL - RS', tel2: '-', email: '-' },
         { cnpj: '01.234.172/0001-82', fantasia: 'FRIGORIFICO BONNA', razao: 'FRIGORIFICO BONNA CARNE LTDA', situacao: 'ATIVA', uf: 'RS', telefone: '(54) 3231-0000', ddd: '54', segmento: 'Frigorífico', municipio: 'Caxias do Sul', tipo: 'MATRIZ', natureza: 'Sociedade Empresária Limitada', porte: 'Demais', capital: 'R$ 100.000,00', inicio: '15/08/1999', dataSit: '15/08/1999', cnae_principal: '1011201', cnae_secundario: '1013901', logradouro: 'ROD BR 116', numero: 'KM 45', complemento: 'SALA 1', bairro: 'ZONA RURAL', cep: '95000-000', municipio: 'CAXIAS DO SUL - RS', tel2: '-', email: 'contato@bonnacarne.com.br' },
@@ -70,65 +70,100 @@ document.addEventListener('DOMContentLoaded', function() {
     ];
     let nextSegmentId = 6;
 
-    let ufData = [];
-
     let currentPage = 1;
     const rowsPerPage = 5;
     let filteredData = [];
     let currentItems = [];
 
     // ==========================================
-    // INTEGRAÇÃO COM API DAS UFs (COM TRATAMENTO DE ERRO E LOCALHOST)
+    // INTEGRAÇÃO COM APIs (UFs, Situações e CNAEs)
     // ==========================================
-    async function carregarUFsDaAPI() {
-        const urls = [
-            'http://192.168.1.230:8080/api/ufs', // IP fornecido
-            'http://localhost:8080/api/ufs'      // Fallback caso o backend esteja na mesma máquina
-        ];
-
+    
+    // Função genérica para tentar buscar em múltiplas URLs (IP ou localhost)
+    async function fetchFromAPI(urls) {
         for (const url of urls) {
             try {
-                console.log(`Tentando buscar UFs em: ${url}`);
                 const response = await fetch(url);
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-                
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const data = await response.json();
-                
-                // Verificar se a API retorna um objeto com a lista dentro de 'data' ou 'results'
-                const lista = Array.isArray(data) ? data : (data.data || data.results || []);
-
-                // Mapear para o formato interno
-                ufData = lista.map(item => ({
-                    sigla: item.uf || item.sigla,
-                    nome: item.nome || item.descricao,
-                    full: item.ufNome || `${item.uf || item.sigla} - ${item.nome || item.descricao}`
-                })).filter(uf => uf.sigla);
-
-                // Atualizar o dropdown de UF
-                filterUf.innerHTML = '<option value="">Todos</option>' + ufData.map(uf => `<option value="${uf.sigla}">${uf.sigla}</option>`).join('');
-                
-                // Atualizar o modal se aberto
-                if (currentGenericContext === 'uf' && genericModal.style.display === 'flex') {
-                    renderGenericList(ufData);
-                }
-
-                console.log("✅ UFs carregadas da API com sucesso!");
-                return; // Se funcionou, para a execução
-
-            } catch (error) {
-                console.warn(`Falha ao tentar ${url}:`, error);
+                return Array.isArray(data) ? data : (data.data || data.results || []);
+            } catch (e) {
+                console.warn(`Falha ao tentar: ${url}`, e);
             }
         }
-
-        // Se todas as tentativas falharem
-        console.error("❌ Não foi possível carregar as UFs de nenhuma URL.");
-        alert("Não foi possível carregar as UFs da API. Verifique se o servidor está rodando e se o CORS está habilitado. Tente acessar: " + urls[0]);
-        ufData = [];
-        filterUf.innerHTML = '<option value="">Todos</option>';
+        return null;
     }
 
+    async function carregarUFsDaAPI() {
+        const data = await fetchFromAPI([
+            'http://192.168.1.230:8080/api/ufs',
+            'http://localhost:8080/api/ufs'
+        ]);
+        
+        if (data) {
+            ufData = data.map(item => ({
+                sigla: item.uf || item.sigla,
+                nome: item.nome || item.descricao,
+                full: item.ufNome || `${item.uf} - ${item.nome}`
+            })).filter(uf => uf.sigla);
+
+            filterUf.innerHTML = '<option value="">Todos</option>' + ufData.map(uf => `<option value="${uf.sigla}">${uf.sigla}</option>`).join('');
+            
+            if (currentGenericContext === 'uf' && genericModal.style.display === 'flex') {
+                renderGenericList(ufData);
+            }
+        } else {
+            console.error("Erro ao carregar UFs: API não acessível.");
+        }
+    }
+
+    async function carregarSituacoesDaAPI() {
+        const data = await fetchFromAPI([
+            'http://192.168.1.230:8080/api/situacoes-cadastrais',
+            'http://localhost:8080/api/situacoes-cadastrais'
+        ]);
+        
+        if (data) {
+            situacoesData = data.map(item => {
+                if (typeof item === 'string') return { nome: item };
+                return { nome: item.nome || item.descricao || item.situacao || item.label };
+            }).filter(s => s.nome);
+            
+            filterStatus.innerHTML = '<option value="">Todas</option>' + situacoesData.map(s => `<option value="${s.nome}">${s.nome}</option>`).join('');
+        } else {
+            console.error("Erro ao carregar Situações: API não acessível.");
+        }
+    }
+
+    async function carregarCnaesDaAPI() {
+        // Note o parâmetro "filtro=10" na URL original
+        const data = await fetchFromAPI([
+            'http://192.168.1.230:8080/api/cnaes?filtro=10',
+            'http://localhost:8080/api/cnaes?filtro=10'
+        ]);
+        
+        if (data) {
+            // Mapeamento EXATO para o JSON fornecido: { "codigo", "descricao", "codigoDescricao" }
+            cnaeData = data.map(item => ({
+                codigo: item.codigo || item.cnae || item.id,
+                descricao: item.descricao || item.nome || '',
+                full: item.codigoDescricao || `${item.codigo} - ${item.descricao}` // Usa o campo pronto se existir
+            })).filter(c => c.codigo);
+
+            // Preencher select de CNAE com o texto "codigoDescricao" (ex: 0111301 - Cultivo de arroz)
+            filterCnae.innerHTML = '<option value="">Todos</option>' + cnaeData.map(c => `<option value="${c.codigo}">${c.full}</option>`).join('');
+            
+            if (currentGenericContext === 'cnae' && genericModal.style.display === 'flex') {
+                renderGenericList(cnaeData);
+            }
+        } else {
+            console.error("Erro ao carregar CNAEs: API não acessível.");
+        }
+    }
+
+    // ==========================================
+    // LÓGICA DOS MODAIS E FECHAMENTO (ESC)
+    // ==========================================
     function closeAllModals() {
         if (detailsModal.style.display === 'flex') detailsModal.style.display = 'none';
         if (genericModal.style.display === 'flex') genericModal.style.display = 'none';
@@ -171,6 +206,9 @@ document.addEventListener('DOMContentLoaded', function() {
         confirmCallback = null;
     });
 
+    // ==========================================
+    // LÓGICA DA TABELA E DETALHES
+    // ==========================================
     function renderTable(data) {
         tbody.innerHTML = '';
         if(data.length === 0) {
@@ -221,8 +259,9 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('det-inicio').innerText = company.inicio;
         document.getElementById('det-data-sit').innerText = company.dataSit;
         
-        const cnaeDesc = cnaeData.find(c => c.codigo === company.cnae_principal);
-        const cnaeDisplay = cnaeDesc ? `${company.cnae_principal} - ${cnaeDesc.descricao}` : company.cnae_principal;
+        // Buscar descrição do CNAE na lista carregada da API (se disponível)
+        const cnaeEncontrado = cnaeData.find(c => c.codigo === company.cnae_principal);
+        const cnaeDisplay = cnaeEncontrado ? cnaeEncontrado.full : company.cnae_principal;
         document.getElementById('det-cnae').innerText = cnaeDisplay;
 
         document.getElementById('det-logradouro').innerText = company.logradouro;
@@ -245,6 +284,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // ==========================================
+    // LÓGICA CRUD SEGMENTOS
+    // ==========================================
     function resetSegmentForm() {
         segmentNome.value = '';
         segmentDesc.value = '';
@@ -335,11 +377,12 @@ document.addEventListener('DOMContentLoaded', function() {
         segmentSearch.value = ''; renderSegments(); resetSegmentForm(); segmentModal.style.display = 'flex';
     });
 
+    // ==========================================
+    // PESQUISAS E MODAIS GENÉRICOS
+    // ==========================================
     const municipiosData = ['São Paulo - SP', 'Rio de Janeiro - RJ', 'Belo Horizonte - MG', 'Porto Alegre - RS', 'Cachoeira do Sul - RS'];
 
     const auxData = {
-        'cnaes': cnaeData,
-        'municipios': municipiosData,
         'natureza': ['Sociedade Empresária Limitada', 'Empresa Individual de Responsabilidade Limitada', 'Sociedade Anônima']
     };
 
@@ -352,17 +395,8 @@ document.addEventListener('DOMContentLoaded', function() {
         filterMunicipio.innerHTML = options;
     }
 
-    function updateCnaeFilter() {
-        let options = '<option value="">Todos</option>';
-        cnaeData.forEach(cnae => {
-            const descricaoFormatada = `${cnae.codigo} - ${cnae.descricao}`;
-            options += `<option value="${cnae.codigo}">${descricaoFormatada}</option>`;
-        });
-        filterCnae.innerHTML = options;
-    }
-
     function formatAsCard(item) {
-        if (item && typeof item === 'object' && item.codigo) return { sigla: item.codigo, nome: item.descricao, full: `${item.codigo} - ${item.descricao}` };
+        if (item && typeof item === 'object' && item.codigo) return { sigla: item.codigo, nome: item.descricao, full: item.full || `${item.codigo} - ${item.descricao}` };
         if (typeof item === 'string') return { sigla: '', nome: item, full: item };
         return { sigla: item.sigla || '', nome: item.nome || '', full: item.full || `${item.sigla} - ${item.nome}` };
     }
@@ -435,16 +469,19 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    document.getElementById('menu-cnaes').addEventListener('click', () => openGenericModal('Pesquisa CNAE', 'Informe o CNAE:', auxData.cnaes, 'cnae'));
-    document.getElementById('menu-municipios').addEventListener('click', () => openGenericModal('Pesquisa Município', 'Informe o município:', auxData.municipios, 'municipio'));
+    document.getElementById('menu-cnaes').addEventListener('click', () => openGenericModal('Pesquisa CNAE', 'Informe o CNAE:', cnaeData, 'cnae'));
+    document.getElementById('menu-municipios').addEventListener('click', () => openGenericModal('Pesquisa Município', 'Informe o município:', municipiosData, 'municipio'));
     document.getElementById('menu-natureza').addEventListener('click', () => openGenericModal('Pesquisa Natureza Jurídica', 'Informe a natureza:', auxData.natureza, 'natureza'));
 
+    // ==========================================
+    // FILTROS E PAGINAÇÃO
+    // ==========================================
     function applyFilters() {
         const uf = filterUf.value;
-        const status = document.getElementById('filter-status').value;
+        const status = filterStatus.value;
         const ddd = document.getElementById('filter-ddd').value.trim();
         const municipio = filterMunicipio.value.trim();
-        const segmento = document.getElementById('filter-segmento').value;
+        const segmento = filterSegmento.value;
         const cnae = filterCnae.value.trim();
         const tipoCnae = document.getElementById('filter-tipo-cnae').value;
 
@@ -474,10 +511,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function clearFilters() {
         filterUf.value = '';
-        document.getElementById('filter-status').value = 'ATIVA';
+        filterStatus.value = '';
         document.getElementById('filter-ddd').value = '';
         filterMunicipio.value = '';
-        document.getElementById('filter-segmento').value = '';
+        filterSegmento.value = '';
         filterCnae.value = '';
         document.getElementById('filter-tipo-cnae').value = '';
         applyFilters();
@@ -493,8 +530,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Inicializações
     updateSegmentFilter();
     updateMunicipioFilter();
-    updateCnaeFilter();
-    carregarUFsDaAPI(); // Tenta carregar da API
+    
+    // Chama as 3 APIs
+    carregarUFsDaAPI();
+    carregarSituacoesDaAPI();
+    carregarCnaesDaAPI();
     
     btnSearch.addEventListener('click', applyFilters);
     btnClear.addEventListener('click', clearFilters);
