@@ -151,3 +151,66 @@ tr:hover { background-color: #f1f5f9; }
 .confirm-content p { font-size: 15px; color: #666; margin-bottom: 25px; }
 .confirm-actions { display: flex; justify-content: center; gap: 15px; }
 .confirm-actions .btn-primary, .confirm-actions .btn-secondary { min-width: 120px; }
+/* NOVOS ESTILOS PARA VÍNCULOS */
+.btn-link-cnae {
+    background-color: #f0f9ff;
+    color: #0369a1;
+    border: 1px solid #bae6fd;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s;
+}
+.btn-link-cnae:hover {
+    background-color: #e0f2fe;
+}
+
+.link-count-badge {
+    display: inline-block;
+    background: #2563eb;
+    color: white;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 2px 8px;
+    border-radius: 12px;
+    margin-left: 8px;
+}
+
+/* Lista de CNAEs no modal de vínculo */
+.link-item {
+    padding: 8px 10px;
+    border-bottom: 1px solid #f1f5f9;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    transition: background 0.2s;
+}
+.link-item:hover {
+    background: #f8fafc;
+}
+.link-item.selected {
+    background: #eff6ff;
+    border-left: 3px solid #2563eb;
+}
+.link-item input[type="checkbox"] {
+    cursor: pointer;
+}
+.link-item .code {
+    font-weight: bold;
+    color: #111;
+}
+.link-item .desc {
+    color: #9ca3af;
+    margin-left: 5px;
+}
+
+/* Ajuste no modal genérico para caber a lista */
+.generic-modal-list-container {
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 5px;
+}

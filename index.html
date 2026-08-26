@@ -71,7 +71,6 @@
             <div class="filters-row">
                 <div class="filter-group">
                     <label>UF</label>
-                    <!-- Agora vazio, preenchido pela API -->
                     <select id="filter-uf">
                         <option value="">Todos</option>
                     </select>
@@ -219,14 +218,14 @@
     </div>
 </div>
 
-<!-- MODAL CRUD SEGMENTOS (Sem campo de Descrição) -->
+<!-- MODAL CRUD SEGMENTOS -->
 <div id="segment-modal" class="modal-overlay">
-    <div class="modal-content large-modal" style="width: 600px;">
+    <div class="modal-content large-modal" style="width: 650px;">
         <span class="close-modal" id="close-segment-modal">&times;</span>
         <div class="modal-header">
             <div>
                 <h2>Gerenciar Segmentos</h2>
-                <p>Cadastre, edite ou exclua os segmentos</p>
+                <p>Cadastre, edite ou exclua os segmentos e vincule CNAEs</p>
             </div>
         </div>
         <div class="modal-scroll-area">
@@ -251,6 +250,29 @@
                 <h4 style="margin-bottom: 15px;">Segmentos Cadastrados</h4>
                 <div id="segment-list-container" style="max-height: 250px; overflow-y: auto;"></div>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL VINCULAR CNAE AO SEGMENTO -->
+<div id="link-cnae-modal" class="modal-overlay">
+    <div class="modal-content generic-content" style="width: 500px;">
+        <span class="close-modal" id="close-link-modal">&times;</span>
+        <h2 style="margin-bottom: 5px;">Vincular CNAE ao Segmento</h2>
+        <p id="link-segment-name" style="color: #666; font-size: 14px; margin-bottom: 20px;"></p>
+        
+        <div class="input-with-icon generic-search-box" style="margin-bottom: 20px;">
+            <input type="text" id="link-search" placeholder="Buscar CNAE por código ou descrição...">
+            <i class="fas fa-search" style="font-size: 18px; color: #9ca3af; position: absolute; right: 15px; top: 50%; transform: translateY(-50%);"></i>
+        </div>
+
+        <div id="link-cnae-list" style="max-height: 300px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px;">
+            <!-- Lista de CNAEs para selecionar -->
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+            <button class="btn-secondary" id="btn-cancel-link">Cancelar</button>
+            <button class="btn-primary" id="btn-save-link">Salvar Vínculo</button>
         </div>
     </div>
 </div>
