@@ -1,7 +1,6 @@
 document.addEventListener('DOMContentLoaded', function() {
     console.log("✅ Página carregada! O JavaScript está rodando.");
 
-    // Elementos principais
     const tbody = document.getElementById('table-body');
     const recordsText = document.getElementById('records-text');
     const pageIndicator = document.getElementById('page-indicator');
@@ -34,13 +33,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const linkModal = document.getElementById('link-cnae-modal');
     const linkClose = document.getElementById('close-link-modal');
     const linkSearch = document.getElementById('link-search');
-    const linkList = document.getElementById('link-cnae-list');
+    const availableList = document.getElementById('available-list');
+    const linkedList = document.getElementById('linked-list');
     const linkSegmentName = document.getElementById('link-segment-name');
     const btnCancelLink = document.getElementById('btn-cancel-link');
     const btnSaveLink = document.getElementById('btn-save-link');
-    let linkTargetSegmentId = null; // Segmento que está sendo vinculado
+    const btnAddLink = document.getElementById('btn-add-link');
+    const btnRemoveLink = document.getElementById('btn-remove-link');
+    let linkTargetSegmentId = null;
 
-    // Outros elementos
     const genericModalBody = document.getElementById('generic-modal-body');
     const genericModalTitle = document.getElementById('generic-modal-title');
     const genericModalSubtitle = document.getElementById('generic-modal-subtitle');
@@ -58,14 +59,16 @@ document.addEventListener('DOMContentLoaded', function() {
     let editingSegmentId = null;
     let currentGenericContext = null;
 
-    // Listas
-    let cnaeData = []; // Lista carregada da API (150 primeiros + buscas)
+    // Listas e Dados
+    let cnaeData = [];
     let situacoesData = [];
     let ufData = [];
     let selectedCnaeCode = null;
-    let segmentoCnaeLinks = []; // Array para armazenar vínculos { segmentoId: number, cnaeCodigo: string }
+    let segmentoCnaeLinks = [];
+    let allCnaesCache = [];
+    let availableCnaes = [];
+    let linkedCnaes = [];
 
-    // Mock inicial
     const mockData = [
         { cnpj: '06.771.019/0001-31', fantasia: 'MATADOURO FICAGNA', razao: 'ZELO FICAGNA', situacao: 'ATIVA', uf: 'RS', telefone: '(51) 3722-4664', ddd: '51', segmento: 'Frigorífico', municipio: 'Cachoeira do Sul', tipo: 'FILIAL', natureza: 'Sociedade Empresária Limitada', porte: 'Demais', capital: 'R$ 0,00', inicio: '02/05/2002', dataSit: '02/05/2002', cnae_principal: '1011201', cnae_secundario: '4637101', logradouro: 'LOCALIDADE DE TRES VENDAS', numero: 'S/N', complemento: '-', bairro: 'TRES VENDAS', cep: '96501-035', municipio: 'CACHOEIRA DO SUL - RS', tel2: '-', email: '-' },
         { cnpj: '01.234.172/0001-82', fantasia: 'FRIGORIFICO BONNA', razao: 'FRIGORIFICO BONNA CARNE LTDA', situacao: 'ATIVA', uf: 'RS', telefone: '(54) 3231-0000', ddd: '54', segmento: 'Frigorífico', municipio: 'Caxias do Sul', tipo: 'MATRIZ', natureza: 'Sociedade Empresária Limitada', porte: 'Demais', capital: 'R$ 100.000,00', inicio: '15/08/1999', dataSit: '15/08/1999', cnae_principal: '1011201', cnae_secundario: '1013901', logradouro: 'ROD BR 116', numero: 'KM 45', complemento: 'SALA 1', bairro: 'ZONA RURAL', cep: '95000-000', municipio: 'CAXIAS DO SUL - RS', tel2: '-', email: 'contato@bonnacarne.com.br' },
@@ -88,9 +91,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let filteredData = [];
     let currentItems = [];
 
-    // ==========================================
-    // FUNÇÕES DE API (UFs, Situações, CNAEs)
-    // ==========================================
+    // APIS
     async function fetchFromAPI(urls) {
         for (const url of urls) {
             try {
@@ -111,6 +112,8 @@ document.addEventListener('DOMContentLoaded', function() {
             ufData = data.map(item => ({ sigla: item.uf || item.sigla, nome: item.nome || item.descricao, full: item.ufNome || `${item.uf} - ${item.nome}` })).filter(uf => uf.sigla);
             filterUf.innerHTML = '<option value="">Todos</option>' + ufData.map(uf => `<option value="${uf.sigla}">${uf.sigla}</option>`).join('');
             if (currentGenericContext === 'uf' && genericModal.style.display === 'flex') renderGenericList(ufData);
+        } else {
+            console.error("Erro ao carregar UFs: API não acessível.");
         }
     }
 
@@ -119,6 +122,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if (data) {
             situacoesData = data.map(item => ({ nome: item.nome || item.descricao || item.situacao || item.label })).filter(s => s.nome);
             filterStatus.innerHTML = '<option value="">Todas</option>' + situacoesData.map(s => `<option value="${s.nome}">${s.nome}</option>`).join('');
+        } else {
+            console.error("Erro ao carregar Situações: API não acessível.");
         }
     }
 
@@ -137,12 +142,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function carregarCnaesIniciais() {
         const data = await buscarCnaes('');
-        if (data.length > 0) cnaeData = data;
+        if (data.length > 0) {
+            cnaeData = data;
+            allCnaesCache = data;
+        }
     }
 
-    // ==========================================
-    // LÓGICA DO AUTOCOMPLETE DE CNAE
-    // ==========================================
+    // AUTOCOMPLETE
     let debounceTimer;
     filterCnaeInput.addEventListener('input', function() {
         clearTimeout(debounceTimer);
@@ -183,9 +189,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!e.target.closest('.autocomplete-container')) cnaeSuggestions.classList.remove('active');
     });
 
-    // ==========================================
-    // LÓGICA DOS MODAIS E FECHAMENTO (ESC)
-    // ==========================================
+    // FECHAR MODAIS E ESC
     function closeAllModals() {
         if (detailsModal.style.display === 'flex') detailsModal.style.display = 'none';
         if (genericModal.style.display === 'flex') genericModal.style.display = 'none';
@@ -233,9 +237,7 @@ document.addEventListener('DOMContentLoaded', function() {
         confirmCallback = null;
     });
 
-    // ==========================================
-    // LÓGICA DA TABELA E DETALHES
-    // ==========================================
+    // TABELA E DETALHES
     function renderTable(data) {
         tbody.innerHTML = '';
         if(data.length === 0) {
@@ -310,9 +312,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // ==========================================
-    // LÓGICA CRUD SEGMENTOS (SEM DESCRIÇÃO)
-    // ==========================================
+    // CRUD SEGMENTOS
     function resetSegmentForm() {
         segmentNome.value = '';
         editingSegmentId = null;
@@ -326,7 +326,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const term = filterText.toLowerCase();
         let html = `<table class="segment-table"><thead><tr><th>Nome</th><th>Ações</th></tr></thead><tbody>`;
         segmentData.filter(seg => seg.nome.toLowerCase().includes(term)).forEach(seg => {
-            // Conta quantos CNAEs estão vinculados a esse segmento
             const countLinks = segmentoCnaeLinks.filter(link => link.segmentoId === seg.id).length;
             html += `<tr><td>${seg.nome} <span class="link-count-badge">${countLinks}</span></td><td>
                 <button class="btn-link-cnae" onclick="openLinkModal(${seg.id})"><i class="fas fa-link"></i> Vincular CNAE</button>
@@ -362,7 +361,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const segment = segmentData.find(seg => seg.id === id);
         showConfirm('Excluir Segmento', `Tem certeza que deseja excluir o segmento "${segment.nome}"?`, function() {
             segmentData = segmentData.filter(seg => seg.id !== id);
-            segmentoCnaeLinks = segmentoCnaeLinks.filter(link => link.segmentoId !== id); // Remove vínculos do segmento
+            segmentoCnaeLinks = segmentoCnaeLinks.filter(link => link.segmentoId !== id);
             renderSegments(segmentSearch.value);
             updateSegmentFilter();
             if(editingSegmentId === id) resetSegmentForm();
@@ -404,9 +403,7 @@ document.addEventListener('DOMContentLoaded', function() {
         segmentSearch.value = ''; renderSegments(); resetSegmentForm(); segmentModal.style.display = 'flex';
     });
 
-    // ==========================================
-    // LÓGICA DE VÍNCULO SEGMENTO-CNAE
-    // ==========================================
+    // VÍNCULO (Modal Duas Colunas)
     window.openLinkModal = function(segmentoId) {
         const segment = segmentData.find(seg => seg.id === segmentoId);
         if(!segment) return;
@@ -415,77 +412,104 @@ document.addEventListener('DOMContentLoaded', function() {
         linkSegmentName.innerText = `Segmento: ${segment.nome}`;
         linkSearch.value = '';
         
-        // Preenche a lista com todos os CNAEs iniciais (e marca os já vinculados)
-        renderLinkList(cnaeData);
+        const existingLinks = segmentoCnaeLinks.filter(link => link.segmentoId === segmentoId).map(l => l.cnaeCodigo);
+        linkedCnaes = allCnaesCache.filter(cnae => existingLinks.includes(cnae.codigo));
+        availableCnaes = allCnaesCache.filter(cnae => !existingLinks.includes(cnae.codigo));
+        
+        renderLinkLists();
         linkModal.style.display = 'flex';
     };
 
-    function renderLinkList(cnaes) {
-        linkList.innerHTML = '';
-        // Cria um Set de códigos já vinculados a este segmento para marcar os checkboxes
-        const linkedCodes = segmentoCnaeLinks.filter(link => link.segmentoId === linkTargetSegmentId).map(link => link.cnaeCodigo);
+    function renderLinkLists() {
+        availableList.innerHTML = '';
+        linkedList.innerHTML = '';
         
-        cnaes.forEach(cnae => {
-            const isLinked = linkedCodes.includes(cnae.codigo);
+        availableCnaes.forEach(cnae => {
             const div = document.createElement('div');
             div.classList.add('link-item');
-            if(isLinked) div.classList.add('selected');
-            div.innerHTML = `
-                <input type="checkbox" value="${cnae.codigo}" ${isLinked ? 'checked' : ''}>
-                <span class="code">${cnae.codigo}</span>
-                <span class="desc">- ${cnae.descricao}</span>
-            `;
-            div.addEventListener('click', function(e) {
-                if(e.target.tagName !== 'INPUT') {
-                    const checkbox = div.querySelector('input');
-                    checkbox.checked = !checkbox.checked;
-                }
-                div.classList.toggle('selected');
-            });
-            linkList.appendChild(div);
+            div.dataset.codigo = cnae.codigo;
+            div.innerHTML = `<span class="code">${cnae.codigo}</span><span class="desc">- ${cnae.descricao}</span>`;
+            availableList.appendChild(div);
         });
+
+        linkedCnaes.forEach(cnae => {
+            const div = document.createElement('div');
+            div.classList.add('link-item');
+            div.dataset.codigo = cnae.codigo;
+            div.innerHTML = `<span class="code">${cnae.codigo}</span><span class="desc">- ${cnae.descricao}</span>`;
+            linkedList.appendChild(div);
+        });
+        
+        updateArrowButtons();
     }
 
-    // Buscar CNAEs no modal de vínculo
-    let linkDebounceTimer;
-    linkSearch.addEventListener('input', function() {
-        clearTimeout(linkDebounceTimer);
-        const termo = this.value.trim();
-        if(termo.length === 0) {
-            renderLinkList(cnaeData);
-            return;
+    function handleListClick(event) {
+        const item = event.target.closest('.link-item');
+        if (item) {
+            item.classList.toggle('selected');
         }
-        linkDebounceTimer = setTimeout(async () => {
-            const resultados = await buscarCnaes(termo);
-            renderLinkList(resultados);
-        }, 300);
+    }
+
+    availableList.addEventListener('click', handleListClick);
+    linkedList.addEventListener('click', handleListClick);
+
+    btnAddLink.addEventListener('click', function() {
+        const selectedItems = availableList.querySelectorAll('.link-item.selected');
+        selectedItems.forEach(item => {
+            const codigo = item.dataset.codigo;
+            const cnae = availableCnaes.find(c => c.codigo === codigo);
+            if (cnae) {
+                linkedCnaes.push(cnae);
+                availableCnaes = availableCnaes.filter(c => c.codigo !== codigo);
+            }
+        });
+        renderLinkLists();
     });
 
-    // Salvar vínculos
+    btnRemoveLink.addEventListener('click', function() {
+        const selectedItems = linkedList.querySelectorAll('.link-item.selected');
+        selectedItems.forEach(item => {
+            const codigo = item.dataset.codigo;
+            const cnae = linkedCnaes.find(c => c.codigo === codigo);
+            if (cnae) {
+                availableCnaes.push(cnae);
+                linkedCnaes = linkedCnaes.filter(c => c.codigo !== codigo);
+            }
+        });
+        renderLinkLists();
+    });
+
+    function updateArrowButtons() {
+        const hasAvailableSelected = availableList.querySelector('.link-item.selected') !== null;
+        const hasLinkedSelected = linkedList.querySelector('.link-item.selected') !== null;
+        btnAddLink.disabled = !hasAvailableSelected;
+        btnRemoveLink.disabled = !hasLinkedSelected;
+    }
+
+    linkSearch.addEventListener('input', function() {
+        const termo = this.value.toLowerCase();
+        const filtered = allCnaesCache.filter(cnae => {
+            const isLinked = linkedCnaes.some(c => c.codigo === cnae.codigo);
+            if (isLinked) return false;
+            return cnae.full.toLowerCase().includes(termo) || cnae.descricao.toLowerCase().includes(termo);
+        });
+        availableCnaes = filtered.filter(c => !linkedCnaes.some(l => l.codigo === c.codigo));
+        renderLinkLists();
+    });
+
     btnSaveLink.addEventListener('click', function() {
         if(!linkTargetSegmentId) return;
-        
-        // Pega todos os checkboxes marcados
-        const selectedCheckboxes = linkList.querySelectorAll('input[type="checkbox"]:checked');
-        const selectedCodes = Array.from(selectedCheckboxes).map(cb => cb.value);
-        
-        // Remove todos os vínculos atuais deste segmento e adiciona os novos
+        const linkedCodes = linkedCnaes.map(c => c.codigo);
         segmentoCnaeLinks = segmentoCnaeLinks.filter(link => link.segmentoId !== linkTargetSegmentId);
-        selectedCodes.forEach(codigo => {
+        linkedCodes.forEach(codigo => {
             segmentoCnaeLinks.push({ segmentoId: linkTargetSegmentId, cnaeCodigo: codigo });
         });
-        
-        // Fecha o modal, atualiza a tabela de segmentos
         linkModal.style.display = 'none';
         renderSegments(segmentSearch.value);
-        
-        // Feedback simples
         console.log("Vínculos salvos:", segmentoCnaeLinks);
     });
 
-    // ==========================================
-    // PESQUISAS E MODAIS GENÉRICOS
-    // ==========================================
+    // MODAIS GENÉRICOS
     const auxData = {
         'natureza': ['Sociedade Empresária Limitada', 'Empresa Individual de Responsabilidade Limitada', 'Sociedade Anônima']
     };
@@ -562,9 +586,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('menu-municipios').addEventListener('click', () => openGenericModal('Pesquisa Município', 'Informe o município:', ['São Paulo - SP', 'Rio de Janeiro - RJ', 'Belo Horizonte - MG', 'Porto Alegre - RS', 'Cachoeira do Sul - RS'], 'municipio'));
     document.getElementById('menu-natureza').addEventListener('click', () => openGenericModal('Pesquisa Natureza Jurídica', 'Informe a natureza:', auxData.natureza, 'natureza'));
 
-    // ==========================================
-    // FILTROS E PAGINAÇÃO
-    // ==========================================
+    // FILTROS
     function applyFilters() {
         const uf = filterUf.value;
         const status = filterStatus.value;
@@ -615,9 +637,8 @@ document.addEventListener('DOMContentLoaded', function() {
         renderTable(filteredData);
     }
 
-    // Inicializações
+    // INICIALIZAÇÃO
     updateSegmentFilter();
-    
     carregarUFsDaAPI();
     carregarSituacoesDaAPI();
     carregarCnaesIniciais();

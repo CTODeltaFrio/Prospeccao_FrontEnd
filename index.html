@@ -254,20 +254,39 @@
     </div>
 </div>
 
-<!-- MODAL VINCULAR CNAE AO SEGMENTO -->
+<!-- MODAL VINCULAR CNAE AO SEGMENTO (DUAS COLUNAS) -->
 <div id="link-cnae-modal" class="modal-overlay">
-    <div class="modal-content generic-content" style="width: 500px;">
+    <div class="modal-content generic-content" style="width: 700px;">
         <span class="close-modal" id="close-link-modal">&times;</span>
         <h2 style="margin-bottom: 5px;">Vincular CNAE ao Segmento</h2>
         <p id="link-segment-name" style="color: #666; font-size: 14px; margin-bottom: 20px;"></p>
         
-        <div class="input-with-icon generic-search-box" style="margin-bottom: 20px;">
-            <input type="text" id="link-search" placeholder="Buscar CNAE por código ou descrição...">
-            <i class="fas fa-search" style="font-size: 18px; color: #9ca3af; position: absolute; right: 15px; top: 50%; transform: translateY(-50%);"></i>
-        </div>
+        <div class="link-container">
+            <!-- COLUNA ESQUERDA: DISPONÍVEIS -->
+            <div class="link-column">
+                <div class="link-column-header">
+                    <span>CNAEs Disponíveis</span>
+                </div>
+                <div class="input-with-icon link-search-box">
+                    <input type="text" id="link-search" placeholder="Buscar...">
+                    <i class="fas fa-search" style="font-size: 15px; color: #9ca3af; position: absolute; right: 10px; top: 50%; transform: translateY(-50%);"></i>
+                </div>
+                <div id="available-list" class="link-list"></div>
+            </div>
 
-        <div id="link-cnae-list" style="max-height: 300px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px;">
-            <!-- Lista de CNAEs para selecionar -->
+            <!-- BOTÕES DE AÇÃO (SETAS) -->
+            <div class="link-actions">
+                <button class="action-btn-arrow" id="btn-add-link" title="Adicionar"><i class="fas fa-arrow-right"></i></button>
+                <button class="action-btn-arrow" id="btn-remove-link" title="Remover"><i class="fas fa-arrow-left"></i></button>
+            </div>
+
+            <!-- COLUNA DIREITA: VINCULADOS -->
+            <div class="link-column">
+                <div class="link-column-header linked-header">
+                    <span>CNAEs Vinculados</span>
+                </div>
+                <div id="linked-list" class="link-list"></div>
+            </div>
         </div>
 
         <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
