@@ -471,22 +471,6 @@ select.input {
     background: #f4f7ff;
 }
 
-.export-btn {
-    height: 37px;
-    border: 1px solid #dbe2ec;
-    background: white;
-    border-radius: 7px;
-    color: #38506e;
-    cursor: pointer;
-    padding: 0 16px;
-    font-weight: 600;
-    margin-left: 8px;
-}
-
-.export-btn i {
-    font-size: 14px;
-}
-
 table {
     width: 100%;
     border-collapse: collapse;
@@ -623,7 +607,6 @@ tbody tr:hover {
     padding: 2rem;
 }
 
-/* Card do formulário - visual simples (como antes) */
 .card-segmento {
     background: white;
     border: 1px solid #e5eaf1;
@@ -640,12 +623,10 @@ tbody tr:hover {
     color: #172b4d;
 }
 
-/* Remove qualquer ícone ou destaque extra */
 .card-segmento h2::before {
     content: none;
 }
 
-/* Campos do formulário */
 .form-group {
     display: flex;
     flex-direction: column;
@@ -743,7 +724,6 @@ tbody tr:hover {
     border-color: #b0bcc9;
 }
 
-/* Tabela de segmentos (visual bonito, mantido) */
 .table-header {
     display: flex;
     justify-content: space-between;
@@ -827,9 +807,8 @@ tbody tr:hover {
 #segmentosTable .cell-actions {
     display: flex;
     gap: 8px;
-    justify-content: center;       /* centraliza horizontalmente na coluna */
-    align-items: center;           /* garante alinhamento vertical centralizado */
-    height: 100%;                  /* ocupa toda a altura da célula, se necessário */
+    justify-content: center;
+    align-items: center;
 }
 
 #segmentosTable .btn-table {
@@ -867,7 +846,6 @@ tbody tr:hover {
     border-color: #dc2626;
 }
 
-/* Destaque para modo edição (azul suave) */
 #segment-form-card.editing-mode {
     border: 2px solid #2563eb;
     background: #eff6ff;
@@ -1406,33 +1384,6 @@ tbody tr:hover {
     font-size: 14px;
 }
 
-/* ================== EXPORTAR BOTÃO ================== */
-.export-btn {
-    height: 37px;
-    border: 1px solid #dbe2ec;
-    background: white;
-    border-radius: 7px;
-    color: #38506e;
-    cursor: pointer;
-    padding: 0 16px;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    transition: all 0.2s;
-}
-
-.export-btn:hover {
-    background: #f0fdf4;
-    border-color: #22c55e;
-    color: #15803d;
-}
-
-.export-btn i {
-    font-size: 16px;
-    color: #16a34a;
-}
-
 /* ================== CHIPS DE CNAEs VINCULADOS ================== */
 #linked-cnae-list {
     display: flex;
@@ -1529,13 +1480,11 @@ tbody tr:hover {
     scrollbar-color: rgba(255,255,255,0.4) rgba(255,255,255,0.1);
 }
 
-/* Mostra o tooltip no hover OU quando a classe .open está presente */
 .cnae-tooltip:hover .cnae-tooltip-content,
 .cnae-tooltip.open .cnae-tooltip-content {
     display: block;
 }
 
-/* Seta do tooltip */
 .cnae-tooltip-content::after {
     content: '';
     position: absolute;
@@ -1562,7 +1511,6 @@ tbody tr:hover {
     color: #93c5fd;
 }
 
-/* Barra de rolagem estilizada (Chrome, Edge, Safari) */
 .cnae-tooltip-content::-webkit-scrollbar {
     width: 8px;
 }
@@ -1656,19 +1604,4 @@ tbody tr:hover {
     table {
         min-width: 900px;
     }
-}
-
-/* Ajuste do cabeçalho da tela de segmentos */
-.header-left-segmentos {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-}
-
-.header-left-segmentos h1 {
-    margin-bottom: 0; /* remove o espaço inferior extra */
-}
-
-.header-left-segmentos .subtitle {
-    margin-top: 4px;
 }

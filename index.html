@@ -6,6 +6,7 @@
     <title>Prospecção de Empresas e Estabelecimentos</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/png" href="favicon.png">
 </head>
 <body>
 
@@ -192,12 +193,9 @@
                     <div class="results-title">
                         Resultados da Pesquisa
                     </div>
-                        <div class="result-actions">
-                            <button class="icon-btn active">▤</button>
-                            <button class="export-btn" onclick="exportarExcel()">
-                                <i class="fas fa-file-excel"></i> &nbsp; Exportar Excel
-                            </button>
-                        </div>
+                    <div class="result-actions">
+                        <button class="icon-btn active"><i class="fas fa-table"></i></button>
+                    </div>
                 </div>
 
                 <table>
@@ -217,11 +215,11 @@
 
                 <div class="table-footer">
                     <div class="showing" id="records-footer">Exibindo 0 registros</div>
-                        <div class="pagination">
-                            <button class="page-btn" id="btn-prev"><i class="fas fa-chevron-left"></i></button>
-                            <span class="page-indicator" id="page-indicator">Página 1</span>
-                            <button class="page-btn" id="btn-next"><i class="fas fa-chevron-right"></i></button>
-                        </div>  
+                    <div class="pagination">
+                        <button class="page-btn" id="btn-prev"><i class="fas fa-chevron-left"></i></button>
+                        <span class="page-indicator" id="page-indicator">Página 1</span>
+                        <button class="page-btn" id="btn-next"><i class="fas fa-chevron-right"></i></button>
+                    </div>
                 </div>
             </section>
         </div>
@@ -230,14 +228,9 @@
         <div id="segment-screen" style="display: none;">
             <div class="container">
                 <div class="header">
-                    <div class="header-left-segmentos">
-                        <button class="btn-secondary" id="btn-back-main" style="width: auto;">
-                            <i class="fas fa-arrow-left"></i> &nbsp; Voltar para Prospecção
-                        </button>
-                        <div>
-                            <h1>Gerenciar segmentos</h1>
-                            <div class="subtitle">Organize e categorize seus contatos por segmentos</div>
-                        </div>
+                    <div>
+                        <h1>Gerenciar segmentos</h1>
+                        <div class="subtitle">Organize e categorize seus contatos por segmentos</div>
                     </div>
                     <button class="btn-primary" onclick="novoSegmento()">
                         <i class="fas fa-plus"></i> &nbsp; Novo segmento
@@ -272,7 +265,7 @@
 
                 <div class="card-segmento">
                     <div class="table-header">
-                        <h2 style="margin-bottom: 0;">Segmentos cadastrados</h2>
+                        <h2>Segmentos cadastrados</h2>
                         <input type="text" class="table-search" placeholder="Buscar segmento..." id="segment-search">
                     </div>
                     <table id="segmentosTable">
@@ -286,12 +279,6 @@
                         </thead>
                         <tbody id="segment-table-body"></tbody>
                     </table>
-                </div>
-
-                <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
-                    <button class="btn-secondary" id="btn-back-main" style="width: auto;">
-                        <i class="fas fa-arrow-left"></i> &nbsp; Voltar para Prospecção
-                    </button>
                 </div>
             </div>
         </div>
@@ -349,8 +336,8 @@
             <div class="modal-footer">
                 <button class="btn-secondary">Ignorar Cadastro</button>
                 <div class="footer-actions">
-                    <button class="btn-light-blue"><i class="fas fa-robot"></i> Dados com IA</button>
-                    <button class="btn-primary btn-register"><i class="fas fa-user-plus"></i> Registro CRM</button>
+                    <button class="btn-light-blue">Dados com IA</button>
+                    <button class="btn-primary btn-register">Registro CRM</button>
                 </div>
             </div>
         </div>

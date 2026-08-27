@@ -24,7 +24,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Elementos da tela de segmentos
         const btnHome = document.getElementById('btn-home');
-        const btnBackMain = document.getElementById('btn-back-main');
         const btnSaveSegment = document.getElementById('btn-save-segment');
         const btnCancelSegment = document.getElementById('btn-cancel-segment');
         const segmentNome = document.getElementById('segment-nome');
@@ -267,8 +266,12 @@ document.addEventListener('DOMContentLoaded', function() {
             updateSegmentFilter();
         }
 
-        btnBackMain.addEventListener('click', closeSegmentScreen);
         btnHome.addEventListener('click', function() { closeSegmentScreen(); closeAllModals(); });
+        // ⬇️ ADICIONADO: Dashboard volta para a tela principal
+        document.getElementById('menu-dashboard').addEventListener('click', function() { 
+            closeSegmentScreen(); 
+            closeAllModals(); 
+        });
 
         function novoSegmento() { resetSegmentForm(); }
 
@@ -329,7 +332,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 segmentTableBody.appendChild(tr);
             });
 
-            // Adiciona listeners para os botões de ação
             segmentTableBody.querySelectorAll('button[data-action]').forEach(btn => {
                 btn.addEventListener('click', function() {
                     const id = parseInt(this.dataset.id);
@@ -341,7 +343,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             });
 
-            // Adiciona listeners para os tooltips (clique para fixar/abrir)
             segmentTableBody.querySelectorAll('.cnae-tooltip').forEach(tooltip => {
                 const trigger = tooltip.querySelector('.tooltip-trigger');
                 trigger.addEventListener('click', function(e) {
@@ -370,7 +371,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
         window.vincularCNAE = function() {
             const cnaeCodigo = linkCnaeSelect.value;
-            if (!cnaeCodigo) { alert('Selecione um CNAE para vincular.'); return; }
+            if (!cnaeCodigo) {
+                showWarning('Selecione um CNAE para vincular.');
+                return;
+            }
             const cnae = allCnaesCache.find(c => c.codigo === cnaeCodigo);
             if (cnae) {
                 currentLinkedCnaes.push(cnae);
@@ -404,7 +408,10 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('segmentoForm').addEventListener('submit', function(e) {
             e.preventDefault();
             const nome = segmentNome.value.trim();
-            if (!nome) { alert('Informe o nome do segmento.'); return; }
+            if (!nome) {
+                showWarning('Informe o nome do segmento.');
+                return;
+            }
             if (editingSegmentId !== null) {
                 const seg = segmentData.find(s => s.id === editingSegmentId);
                 if (seg) seg.nome = nome;
@@ -477,10 +484,26 @@ document.addEventListener('DOMContentLoaded', function() {
             confirmTitle.innerText = title;
             confirmMessage.innerText = message;
             confirmCallback = callback;
+            btnConfirmCancel.style.display = 'inline-block';
+            btnConfirmOk.innerText = 'Confirmar';
             confirmModal.style.display = 'flex';
         }
 
-        btnConfirmOk.addEventListener('click', function() { if (confirmCallback) confirmCallback(); confirmModal.style.display = 'none'; confirmCallback = null; });
+        function showWarning(message, title = 'Aviso') {
+            confirmTitle.innerText = title;
+            confirmMessage.innerText = message;
+            btnConfirmCancel.style.display = 'none';
+            btnConfirmOk.innerText = 'OK';
+            confirmCallback = function() {
+                confirmModal.style.display = 'none';
+                confirmCallback = null;
+                btnConfirmCancel.style.display = 'inline-block';
+                btnConfirmOk.innerText = 'Confirmar';
+            };
+            confirmModal.style.display = 'flex';
+        }
+
+        btnConfirmOk.addEventListener('click', function() { if (confirmCallback) confirmCallback(); });
         btnConfirmCancel.addEventListener('click', function() { confirmModal.style.display = 'none'; confirmCallback = null; });
 
         // ========== TABELA PRINCIPAL ==========
@@ -764,28 +787,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             renderTable(filteredData);
-        }
-
-        function exportarExcel() {
-            const dadosExportar = filteredData.length > 0 ? filteredData : mockData;
-            if (dadosExportar.length === 0) {
-                alert("Nenhum dado para exportar.");
-                return;
-            }
-            const headers = ["CNPJ", "Nome Fantasia", "Razão Social", "Situação", "UF", "Telefone", "Segmento"];
-            const rows = dadosExportar.map(item => [
-                item.cnpj, item.fantasia, item.razao, item.situacao, item.uf, item.telefone, item.segmento
-            ]);
-            const csvContent = [headers.join(";"), ...rows.map(row => row.join(";"))].join("\n");
-            const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
-            const link = document.createElement("a");
-            const url = URL.createObjectURL(blob);
-            link.setAttribute("href", url);
-            link.setAttribute("download", "prospeccao_empresas.csv");
-            link.style.visibility = "hidden";
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
         }
 
         // ========== LISTENER GLOBAL PARA FECHAR TOOLTIPS AO CLICAR FORA ==========
