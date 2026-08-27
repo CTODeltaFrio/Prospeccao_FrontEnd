@@ -11,8 +11,7 @@
 
 <div class="app-container">
     <nav class="sidebar">
-        <div class="brand"><i class="fas fa-search"></i> Prospecção</div>
-        
+        <div class="brand" id="btn-home"><i class="fas fa-search"></i> Prospecção</div>
         <ul class="menu">
             <li class="menu-category">CADASTROS AUXILIARES</li>
             <li class="menu-item" id="menu-cnaes"><i class="fas fa-list-ul"></i> CNAEs</li>
@@ -23,136 +22,221 @@
     </nav>
 
     <main class="main-content">
-        <header class="header">
-            <div class="header-left">
-                <h1>Prospecção de Empresas e Estabelecimentos</h1>
-                <p>Base RFB CNPJ - Dados Atualizados em 09/08/2026 16:34</p>
-            </div>
-            <div class="header-right">Competência<br>2026-08</div>
-        </header>
+        <!-- TELA PRINCIPAL (Prospecção) -->
+        <div id="main-screen">
+            <header class="header">
+                <div class="header-left">
+                    <h1>Prospecção de Empresas e Estabelecimentos</h1>
+                    <p>Base RFB CNPJ - Dados Atualizados em 09/08/2026 16:34</p>
+                </div>
+                <div class="header-right">Competência<br>2026-08</div>
+            </header>
 
-        <section class="kpi-container">
-            <div class="kpi-card">
-                <div class="kpi-icon icon-blue"><i class="fas fa-city"></i></div>
-                <div class="kpi-info">
-                    <span class="kpi-label">Empresas</span>
-                    <span class="kpi-value">69.062.849</span>
-                </div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-icon icon-green"><i class="fas fa-store"></i></div>
-                <div class="kpi-info">
-                    <span class="kpi-label">Estabelecimentos</span>
-                    <span class="kpi-value">72.318.961</span>
-                </div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-icon icon-purple"><i class="fas fa-users"></i></div>
-                <div class="kpi-info">
-                    <span class="kpi-label">Sócios</span>
-                    <span class="kpi-value">27.992.378</span>
-                </div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-icon icon-orange"><i class="fas fa-sack-dollar"></i></div>
-                <div class="kpi-info">
-                    <span class="kpi-label">Simples (MEI)</span>
-                    <span class="kpi-value">49.445.426</span>
-                </div>
-            </div>
-        </section>
-
-        <section class="filters-section">
-            <div class="filters-header">
-                <h3><i class="fas fa-filter" style="color:#2563eb;"></i> Filtros de Pesquisa</h3>
-                <a id="btn-clear-filters"><i class="fas fa-sync-alt"></i> Limpar Filtros</a>
-            </div>
-
-            <div class="filters-row">
-                <div class="filter-group">
-                    <label>UF</label>
-                    <select id="filter-uf">
-                        <option value="">Todos</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label>Situação Cadastral</label>
-                    <select id="filter-status">
-                        <option value="">Todas</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label>DDD</label>
-                    <input type="text" id="filter-ddd" placeholder="Ex: 51" maxlength="2">
-                </div>
-                <div class="filter-group">
-                    <label>Segmento</label>
-                    <select id="filter-segmento">
-                        <option value="">Todos</option>
-                    </select>
-                </div>
-                <div class="filter-group" style="flex: 2;">
-                    <label>CNAE (Buscar por código ou descrição)</label>
-                    <div class="autocomplete-container">
-                        <input type="text" id="filter-cnae" placeholder="Digite ex: 1012103 ou frutas..." autocomplete="off">
-                        <i class="fas fa-search"></i>
-                        <div id="cnae-suggestions" class="autocomplete-list"></div>
+            <section class="kpi-container">
+                <div class="kpi-card">
+                    <div class="kpi-icon icon-blue"><i class="fas fa-city"></i></div>
+                    <div class="kpi-info">
+                        <span class="kpi-label">Empresas</span>
+                        <span class="kpi-value">69.062.849</span>
                     </div>
                 </div>
-                <div class="filter-group">
-                    <label>Escopo do CNAE</label>
-                    <select id="filter-tipo-cnae">
-                        <option value="">Todos</option>
-                        <option value="principal">Somente Principal</option>
-                        <option value="secundario">Principal e Secundário</option>
-                    </select>
+                <div class="kpi-card">
+                    <div class="kpi-icon icon-green"><i class="fas fa-store"></i></div>
+                    <div class="kpi-info">
+                        <span class="kpi-label">Estabelecimentos</span>
+                        <span class="kpi-value">72.318.961</span>
+                    </div>
                 </div>
-                <div class="btn-search-container">
-                    <button class="btn-primary" id="btn-search">Pesquisar</button>
+                <div class="kpi-card">
+                    <div class="kpi-icon icon-purple"><i class="fas fa-users"></i></div>
+                    <div class="kpi-info">
+                        <span class="kpi-label">Sócios</span>
+                        <span class="kpi-value">27.992.378</span>
+                    </div>
                 </div>
-            </div>
-        </section>
+                <div class="kpi-card">
+                    <div class="kpi-icon icon-orange"><i class="fas fa-sack-dollar"></i></div>
+                    <div class="kpi-info">
+                        <span class="kpi-label">Simples (MEI)</span>
+                        <span class="kpi-value">49.445.426</span>
+                    </div>
+                </div>
+            </section>
 
-        <section class="results-section">
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>CNPJ</th>
-                            <th>Nome Fantasia</th>
-                            <th>Razão Social</th>
-                            <th>Situação</th>
-                            <th>UF</th>
-                            <th>Telefone</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody id="table-body"></tbody>
-                </table>
+            <section class="filters-section">
+                <div class="filters-header">
+                    <h3><i class="fas fa-filter" style="color:#2563eb;"></i> Filtros de Pesquisa</h3>
+                    <a id="btn-clear-filters"><i class="fas fa-sync-alt"></i> Limpar Filtros</a>
+                </div>
+
+                <div class="filters-row filter-row-1">
+                    <div class="filter-group">
+                        <label>UF</label>
+                        <select id="filter-uf"><option value="">Todos</option></select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Região</label>
+                        <select id="filter-regiao">
+                            <option value="">Todas</option>
+                            <option value="Norte">Norte</option>
+                            <option value="Nordeste">Nordeste</option>
+                            <option value="Centro-Oeste">Centro-Oeste</option>
+                            <option value="Sudeste">Sudeste</option>
+                            <option value="Sul">Sul</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>DDD</label>
+                        <input type="text" id="filter-ddd" placeholder="Ex: 51" maxlength="2">
+                    </div>
+                </div>
+
+                <div class="filters-row filter-row-2">
+                    <div class="filter-group" style="flex: 0.8;">
+                        <label>Filtrar por</label>
+                        <select id="filter-type-toggle">
+                            <option value="segmento">Segmento</option>
+                            <option value="cnae">CNAE</option>
+                        </select>
+                    </div>
+                    <div class="filter-group" id="group-segmento" style="flex: 1.5;">
+                        <label>Segmento</label>
+                        <select id="filter-segmento"><option value="">Todos</option></select>
+                    </div>
+                    <div class="filter-group" id="group-escopo-segmento" style="flex: 1;">
+                        <label>Escopo do Segmento</label>
+                        <select id="filter-escopo-segmento">
+                            <option value="principal">Somente Principal</option>
+                            <option value="secundario" selected>Principal e Secundário</option>
+                        </select>
+                    </div>
+                    <div class="filter-group" id="group-cnae" style="flex: 1.5; display: none;">
+                        <label>Buscar CNAE (código ou descrição)</label>
+                        <div class="autocomplete-container">
+                            <input type="text" id="filter-cnae" placeholder="Digite ex: 1012103 ou frutas..." autocomplete="off">
+                            <i class="fas fa-search"></i>
+                            <div id="cnae-suggestions" class="autocomplete-list"></div>
+                        </div>
+                    </div>
+                    <div class="filter-group" id="group-escopo-cnae" style="flex: 1; display: none;">
+                        <label>Escopo do CNAE</label>
+                        <select id="filter-tipo-cnae">
+                            <option value="principal">Somente Principal</option>
+                            <option value="secundario" selected>Principal e Secundário</option>
+                        </select>
+                    </div>
+                    <div class="btn-search-container">
+                        <button class="btn-primary" id="btn-search">Pesquisar</button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="results-section">
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>CNPJ</th><th>Nome Fantasia</th><th>Razão Social</th>
+                                <th>Situação</th><th>UF</th><th>Telefone</th><th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-body"></tbody>
+                    </table>
+                </div>
+                
+                <div class="pagination-container">
+                    <span id="records-text">Exibindo 0 registros</span>
+                    <div class="pagination-controls">
+                        <button id="btn-prev">&lt;</button>
+                        <span class="page-item" id="page-indicator">Página 1</span>
+                        <button id="btn-next">&gt;</button>
+                        <span style="margin-left: 10px; border:none; background:none;">50 por página</span>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- TELA DE SEGMENTOS -->
+        <div id="segment-screen" style="display: none;">
+            <div class="container">
+                <div class="header">
+                    <div class="header-content">
+                        <h1>Gerenciar segmentos</h1>
+                        <p>Organize e categorize seus contatos por segmentos</p>
+                    </div>
+                    <button class="btn-novo" onclick="novoSegmento()">
+                        <i class="fas fa-plus"></i>
+                        Novo segmento
+                    </button>
+                </div>
+
+                <div class="card" id="segment-form-card">
+                    <h2 id="form-title">Cadastro de segmento</h2>
+                    
+                    <form id="segmentoForm">
+                        <div class="form-group">
+                            <label for="nomeSegmento">Nome do segmento</label>
+                            <input type="text" id="segment-nome" placeholder="Ex: Varejo, Atacado...">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="cnaeSelect">CNAEs vinculados</label>
+                            <div class="input-with-button">
+                                <select id="link-cnae-select">
+                                    <option value="">Selecione um CNAE para vincular...</option>
+                                </select>
+                                <button type="button" class="btn-vincular" onclick="vincularCNAE()">
+                                    <i class="fas fa-plus"></i>
+                                    Vincular
+                                </button>
+                            </div>
+                            <div class="helper-text" id="linked-cnae-list" style="margin-top: 10px;">Nenhum CNAE vinculado.</div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn-primary" id="btn-save-segment">Salvar segmento</button>
+                            <button type="button" class="btn-secondary" id="btn-cancel-segment" style="display: none;">Cancelar</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <div class="table-header">
+                        <h2 style="margin-bottom: 0;">Segmentos cadastrados</h2>
+                        <input type="text" class="table-search" placeholder="Buscar segmento..." id="segment-search">
+                    </div>
+
+                    <div class="table-container">
+                        <table id="segmentosTable">
+                            <thead>
+                                <tr>
+                                    <th>#ID</th>
+                                    <th>Nome</th>
+                                    <th>Qtd. CNAEs</th>
+                                    <th style="text-align: center;">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="segment-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
             
-            <div class="pagination-container">
-                <span id="records-text">Exibindo 0 registros</span>
-                <div class="pagination-controls">
-                    <button id="btn-prev">&lt;</button>
-                    <span class="page-item" id="page-indicator">Página 1</span>
-                    <button id="btn-next">&gt;</button>
-                    <span style="margin-left: 10px; border:none; background:none;">50 por página</span>
-                </div>
+            <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
+                <button class="btn-secondary" id="btn-back-main" style="width: auto;">
+                    <i class="fas fa-arrow-left"></i> Voltar para Prospecção
+                </button>
             </div>
-        </section>
+        </div>
     </main>
 </div>
 
-<!-- MODAL DETALHES DO ESTABELECIMENTO -->
+<!-- MODAIS -->
 <div id="details-modal" class="modal-overlay">
     <div class="modal-content large-modal">
         <span class="close-modal" id="close-details-modal">&times;</span>
         <div class="modal-header">
-            <div>
-                <h2>Detalhes do Estabelecimento</h2>
-                <p>Informações cadastrais e comerciais do estabelecimento</p>
-            </div>
+            <div><h2>Detalhes do Estabelecimento</h2><p>Informações cadastrais e comerciais do estabelecimento</p></div>
         </div>
         <div class="modal-scroll-area">
             <div class="card principal-card">
@@ -196,15 +280,11 @@
         </div>
         <div class="modal-footer">
             <button class="btn-secondary">Ignorar Cadastro</button>
-            <div class="footer-actions">
-                <button class="btn-light-blue">Dados com IA</button>
-                <button class="btn-primary btn-register">Registro CRM</button>
-            </div>
+            <div class="footer-actions"><button class="btn-light-blue">Dados com IA</button><button class="btn-primary btn-register">Registro CRM</button></div>
         </div>
     </div>
 </div>
 
-<!-- JANELA MODAL GENÉRICA (PESQUISAS) -->
 <div id="generic-modal" class="modal-overlay">
     <div class="modal-content generic-content">
         <span class="close-modal" id="close-generic-modal">&times;</span>
@@ -218,85 +298,6 @@
     </div>
 </div>
 
-<!-- MODAL CRUD SEGMENTOS -->
-<div id="segment-modal" class="modal-overlay">
-    <div class="modal-content large-modal" style="width: 650px;">
-        <span class="close-modal" id="close-segment-modal">&times;</span>
-        <div class="modal-header">
-            <div>
-                <h2>Gerenciar Segmentos</h2>
-                <p>Cadastre, edite ou exclua os segmentos e vincule CNAEs</p>
-            </div>
-        </div>
-        <div class="modal-scroll-area">
-            <div class="input-with-icon generic-search-box" style="margin-bottom: 20px;">
-                <input type="text" id="segment-search" placeholder="Pesquisar segmento para verificar se já existe...">
-                <i class="fas fa-search" style="font-size: 18px; color: #9ca3af; position: absolute; right: 15px; top: 50%; transform: translateY(-50%);"></i>
-            </div>
-            <div class="card" id="segment-form-card" style="margin-bottom: 15px;">
-                <h4 id="segment-form-title" style="margin-bottom: 15px;">Novo Segmento</h4>
-                <div class="form-row">
-                    <div class="form-group" style="flex: 1;">
-                        <label>Nome do Segmento</label>
-                        <input type="text" id="segment-nome" placeholder="Ex: Varejo, Atacado...">
-                    </div>
-                </div>
-                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px;">
-                    <button class="btn-secondary" id="btn-cancel-segment" style="display: none;">Cancelar</button>
-                    <button class="btn-primary" id="btn-save-segment" style="height: 35px;">Salvar</button>
-                </div>
-            </div>
-            <div class="card">
-                <h4 style="margin-bottom: 15px;">Segmentos Cadastrados</h4>
-                <div id="segment-list-container" style="max-height: 250px; overflow-y: auto;"></div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- MODAL VINCULAR CNAE AO SEGMENTO (DUAS COLUNAS) -->
-<div id="link-cnae-modal" class="modal-overlay">
-    <div class="modal-content generic-content" style="width: 700px;">
-        <span class="close-modal" id="close-link-modal">&times;</span>
-        <h2 style="margin-bottom: 5px;">Vincular CNAE ao Segmento</h2>
-        <p id="link-segment-name" style="color: #666; font-size: 14px; margin-bottom: 20px;"></p>
-        
-        <div class="link-container">
-            <!-- COLUNA ESQUERDA: DISPONÍVEIS -->
-            <div class="link-column">
-                <div class="link-column-header">
-                    <span>CNAEs Disponíveis</span>
-                </div>
-                <div class="input-with-icon link-search-box">
-                    <input type="text" id="link-search" placeholder="Buscar...">
-                    <i class="fas fa-search" style="font-size: 15px; color: #9ca3af; position: absolute; right: 10px; top: 50%; transform: translateY(-50%);"></i>
-                </div>
-                <div id="available-list" class="link-list"></div>
-            </div>
-
-            <!-- BOTÕES DE AÇÃO (SETAS) -->
-            <div class="link-actions">
-                <button class="action-btn-arrow" id="btn-add-link" title="Adicionar"><i class="fas fa-arrow-right"></i></button>
-                <button class="action-btn-arrow" id="btn-remove-link" title="Remover"><i class="fas fa-arrow-left"></i></button>
-            </div>
-
-            <!-- COLUNA DIREITA: VINCULADOS -->
-            <div class="link-column">
-                <div class="link-column-header linked-header">
-                    <span>CNAEs Vinculados</span>
-                </div>
-                <div id="linked-list" class="link-list"></div>
-            </div>
-        </div>
-
-        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
-            <button class="btn-secondary" id="btn-cancel-link">Cancelar</button>
-            <button class="btn-primary" id="btn-save-link">Salvar Vínculo</button>
-        </div>
-    </div>
-</div>
-
-<!-- MODAL DE CONFIRMAÇÃO -->
 <div id="confirm-modal" class="modal-overlay">
     <div class="modal-content confirm-content">
         <span class="close-modal" id="close-confirm-modal">&times;</span>
