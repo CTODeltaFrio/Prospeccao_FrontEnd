@@ -1,82 +1,137 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Prospecção de Empresas</title>
+    <title>Prospecção de Empresas e Estabelecimentos</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<div class="app-container">
-    <nav class="sidebar">
-        <div class="brand" id="btn-home"><i class="fas fa-search"></i> Prospecção</div>
-        <ul class="menu">
-            <li class="menu-category">CADASTROS AUXILIARES</li>
-            <li class="menu-item" id="menu-cnaes"><i class="fas fa-list-ul"></i> CNAEs</li>
-            <li class="menu-item" id="menu-municipios"><i class="fas fa-map-marker-alt"></i> Municípios</li>
-            <li class="menu-item" id="menu-natureza"><i class="fas fa-balance-scale"></i> Natureza Jurídica</li>
-            <li class="menu-item" id="menu-segmentos"><i class="fas fa-layer-group"></i> Segmentos</li>
-        </ul>
-    </nav>
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="logo" id="btn-home">
+            <div class="logo-icon"><i class="fas fa-search"></i></div>
+            <span>Prospecção</span>
+        </div>
 
-    <main class="main-content">
-        <!-- TELA PRINCIPAL (Prospecção) -->
+        <div class="menu-item active" id="menu-dashboard">
+            <div class="menu-icon"><i class="fas fa-chart-line"></i></div>
+            <div class="menu-text">
+                <strong>Dashboard</strong>
+                <small>Visão geral</small>
+            </div>
+        </div>
+
+        <div class="menu-title">CADASTROS AUXILIARES</div>
+
+        <div class="menu-item" id="menu-cnaes">
+            <div class="menu-icon"><i class="fas fa-list-ul"></i></div>
+            <div class="menu-text">
+                <strong>CNAEs</strong>
+            </div>
+        </div>
+
+        <div class="menu-item" id="menu-municipios">
+            <div class="menu-icon"><i class="fas fa-map-marker-alt"></i></div>
+            <div class="menu-text">
+                <strong>Municípios</strong>
+            </div>
+        </div>
+
+        <div class="menu-item" id="menu-natureza">
+            <div class="menu-icon"><i class="fas fa-balance-scale"></i></div>
+            <div class="menu-text">
+                <strong>Natureza Jurídica</strong>
+            </div>
+        </div>
+
+        <div class="menu-item" id="menu-segmentos">
+            <div class="menu-icon"><i class="fas fa-layer-group"></i></div>
+            <div class="menu-text">
+                <strong>Segmentos</strong>
+            </div>
+        </div>
+    </aside>
+
+    <!-- CONTEÚDO PRINCIPAL -->
+    <main class="main">
+
+        <!-- TELA PRINCIPAL (PROSPECÇÃO) -->
         <div id="main-screen">
+            <!-- HEADER -->
             <header class="header">
-                <div class="header-left">
+                <div>
                     <h1>Prospecção de Empresas e Estabelecimentos</h1>
-                    <p>Base RFB CNPJ - Dados Atualizados em 09/08/2026 16:34</p>
+                    <div class="subtitle">
+                        <span class="status-dot"></span>
+                        Base RFB CNPJ • Dados atualizados em 09/08/2026 16:34
+                    </div>
                 </div>
-                <div class="header-right">Competência<br>2026-08</div>
+                <div class="competencia">
+                    <div class="competencia-left">
+                        <div class="calendar"><i class="fas fa-calendar-alt"></i></div>
+                        <div>
+                            <strong>Competência</strong>
+                            <span>2026-08</span>
+                        </div>
+                    </div>
+                </div>
             </header>
 
-            <section class="kpi-container">
-                <div class="kpi-card">
-                    <div class="kpi-icon icon-blue"><i class="fas fa-city"></i></div>
-                    <div class="kpi-info">
-                        <span class="kpi-label">Empresas</span>
-                        <span class="kpi-value">69.062.849</span>
+            <!-- CARDS KPIs -->
+            <section class="cards">
+                <div class="card">
+                    <div class="card-icon blue"><i class="fas fa-city"></i></div>
+                    <div class="card-info">
+                        <label>Empresas</label>
+                        <strong>69.062.849</strong>
                     </div>
                 </div>
-                <div class="kpi-card">
-                    <div class="kpi-icon icon-green"><i class="fas fa-store"></i></div>
-                    <div class="kpi-info">
-                        <span class="kpi-label">Estabelecimentos</span>
-                        <span class="kpi-value">72.318.961</span>
+                <div class="card">
+                    <div class="card-icon green"><i class="fas fa-store"></i></div>
+                    <div class="card-info">
+                        <label>Estabelecimentos</label>
+                        <strong>72.318.961</strong>
                     </div>
                 </div>
-                <div class="kpi-card">
-                    <div class="kpi-icon icon-purple"><i class="fas fa-users"></i></div>
-                    <div class="kpi-info">
-                        <span class="kpi-label">Sócios</span>
-                        <span class="kpi-value">27.992.378</span>
+                <div class="card">
+                    <div class="card-icon purple"><i class="fas fa-users"></i></div>
+                    <div class="card-info">
+                        <label>Sócios</label>
+                        <strong>27.992.378</strong>
                     </div>
                 </div>
-                <div class="kpi-card">
-                    <div class="kpi-icon icon-orange"><i class="fas fa-sack-dollar"></i></div>
-                    <div class="kpi-info">
-                        <span class="kpi-label">Simples (MEI)</span>
-                        <span class="kpi-value">49.445.426</span>
+                <div class="card">
+                    <div class="card-icon orange"><i class="fas fa-sack-dollar"></i></div>
+                    <div class="card-info">
+                        <label>Simples (MEI)</label>
+                        <strong>49.445.426</strong>
                     </div>
                 </div>
             </section>
 
-            <section class="filters-section">
-                <div class="filters-header">
-                    <h3><i class="fas fa-filter" style="color:#2563eb;"></i> Filtros de Pesquisa</h3>
-                    <a id="btn-clear-filters"><i class="fas fa-sync-alt"></i> Limpar Filtros</a>
+            <!-- FILTROS -->
+            <section class="filter-box">
+                <div class="filter-header">
+                    <div class="filter-title">
+                        <span class="filter-title-icon"><i class="fas fa-filter"></i></span>
+                        Filtros de Pesquisa
+                    </div>
+                    <div class="clear-filter" id="btn-clear-filters"><i class="fas fa-sync-alt"></i> Limpar filtros</div>
                 </div>
 
-                <div class="filters-row filter-row-1">
-                    <div class="filter-group">
+                <div class="filter-row">
+                    <div class="field">
                         <label>UF</label>
-                        <select id="filter-uf"><option value="">Todos</option></select>
+                        <select id="filter-uf" class="input">
+                            <option value="">Todos</option>
+                        </select>
                     </div>
-                    <div class="filter-group">
+                    <div class="field">
                         <label>Região</label>
-                        <select id="filter-regiao">
+                        <select id="filter-regiao" class="input">
                             <option value="">Todas</option>
                             <option value="Norte">Norte</option>
                             <option value="Nordeste">Nordeste</option>
@@ -85,73 +140,88 @@
                             <option value="Sul">Sul</option>
                         </select>
                     </div>
-                    <div class="filter-group">
+                    <div class="field">
                         <label>DDD</label>
-                        <input type="text" id="filter-ddd" placeholder="Ex: 51" maxlength="2">
+                        <input id="filter-ddd" class="input" type="text" placeholder="Ex: 51" maxlength="2">
                     </div>
                 </div>
 
-                <div class="filters-row filter-row-2">
-                    <div class="filter-group" style="flex: 0.8;">
+                <div class="filter-row-bottom">
+                    <div class="field">
                         <label>Filtrar por</label>
-                        <select id="filter-type-toggle">
+                        <select id="filter-type-toggle" class="input">
                             <option value="segmento">Segmento</option>
                             <option value="cnae">CNAE</option>
                         </select>
                     </div>
-                    <div class="filter-group" id="group-segmento" style="flex: 1.5;">
+                    <div class="field" id="group-segmento">
                         <label>Segmento</label>
-                        <select id="filter-segmento"><option value="">Todos</option></select>
+                        <select id="filter-segmento" class="input">
+                            <option value="">Todos</option>
+                        </select>
                     </div>
-                    <div class="filter-group" id="group-escopo-segmento" style="flex: 1;">
+                    <div class="field" id="group-escopo-segmento">
                         <label>Escopo do Segmento</label>
-                        <select id="filter-escopo-segmento">
+                        <select id="filter-escopo-segmento" class="input">
                             <option value="principal">Somente Principal</option>
                             <option value="secundario" selected>Principal e Secundário</option>
                         </select>
                     </div>
-                    <div class="filter-group" id="group-cnae" style="flex: 1.5; display: none;">
+                    <div class="field" id="group-cnae" style="display: none;">
                         <label>Buscar CNAE (código ou descrição)</label>
-                        <div class="autocomplete-container">
-                            <input type="text" id="filter-cnae" placeholder="Digite ex: 1012103 ou frutas..." autocomplete="off">
-                            <i class="fas fa-search"></i>
+                        <div class="search-wrapper">
+                            <input id="filter-cnae" class="input" type="text" placeholder="Digite ex: 1012103 ou frutas..." autocomplete="off">
+                            <span class="search-icon"><i class="fas fa-search"></i></span>
                             <div id="cnae-suggestions" class="autocomplete-list"></div>
                         </div>
                     </div>
-                    <div class="filter-group" id="group-escopo-cnae" style="flex: 1; display: none;">
+                    <div class="field" id="group-escopo-cnae" style="display: none;">
                         <label>Escopo do CNAE</label>
-                        <select id="filter-tipo-cnae">
+                        <select id="filter-tipo-cnae" class="input">
                             <option value="principal">Somente Principal</option>
                             <option value="secundario" selected>Principal e Secundário</option>
                         </select>
                     </div>
-                    <div class="btn-search-container">
-                        <button class="btn-primary" id="btn-search">Pesquisar</button>
-                    </div>
+                    <button class="search-btn" id="btn-search"><i class="fas fa-search"></i> &nbsp; Pesquisar</button>
                 </div>
             </section>
 
-            <section class="results-section">
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>CNPJ</th><th>Nome Fantasia</th><th>Razão Social</th>
-                                <th>Situação</th><th>UF</th><th>Telefone</th><th>Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody id="table-body"></tbody>
-                    </table>
-                </div>
-                
-                <div class="pagination-container">
-                    <span id="records-text">Exibindo 0 registros</span>
-                    <div class="pagination-controls">
-                        <button id="btn-prev">&lt;</button>
-                        <span class="page-item" id="page-indicator">Página 1</span>
-                        <button id="btn-next">&gt;</button>
-                        <span style="margin-left: 10px; border:none; background:none;">50 por página</span>
+            <!-- TABELA DE RESULTADOS -->
+            <section class="results">
+                <div class="results-header">
+                    <div class="results-title">
+                        Resultados da Pesquisa
                     </div>
+                        <div class="result-actions">
+                            <button class="icon-btn active">▤</button>
+                            <button class="export-btn" onclick="exportarExcel()">
+                                <i class="fas fa-file-excel"></i> &nbsp; Exportar Excel
+                            </button>
+                        </div>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>CNPJ ↓</th>
+                            <th>Nome Fantasia</th>
+                            <th>Razão Social</th>
+                            <th>Situação</th>
+                            <th>UF</th>
+                            <th>Telefone</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body"></tbody>
+                </table>
+
+                <div class="table-footer">
+                    <div class="showing" id="records-footer">Exibindo 0 registros</div>
+                        <div class="pagination">
+                            <button class="page-btn" id="btn-prev"><i class="fas fa-chevron-left"></i></button>
+                            <span class="page-indicator" id="page-indicator">Página 1</span>
+                            <button class="page-btn" id="btn-next"><i class="fas fa-chevron-right"></i></button>
+                        </div>  
                 </div>
             </section>
         </div>
@@ -160,39 +230,39 @@
         <div id="segment-screen" style="display: none;">
             <div class="container">
                 <div class="header">
-                    <div class="header-content">
-                        <h1>Gerenciar segmentos</h1>
-                        <p>Organize e categorize seus contatos por segmentos</p>
+                    <div class="header-left-segmentos">
+                        <button class="btn-secondary" id="btn-back-main" style="width: auto;">
+                            <i class="fas fa-arrow-left"></i> &nbsp; Voltar para Prospecção
+                        </button>
+                        <div>
+                            <h1>Gerenciar segmentos</h1>
+                            <div class="subtitle">Organize e categorize seus contatos por segmentos</div>
+                        </div>
                     </div>
-                    <button class="btn-novo" onclick="novoSegmento()">
-                        <i class="fas fa-plus"></i>
-                        Novo segmento
+                    <button class="btn-primary" onclick="novoSegmento()">
+                        <i class="fas fa-plus"></i> &nbsp; Novo segmento
                     </button>
                 </div>
 
-                <div class="card" id="segment-form-card">
+                <div class="card-segmento" id="segment-form-card">
                     <h2 id="form-title">Cadastro de segmento</h2>
-                    
                     <form id="segmentoForm">
                         <div class="form-group">
-                            <label for="nomeSegmento">Nome do segmento</label>
+                            <label for="segment-nome">Nome do segmento</label>
                             <input type="text" id="segment-nome" placeholder="Ex: Varejo, Atacado...">
                         </div>
-
                         <div class="form-group">
-                            <label for="cnaeSelect">CNAEs vinculados</label>
+                            <label>CNAEs vinculados</label>
                             <div class="input-with-button">
-                                <select id="link-cnae-select">
+                                <select id="link-cnae-select" class="input">
                                     <option value="">Selecione um CNAE para vincular...</option>
                                 </select>
                                 <button type="button" class="btn-vincular" onclick="vincularCNAE()">
-                                    <i class="fas fa-plus"></i>
-                                    Vincular
+                                    <i class="fas fa-plus"></i> &nbsp; Vincular
                                 </button>
                             </div>
                             <div class="helper-text" id="linked-cnae-list" style="margin-top: 10px;">Nenhum CNAE vinculado.</div>
                         </div>
-
                         <div class="form-actions">
                             <button type="submit" class="btn-primary" id="btn-save-segment">Salvar segmento</button>
                             <button type="button" class="btn-secondary" id="btn-cancel-segment" style="display: none;">Cancelar</button>
@@ -200,117 +270,118 @@
                     </form>
                 </div>
 
-                <div class="card">
+                <div class="card-segmento">
                     <div class="table-header">
                         <h2 style="margin-bottom: 0;">Segmentos cadastrados</h2>
                         <input type="text" class="table-search" placeholder="Buscar segmento..." id="segment-search">
                     </div>
+                    <table id="segmentosTable">
+                        <thead>
+                            <tr>
+                                <th>#ID</th>
+                                <th>Nome</th>
+                                <th>Qtd. CNAEs</th>
+                                <th style="text-align: center;">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="segment-table-body"></tbody>
+                    </table>
+                </div>
 
-                    <div class="table-container">
-                        <table id="segmentosTable">
-                            <thead>
-                                <tr>
-                                    <th>#ID</th>
-                                    <th>Nome</th>
-                                    <th>Qtd. CNAEs</th>
-                                    <th style="text-align: center;">Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody id="segment-table-body"></tbody>
-                        </table>
+                <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
+                    <button class="btn-secondary" id="btn-back-main" style="width: auto;">
+                        <i class="fas fa-arrow-left"></i> &nbsp; Voltar para Prospecção
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- MODAIS -->
+    <div id="details-modal" class="modal-overlay">
+        <div class="modal-content large-modal">
+            <span class="close-modal" id="close-details-modal">&times;</span>
+            <div class="modal-header">
+                <h2>Detalhes do Estabelecimento</h2>
+                <p>Informações cadastrais e comerciais do estabelecimento</p>
+            </div>
+            <div class="modal-scroll-area">
+                <div class="principal-card">
+                    <span class="cnpj-label" id="det-cnpj"></span>
+                    <h3 id="det-razao"></h3>
+                    <span class="fantasia-label" id="det-fantasia"></span>
+                    <div class="badges">
+                        <span class="badge badge-green" id="det-situacao"></span>
+                        <span class="badge badge-blue" id="det-tipo">FILIAL</span>
+                    </div>
+                </div>
+                <div class="info-grid">
+                    <div class="info-card">
+                        <h4>Dados da Empresa</h4>
+                        <div class="info-line"><span>Natureza Jurídica</span><strong id="det-natureza"></strong></div>
+                        <div class="info-line"><span>Porte</span><strong id="det-porte"></strong></div>
+                        <div class="info-line"><span>Capital Social</span><strong id="det-capital"></strong></div>
+                    </div>
+                    <div class="info-card">
+                        <h4>Estabelecimento</h4>
+                        <div class="info-line"><span>Início da Atividade</span><strong id="det-inicio"></strong></div>
+                        <div class="info-line"><span>Data da Situação Cadastral</span><strong id="det-data-sit"></strong></div>
+                        <div class="info-line"><span>CNAE Principal</span><strong id="det-cnae"></strong></div>
+                    </div>
+                    <div class="info-card full-width">
+                        <h4>Endereço</h4>
+                        <div class="info-line"><span>Logradouro</span><strong id="det-logradouro"></strong></div>
+                        <div class="info-line"><span>Número</span><strong id="det-numero"></strong></div>
+                        <div class="info-line"><span>Complemento</span><strong id="det-complemento"></strong></div>
+                        <div class="info-line"><span>Bairro</span><strong id="det-bairro"></strong></div>
+                        <div class="info-line"><span>CEP</span><strong id="det-cep"></strong></div>
+                        <div class="info-line"><span>Município / UF</span><strong id="det-municipio"></strong></div>
+                    </div>
+                    <div class="info-card full-width">
+                        <h4>Contatos</h4>
+                        <div class="info-line"><span>Telefone 1</span><strong id="det-tel1"></strong></div>
+                        <div class="info-line"><span>Telefone 2</span><strong id="det-tel2"></strong></div>
+                        <div class="info-line"><span>E-mail</span><strong id="det-email"></strong></div>
                     </div>
                 </div>
             </div>
-            
-            <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
-                <button class="btn-secondary" id="btn-back-main" style="width: auto;">
-                    <i class="fas fa-arrow-left"></i> Voltar para Prospecção
-                </button>
-            </div>
-        </div>
-    </main>
-</div>
-
-<!-- MODAIS -->
-<div id="details-modal" class="modal-overlay">
-    <div class="modal-content large-modal">
-        <span class="close-modal" id="close-details-modal">&times;</span>
-        <div class="modal-header">
-            <div><h2>Detalhes do Estabelecimento</h2><p>Informações cadastrais e comerciais do estabelecimento</p></div>
-        </div>
-        <div class="modal-scroll-area">
-            <div class="card principal-card">
-                <span class="cnpj-label" id="det-cnpj"></span>
-                <h3 id="det-razao"></h3>
-                <span class="fantasia-label" id="det-fantasia"></span>
-                <div class="badges">
-                    <span class="badge badge-green" id="det-situacao"></span>
-                    <span class="badge badge-blue" id="det-tipo">FILIAL</span>
-                </div>
-            </div>
-            <div class="info-grid">
-                <div class="card info-card">
-                    <h4>Dados da Empresa</h4>
-                    <div class="info-line"><span>Natureza Jurídica</span><strong id="det-natureza"></strong></div>
-                    <div class="info-line"><span>Porte</span><strong id="det-porte"></strong></div>
-                    <div class="info-line"><span>Capital Social</span><strong id="det-capital"></strong></div>
-                </div>
-                <div class="card info-card">
-                    <h4>Estabelecimento</h4>
-                    <div class="info-line"><span>Início da Atividade</span><strong id="det-inicio"></strong></div>
-                    <div class="info-line"><span>Data da Situação Cadastral</span><strong id="det-data-sit"></strong></div>
-                    <div class="info-line"><span>CNAE Principal</span><strong id="det-cnae"></strong></div>
-                </div>
-                <div class="card info-card full-width">
-                    <h4>Endereço</h4>
-                    <div class="info-line"><span>Logradouro</span><strong id="det-logradouro"></strong></div>
-                    <div class="info-line"><span>Número</span><strong id="det-numero"></strong></div>
-                    <div class="info-line"><span>Complemento</span><strong id="det-complemento"></strong></div>
-                    <div class="info-line"><span>Bairro</span><strong id="det-bairro"></strong></div>
-                    <div class="info-line"><span>CEP</span><strong id="det-cep"></strong></div>
-                    <div class="info-line"><span>Município / UF</span><strong id="det-municipio"></strong></div>
-                </div>
-                <div class="card info-card full-width">
-                    <h4>Contatos</h4>
-                    <div class="info-line"><span>Telefone 1</span><strong id="det-tel1"></strong></div>
-                    <div class="info-line"><span>Telefone 2</span><strong id="det-tel2"></strong></div>
-                    <div class="info-line"><span>E-mail</span><strong id="det-email"></strong></div>
+            <div class="modal-footer">
+                <button class="btn-secondary">Ignorar Cadastro</button>
+                <div class="footer-actions">
+                    <button class="btn-light-blue"><i class="fas fa-robot"></i> Dados com IA</button>
+                    <button class="btn-primary btn-register"><i class="fas fa-user-plus"></i> Registro CRM</button>
                 </div>
             </div>
         </div>
-        <div class="modal-footer">
-            <button class="btn-secondary">Ignorar Cadastro</button>
-            <div class="footer-actions"><button class="btn-light-blue">Dados com IA</button><button class="btn-primary btn-register">Registro CRM</button></div>
+    </div>
+
+    <div id="generic-modal" class="modal-overlay">
+        <div class="modal-content generic-content">
+            <span class="close-modal" id="close-generic-modal">&times;</span>
+            <h2 id="generic-modal-title" style="margin-bottom: 5px; text-transform: capitalize;"></h2>
+            <p id="generic-modal-subtitle" style="color: #666; font-size: 14px; margin-bottom: 20px;"></p>
+            <div class="input-with-icon generic-search-box">
+                <input type="text" id="generic-search" placeholder="Pesquisar...">
+                <i class="fas fa-search" style="font-size: 18px; color: #9ca3af; position: absolute; right: 15px; top: 50%; transform: translateY(-50%);"></i>
+            </div>
+            <div id="generic-modal-body" class="generic-modal-list-container"></div>
         </div>
     </div>
-</div>
 
-<div id="generic-modal" class="modal-overlay">
-    <div class="modal-content generic-content">
-        <span class="close-modal" id="close-generic-modal">&times;</span>
-        <h2 id="generic-modal-title" style="margin-bottom: 5px; text-transform: capitalize;"></h2>
-        <p id="generic-modal-subtitle" style="color: #666; font-size: 14px; margin-bottom: 20px;"></p>
-        <div class="input-with-icon generic-search-box">
-            <input type="text" id="generic-search" placeholder="Pesquisar...">
-            <i class="fas fa-search" style="font-size: 18px; color: #9ca3af; position: absolute; right: 15px; top: 50%; transform: translateY(-50%);"></i>
-        </div>
-        <div id="generic-modal-body" class="generic-modal-list-container"></div>
-    </div>
-</div>
-
-<div id="confirm-modal" class="modal-overlay">
-    <div class="modal-content confirm-content">
-        <span class="close-modal" id="close-confirm-modal">&times;</span>
-        <div class="confirm-icon"><i class="fas fa-exclamation-triangle"></i></div>
-        <h3 id="confirm-title">Confirmação</h3>
-        <p id="confirm-message">Tem certeza que deseja continuar?</p>
-        <div class="confirm-actions">
-            <button class="btn-secondary" id="btn-confirm-cancel">Cancelar</button>
-            <button class="btn-primary" id="btn-confirm-ok">Confirmar</button>
+    <div id="confirm-modal" class="modal-overlay">
+        <div class="modal-content confirm-content">
+            <span class="close-modal" id="close-confirm-modal">&times;</span>
+            <div class="confirm-icon"><i class="fas fa-exclamation-triangle"></i></div>
+            <h3 id="confirm-title">Confirmação</h3>
+            <p id="confirm-message">Tem certeza que deseja continuar?</p>
+            <div class="confirm-actions">
+                <button class="btn-secondary" id="btn-confirm-cancel">Cancelar</button>
+                <button class="btn-primary" id="btn-confirm-ok">Confirmar</button>
+            </div>
         </div>
     </div>
-</div>
 
-<script src="script.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
