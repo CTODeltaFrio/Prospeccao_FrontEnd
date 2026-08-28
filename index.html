@@ -4,9 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Prospecção de Empresas e Estabelecimentos</title>
+    <!-- Favicon SVG -->
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
-    <link rel="icon" type="image/png" href="favicon.png">
 </head>
 <body>
 
@@ -61,7 +62,6 @@
 
         <!-- TELA PRINCIPAL (PROSPECÇÃO) -->
         <div id="main-screen">
-            <!-- HEADER -->
             <header class="header">
                 <div>
                     <h1>Prospecção de Empresas e Estabelecimentos</h1>
@@ -81,7 +81,6 @@
                 </div>
             </header>
 
-            <!-- CARDS KPIs -->
             <section class="cards">
                 <div class="card">
                     <div class="card-icon blue"><i class="fas fa-city"></i></div>
@@ -113,7 +112,6 @@
                 </div>
             </section>
 
-            <!-- FILTROS -->
             <section class="filter-box">
                 <div class="filter-header">
                     <div class="filter-title">
@@ -187,14 +185,10 @@
                 </div>
             </section>
 
-            <!-- TABELA DE RESULTADOS -->
             <section class="results">
                 <div class="results-header">
                     <div class="results-title">
                         Resultados da Pesquisa
-                    </div>
-                    <div class="result-actions">
-                        <button class="icon-btn active"><i class="fas fa-table"></i></button>
                     </div>
                 </div>
 
@@ -365,6 +359,7 @@
             <div class="confirm-actions">
                 <button class="btn-secondary" id="btn-confirm-cancel">Cancelar</button>
                 <button class="btn-primary" id="btn-confirm-ok">Confirmar</button>
+                <button class="btn-danger" id="btn-confirm-discard" style="display:none;">Descartar</button>
             </div>
         </div>
     </div>

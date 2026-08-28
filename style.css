@@ -599,7 +599,7 @@ tbody tr:hover {
     text-align: center;
 }
 
-/* ================== TELA DE SEGMENTOS (CORRIGIDA, SEM CONFLITOS) ================== */
+/* ================== TELA DE SEGMENTOS ================== */
 
 .container {
     max-width: 1200px;
@@ -1528,6 +1528,23 @@ tbody tr:hover {
 
 .cnae-tooltip-content::-webkit-scrollbar-thumb:hover {
     background: rgba(255,255,255,0.7);
+}
+
+/* ================== BOTÃO PERIGO (DESCARTAR) ================== */
+.btn-danger {
+    background: #ef4444;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: .2s;
+}
+
+.btn-danger:hover {
+    background: #dc2626;
 }
 
 /* ================== RESPONSIVO ================== */

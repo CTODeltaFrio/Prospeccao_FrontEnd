@@ -64,6 +64,13 @@ document.addEventListener('DOMContentLoaded', function() {
         let cnaeData = [];
         let currentGenericContext = null;
 
+        // Controle de alterações não salvas
+        let isDirty = false;
+
+        function setDirty(value) {
+            isDirty = value;
+        }
+
         // =====================================================
         // TRANSFORMAR TODOS OS SELECTS EM DROPDOWNS CUSTOMIZADOS
         // =====================================================
@@ -169,7 +176,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        // ========== DADOS MOCK ==========
+        // ========== DADOS MOCK (20 empresas) ==========
         const mockData = [
             { cnpj: '06.771.019/0001-31', fantasia: 'MATADOURO FICAGNA', razao: 'ZELO FICAGNA', situacao: 'ATIVA', uf: 'RS', telefone: '(51) 3722-4664', ddd: '51', segmento: 'Frigorífico', municipio: 'Cachoeira do Sul', tipo: 'FILIAL', natureza: 'Sociedade Empresária Limitada', porte: 'Demais', capital: 'R$ 0,00', inicio: '02/05/2002', dataSit: '02/05/2002', cnae_principal: '1011201', cnae_secundario: '4637101', logradouro: 'LOCALIDADE DE TRES VENDAS', numero: 'S/N', complemento: '-', bairro: 'TRES VENDAS', cep: '96501-035', municipio: 'CACHOEIRA DO SUL - RS', tel2: '-', email: '-' },
             { cnpj: '01.234.172/0001-82', fantasia: 'FRIGORIFICO BONNA', razao: 'FRIGORIFICO BONNA CARNE LTDA', situacao: 'ATIVA', uf: 'RS', telefone: '(54) 3231-0000', ddd: '54', segmento: 'Frigorífico', municipio: 'Caxias do Sul', tipo: 'MATRIZ', natureza: 'Sociedade Empresária Limitada', porte: 'Demais', capital: 'R$ 100.000,00', inicio: '15/08/1999', dataSit: '15/08/1999', cnae_principal: '1011201', cnae_secundario: '1013901', logradouro: 'ROD BR 116', numero: 'KM 45', complemento: 'SALA 1', bairro: 'ZONA RURAL', cep: '95000-000', municipio: 'CAXIAS DO SUL - RS', tel2: '-', email: 'contato@bonnacarne.com.br' },
@@ -261,21 +268,48 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         function closeSegmentScreen() {
+            setDirty(false);
             segmentScreen.style.display = 'none';
             mainScreen.style.display = 'block';
             updateSegmentFilter();
         }
 
-        btnHome.addEventListener('click', function() { closeSegmentScreen(); closeAllModals(); });
-        // ⬇️ ADICIONADO: Dashboard volta para a tela principal
-        document.getElementById('menu-dashboard').addEventListener('click', function() { 
-            closeSegmentScreen(); 
-            closeAllModals(); 
+        // ⬇️ EVENTOS DE NAVEGAÇÃO CORRIGIDOS (modal não fecha imediatamente)
+        btnHome.addEventListener('click', function() {
+            if (isDirty) {
+                showConfirm('Alterações não salvas', 'Deseja salvar antes de sair?', function() {
+                    document.getElementById('segmentoForm').requestSubmit();
+                    closeSegmentScreen();
+                });
+            } else {
+                closeSegmentScreen();
+                closeAllModals();
+            }
         });
 
-        function novoSegmento() { resetSegmentForm(); }
+        document.getElementById('menu-dashboard').addEventListener('click', function() {
+            if (isDirty) {
+                showConfirm('Alterações não salvas', 'Deseja salvar antes de sair?', function() {
+                    document.getElementById('segmentoForm').requestSubmit();
+                    closeSegmentScreen();
+                });
+            } else {
+                closeSegmentScreen();
+                closeAllModals();
+            }
+        });
 
-        window.novoSegmento = novoSegmento;
+        // ========== NOVO SEGMENTO ==========
+        window.novoSegmento = function() {
+            if (isDirty) {
+                showConfirm('Alterações não salvas', 'Deseja salvar antes de criar um novo segmento?', function() {
+                    document.getElementById('segmentoForm').requestSubmit();
+                    resetSegmentForm();
+                });
+            } else {
+                resetSegmentForm();
+            }
+        };
 
         function resetSegmentForm() {
             segmentNome.value = '';
@@ -289,9 +323,10 @@ document.addEventListener('DOMContentLoaded', function() {
             currentLinkedCnaes = [];
             linkCnaeSelect.value = '';
             refreshCustomSelect(linkCnaeSelect);
+            setDirty(false);
         }
 
-        // ===== FUNÇÃO CORRIGIDA: renderSegmentTable com tooltip (hover e clique) =====
+        // ========== RENDER TABELA DE SEGMENTOS (com tooltip) ==========
         function renderSegmentTable(searchTerm = '') {
             segmentTableBody.innerHTML = '';
             const term = searchTerm.toLowerCase();
@@ -382,6 +417,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 populateLinkSelect();
                 linkCnaeSelect.value = '';
                 refreshCustomSelect(linkCnaeSelect);
+                setDirty(true);
             }
         };
 
@@ -403,8 +439,10 @@ document.addEventListener('DOMContentLoaded', function() {
             currentLinkedCnaes.splice(index, 1);
             renderLinkedCnaes();
             populateLinkSelect();
+            setDirty(true);
         };
 
+        // ========== SUBMIT ==========
         document.getElementById('segmentoForm').addEventListener('submit', function(e) {
             e.preventDefault();
             const nome = segmentNome.value.trim();
@@ -422,15 +460,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 segmentData.push({ id: newId, nome });
                 currentLinkedCnaes.forEach(cnae => segmentoCnaeLinks.push({ segmentoId: newId, cnaeCodigo: cnae.codigo }));
             }
+            setDirty(false);
             resetSegmentForm();
             renderSegmentTable(segmentSearch.value);
             updateSegmentFilter();
+            confirmModal.style.display = 'none';
         });
 
-        btnCancelSegment.addEventListener('click', function() { resetSegmentForm(); });
+        // ========== BOTÃO CANCELAR EDIÇÃO ==========
+        btnCancelSegment.addEventListener('click', function() {
+            resetSegmentForm();
+        });
 
         segmentSearch.addEventListener('input', function() { renderSegmentTable(this.value); });
 
+        // ========== EDITAR ==========
         function editarSegmento(id) {
             const seg = segmentData.find(s => s.id === id);
             if (!seg) return;
@@ -445,10 +489,10 @@ document.addEventListener('DOMContentLoaded', function() {
             currentLinkedCnaes = allCnaesCache.filter(cnae => segmentoCnaeLinks.some(link => link.segmentoId === id && link.cnaeCodigo === cnae.codigo));
             renderLinkedCnaes();
             populateLinkSelect();
+            setDirty(true);
         }
 
-        window.editarSegmento = editarSegmento;
-
+        // ========== EXCLUIR ==========
         function excluirSegmento(id) {
             const seg = segmentData.find(s => s.id === id);
             showConfirm('Excluir Segmento', `Tem certeza que deseja excluir o segmento "${seg.nome}"?`, function() {
@@ -459,8 +503,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (editingSegmentId === id) resetSegmentForm();
             });
         }
-
-        window.excluirSegmento = excluirSegmento;
 
         // ========== MODAIS ==========
         function closeAllModals() {
@@ -483,9 +525,10 @@ document.addEventListener('DOMContentLoaded', function() {
         function showConfirm(title, message, callback) {
             confirmTitle.innerText = title;
             confirmMessage.innerText = message;
+            btnConfirmOk.innerText = 'Confirmar';
+            btnConfirmCancel.innerText = 'Cancelar';
             confirmCallback = callback;
             btnConfirmCancel.style.display = 'inline-block';
-            btnConfirmOk.innerText = 'Confirmar';
             confirmModal.style.display = 'flex';
         }
 
@@ -494,17 +537,26 @@ document.addEventListener('DOMContentLoaded', function() {
             confirmMessage.innerText = message;
             btnConfirmCancel.style.display = 'none';
             btnConfirmOk.innerText = 'OK';
-            confirmCallback = function() {
-                confirmModal.style.display = 'none';
-                confirmCallback = null;
-                btnConfirmCancel.style.display = 'inline-block';
-                btnConfirmOk.innerText = 'Confirmar';
-            };
+            confirmCallback = null;
             confirmModal.style.display = 'flex';
         }
 
-        btnConfirmOk.addEventListener('click', function() { if (confirmCallback) confirmCallback(); });
-        btnConfirmCancel.addEventListener('click', function() { confirmModal.style.display = 'none'; confirmCallback = null; });
+        // Eventos dos botões do modal
+        btnConfirmOk.addEventListener('click', function() {
+            if (confirmCallback) {
+                const callback = confirmCallback;
+                confirmCallback = null;
+                callback();
+            }
+            confirmModal.style.display = 'none';
+            btnConfirmCancel.style.display = 'inline-block';
+            btnConfirmOk.innerText = 'Confirmar';
+        });
+
+        btnConfirmCancel.addEventListener('click', function() {
+            confirmModal.style.display = 'none';
+            confirmCallback = null;
+        });
 
         // ========== TABELA PRINCIPAL ==========
         function renderTable(data) {
