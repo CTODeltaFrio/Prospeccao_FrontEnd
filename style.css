@@ -1165,6 +1165,7 @@ body.dark-mode .btn-secondary:hover {
 }
 
 /* ===== ANIMAÇÃO DE ELEVAÇÃO NOS BOTÕES DA TABELA DE SEGMENTOS ===== */
+/* ===== ANIMAÇÃO DE ELEVAÇÃO NOS BOTÕES DA TABELA DE SEGMENTOS ===== */
 #segmentosTable .btn-table {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     border-radius: 8px;
@@ -1173,6 +1174,62 @@ body.dark-mode .btn-secondary:hover {
     position: relative;
     overflow: hidden;
     cursor: pointer;
+}
+
+/* Botão Editar - MODO CLARO */
+#segmentosTable .btn-table[data-action="edit"] {
+    background: #eff6ff;
+    color: #1d4ed8;
+    border: 1px solid #bfdbfe;
+}
+
+#segmentosTable .btn-table[data-action="edit"]:hover {
+    background: #1d4ed8;
+    color: white;
+    border-color: #1d4ed8;
+    box-shadow: 0 6px 16px rgba(29, 78, 216, 0.3);
+}
+
+/* Botão Excluir - MODO CLARO */
+#segmentosTable .btn-delete {
+    background: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+}
+
+#segmentosTable .btn-delete:hover {
+    background: #dc2626;
+    color: white;
+    border-color: #dc2626;
+    box-shadow: 0 6px 16px rgba(220, 38, 38, 0.3);
+}
+
+/* Botão Editar - MODO ESCURO (mais vivo, mas não estourado) */
+body.dark-mode #segmentosTable .btn-table[data-action="edit"] {
+    background: #1e3a5f;
+    color: #60a5fa;
+    border-color: #1e3a5f;
+}
+
+body.dark-mode #segmentosTable .btn-table[data-action="edit"]:hover {
+    background: #2563eb;
+    color: #ffffff;
+    border-color: #2563eb;
+    box-shadow: 0 6px 16px rgba(37, 99, 235, 0.5);
+}
+
+/* Botão Excluir - MODO ESCURO (vermelho equilibrado) */
+body.dark-mode #segmentosTable .btn-delete {
+    background: #1e3a5f;
+    color: #f87171;
+    border-color: #1e3a5f;
+}
+
+body.dark-mode #segmentosTable .btn-delete:hover {
+    background: #ef4444;
+    color: #ffffff;
+    border-color: #ef4444;
+    box-shadow: 0 6px 16px rgba(239, 68, 68, 0.5);
 }
 
 #segmentosTable .btn-table:hover {
@@ -1191,38 +1248,36 @@ body.dark-mode .btn-secondary:hover {
     border: 1px solid #bfdbfe;
 }
 
+/* Botão Editar - MODO ESCURO */
 body.dark-mode #segmentosTable .btn-table[data-action="edit"] {
-    background: #1e3a5f;
-    color: #60a5fa;
-    border-color: #1e3a5f;
-}
-
-#segmentosTable .btn-table[data-action="edit"]:hover {
-    background: #1d4ed8;
-    color: white;
+    background: #1d4ed8;         /* Azul mais vivo */
+    color: #ffffff;
     border-color: #1d4ed8;
-    box-shadow: 0 6px 16px rgba(29, 78, 216, 0.3);
 }
 
-#segmentosTable .btn-delete {
-    background: #fef2f2;
-    color: #dc2626;
-    border: 1px solid #fecaca;
+body.dark-mode #segmentosTable .btn-table[data-action="edit"]:hover {
+    background: #2563eb;         /* Azul mais claro */
+    color: #ffffff;
+    border-color: #2563eb;
+    box-shadow: 0 6px 16px rgba(37, 99, 235, 0.5);
 }
 
+/* Botão Excluir - MODO ESCURO */
 body.dark-mode #segmentosTable .btn-delete {
-    background: #1e3a5f;
-    color: #f87171;
-    border-color: #1e3a5f;
-}
-
-#segmentosTable .btn-delete:hover {
-    background: #dc2626;
-    color: white;
+    background: #dc2626;         /* Vermelho vivo */
+    color: #ffffff;
     border-color: #dc2626;
-    box-shadow: 0 6px 16px rgba(220, 38, 38, 0.3);
 }
 
+body.dark-mode #segmentosTable .btn-delete:hover {
+    background: #ef4444;         /* Vermelho mais claro */
+    color: #ffffff;
+    border-color: #ef4444;
+    box-shadow: 0 6px 16px rgba(239, 68, 68, 0.5);
+}
+body.dark-mode {
+    --bg-hover: #061734;  /* Um pouco mais escuro que o fundo dos cards */
+}
 #segment-form-card.editing-mode {
     border: 2px solid #2563eb;
     background: var(--bg-card);
@@ -1748,11 +1803,14 @@ body.dark-mode .generic-card.selected {
     box-shadow: 0 10px 25px rgba(0,0,0,0.12);
     max-height: 280px;
     overflow-y: auto;
-    z-index: 1000;
+    z-index: 9999;
     display: none;
     padding: 6px;
 }
-
+.filter-box {
+    position: relative;   /* ⬅️ Adicione */
+    z-index: 100;         /* ⬅️ Adicione */
+}
 .custom-select.open .custom-select-options {
     display: block;
     animation: fadeIn 0.15s ease;
@@ -2086,9 +2144,17 @@ body.dark-mode .tooltip-trigger {
         overflow-x: auto;
     }
 
+    .results {
+    position: static;     /* Padrão, caso esteja algo diferente */
+    z-index: auto;
+}
     table {
         min-width: 900px;
     }
+}
+body.dark-mode #segmentosTable .btn-table[data-action="edit"] {
+    background: #1e40af;   /* Azul mais vibrante */
+    color: #ffffff;
 }
 
 /* ============ BOTÕES DO MODAL - AJUSTES ============ */
