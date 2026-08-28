@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Prospecção de Empresas e Estabelecimentos</title>
-    <!-- Favicon SVG -->
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
@@ -12,16 +11,17 @@
 <body>
 
     <!-- SIDEBAR -->
-    <aside class="sidebar">
-        <div class="logo" id="btn-home">
-            <div class="logo-icon"><i class="fas fa-search"></i></div>
-            <span>Prospecção</span>
-        </div>
+    <aside class="sidebar" id="sidebar">
+        <!-- Botão toggle -->
+        <button class="sidebar-toggle" id="sidebar-toggle">
+            <i class="fas fa-bars"></i>
+        </button>
 
+        <!-- Primeiro item -->
         <div class="menu-item active" id="menu-dashboard">
-            <div class="menu-icon"><i class="fas fa-chart-line"></i></div>
+            <div class="menu-icon"><i class="fas fa-search"></i></div>
             <div class="menu-text">
-                <strong>Dashboard</strong>
+                <strong>Prospecção</strong>
                 <small>Visão geral</small>
             </div>
         </div>
@@ -30,30 +30,22 @@
 
         <div class="menu-item" id="menu-cnaes">
             <div class="menu-icon"><i class="fas fa-list-ul"></i></div>
-            <div class="menu-text">
-                <strong>CNAEs</strong>
-            </div>
+            <div class="menu-text"><strong>CNAEs</strong></div>
         </div>
 
         <div class="menu-item" id="menu-municipios">
             <div class="menu-icon"><i class="fas fa-map-marker-alt"></i></div>
-            <div class="menu-text">
-                <strong>Municípios</strong>
-            </div>
+            <div class="menu-text"><strong>Municípios</strong></div>
         </div>
 
         <div class="menu-item" id="menu-natureza">
             <div class="menu-icon"><i class="fas fa-balance-scale"></i></div>
-            <div class="menu-text">
-                <strong>Natureza Jurídica</strong>
-            </div>
+            <div class="menu-text"><strong>Natureza Jurídica</strong></div>
         </div>
 
         <div class="menu-item" id="menu-segmentos">
             <div class="menu-icon"><i class="fas fa-layer-group"></i></div>
-            <div class="menu-text">
-                <strong>Segmentos</strong>
-            </div>
+            <div class="menu-text"><strong>Segmentos</strong></div>
         </div>
     </aside>
 
@@ -84,31 +76,19 @@
             <section class="cards">
                 <div class="card">
                     <div class="card-icon blue"><i class="fas fa-city"></i></div>
-                    <div class="card-info">
-                        <label>Empresas</label>
-                        <strong>69.062.849</strong>
-                    </div>
+                    <div class="card-info"><label>Empresas</label><strong>69.062.849</strong></div>
                 </div>
                 <div class="card">
                     <div class="card-icon green"><i class="fas fa-store"></i></div>
-                    <div class="card-info">
-                        <label>Estabelecimentos</label>
-                        <strong>72.318.961</strong>
-                    </div>
+                    <div class="card-info"><label>Estabelecimentos</label><strong>72.318.961</strong></div>
                 </div>
                 <div class="card">
                     <div class="card-icon purple"><i class="fas fa-users"></i></div>
-                    <div class="card-info">
-                        <label>Sócios</label>
-                        <strong>27.992.378</strong>
-                    </div>
+                    <div class="card-info"><label>Sócios</label><strong>27.992.378</strong></div>
                 </div>
                 <div class="card">
                     <div class="card-icon orange"><i class="fas fa-sack-dollar"></i></div>
-                    <div class="card-info">
-                        <label>Simples (MEI)</label>
-                        <strong>49.445.426</strong>
-                    </div>
+                    <div class="card-info"><label>Simples (MEI)</label><strong>49.445.426</strong></div>
                 </div>
             </section>
 
@@ -124,9 +104,7 @@
                 <div class="filter-row">
                     <div class="field">
                         <label>UF</label>
-                        <select id="filter-uf" class="input">
-                            <option value="">Todos</option>
-                        </select>
+                        <select id="filter-uf" class="input"><option value="">Todos</option></select>
                     </div>
                     <div class="field">
                         <label>Região</label>
@@ -155,9 +133,7 @@
                     </div>
                     <div class="field" id="group-segmento">
                         <label>Segmento</label>
-                        <select id="filter-segmento" class="input">
-                            <option value="">Todos</option>
-                        </select>
+                        <select id="filter-segmento" class="input"><option value="">Todos</option></select>
                     </div>
                     <div class="field" id="group-escopo-segmento">
                         <label>Escopo do Segmento</label>
@@ -187,9 +163,7 @@
 
             <section class="results">
                 <div class="results-header">
-                    <div class="results-title">
-                        Resultados da Pesquisa
-                    </div>
+                    <div class="results-title">Resultados da Pesquisa</div>
                 </div>
 
                 <table>
@@ -327,7 +301,7 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn-secondary">Ignorar Cadastro</button>
+                <button class="btn-secondary" id="btn-ignore-cadastro">Ignorar Cadastro</button>
                 <div class="footer-actions">
                     <button class="btn-light-blue">Dados com IA</button>
                     <button class="btn-primary btn-register">Registro CRM</button>
@@ -357,8 +331,8 @@
             <p id="confirm-message">Tem certeza que deseja continuar?</p>
             <div class="confirm-actions">
                 <button class="btn-secondary" id="btn-confirm-cancel">Cancelar</button>
-                <button class="btn-primary" id="btn-confirm-ok">Confirmar</button>
                 <button class="btn-danger" id="btn-confirm-discard" style="display:none;">Descartar</button>
+                <button class="btn-primary" id="btn-confirm-ok">Confirmar</button>
             </div>
         </div>
     </div>

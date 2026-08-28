@@ -2,6 +2,13 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log("✅ Página carregada! O JavaScript está rodando.");
 
     try {
+        // ===== SIDEBAR COLAPSÁVEL =====
+        const sidebar = document.getElementById('sidebar');
+        const sidebarToggle = document.getElementById('sidebar-toggle');
+        sidebarToggle.addEventListener('click', function() {
+            sidebar.classList.toggle('collapsed');
+        });
+
         // Elementos da tela principal
         const mainScreen = document.getElementById('main-screen');
         const segmentScreen = document.getElementById('segment-screen');
@@ -23,7 +30,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const groupEscopoCnae = document.getElementById('group-escopo-cnae');
 
         // Elementos da tela de segmentos
-        const btnHome = document.getElementById('btn-home');
         const btnSaveSegment = document.getElementById('btn-save-segment');
         const btnCancelSegment = document.getElementById('btn-cancel-segment');
         const segmentNome = document.getElementById('segment-nome');
@@ -45,6 +51,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const confirmMessage = document.getElementById('confirm-message');
         const btnConfirmOk = document.getElementById('btn-confirm-ok');
         const btnConfirmCancel = document.getElementById('btn-confirm-cancel');
+        const btnConfirmDiscard = document.getElementById('btn-confirm-discard');
         let confirmCallback = null;
 
         const genericModalBody = document.getElementById('generic-modal-body');
@@ -274,25 +281,99 @@ document.addEventListener('DOMContentLoaded', function() {
             updateSegmentFilter();
         }
 
-        // ⬇️ EVENTOS DE NAVEGAÇÃO CORRIGIDOS (modal não fecha imediatamente)
-        btnHome.addEventListener('click', function() {
-            if (isDirty) {
-                showConfirm('Alterações não salvas', 'Deseja salvar antes de sair?', function() {
-                    document.getElementById('segmentoForm').requestSubmit();
-                    closeSegmentScreen();
-                });
-            } else {
-                closeSegmentScreen();
-                closeAllModals();
+        // ========== FUNÇÕES DOS MODAIS ==========
+        function closeAllModals() {
+            if (detailsModal.style.display === 'flex') detailsModal.style.display = 'none';
+            if (genericModal.style.display === 'flex') genericModal.style.display = 'none';
+            if (confirmModal.style.display === 'flex') confirmModal.style.display = 'none';
+            confirmCallback = null;
+        }
+
+        document.addEventListener('keydown', function(event) { if (event.key === 'Escape') closeAllModals(); });
+
+        detailsClose.addEventListener('click', function() { detailsModal.style.display = 'none'; });
+        genericClose.addEventListener('click', function() { genericModal.style.display = 'none'; });
+        confirmClose.addEventListener('click', function() { confirmModal.style.display = 'none'; });
+
+        detailsModal.addEventListener('click', function(e) { if(e.target === this) detailsModal.style.display = 'none'; });
+        genericModal.addEventListener('click', function(e) { if(e.target === this) genericModal.style.display = 'none'; });
+        confirmModal.addEventListener('click', function(e) { if(e.target === this) confirmModal.style.display = 'none'; });
+
+        function showConfirm(title, message, callback) {
+            confirmTitle.innerText = title;
+            confirmMessage.innerText = message;
+            btnConfirmOk.innerText = 'Confirmar';
+            btnConfirmCancel.innerText = 'Cancelar';
+            btnConfirmDiscard.style.display = 'none';
+            confirmCallback = callback;
+            btnConfirmCancel.style.display = 'inline-block';
+            confirmModal.style.display = 'flex';
+        }
+
+        function showWarning(message, title = 'Aviso') {
+            confirmTitle.innerText = title;
+            confirmMessage.innerText = message;
+            btnConfirmOk.innerText = 'OK';
+            btnConfirmCancel.style.display = 'none';
+            btnConfirmDiscard.style.display = 'none';
+            confirmCallback = null;
+            confirmModal.style.display = 'flex';
+        }
+
+        // Função específica para alterações não salvas (mostra 3 botões)
+        function showUnsavedChangesModal(message, onSave, onDiscard) {
+            confirmTitle.innerText = 'Alterações não salvas';
+            confirmMessage.innerText = message;
+            btnConfirmOk.innerText = 'Salvar';
+            btnConfirmCancel.innerText = 'Cancelar';
+            btnConfirmDiscard.style.display = 'inline-block';
+            confirmCallback = onSave;
+            confirmModal.style.display = 'flex';
+
+            // Configura o botão Descartar
+            btnConfirmDiscard.onclick = function() {
+                if (onDiscard) onDiscard();
+                confirmModal.style.display = 'none';
+                btnConfirmDiscard.style.display = 'none';
+                btnConfirmCancel.style.display = 'inline-block';
+                btnConfirmOk.innerText = 'Confirmar';
+                confirmCallback = null;
+            };
+        }
+
+        // Configurações dos botões do modal
+        btnConfirmOk.addEventListener('click', function() {
+            if (confirmCallback) {
+                const callback = confirmCallback;
+                confirmCallback = null;
+                callback();
             }
+            confirmModal.style.display = 'none';
+            btnConfirmCancel.style.display = 'inline-block';
+            btnConfirmOk.innerText = 'Confirmar';
+            btnConfirmDiscard.style.display = 'none';
         });
 
+        btnConfirmCancel.addEventListener('click', function() {
+            confirmModal.style.display = 'none';
+            confirmCallback = null;
+            btnConfirmDiscard.style.display = 'none';
+        });
+
+        // ========== EVENTOS DE NAVEGAÇÃO (COM ALTERAÇÕES NÃO SALVAS) ==========
         document.getElementById('menu-dashboard').addEventListener('click', function() {
             if (isDirty) {
-                showConfirm('Alterações não salvas', 'Deseja salvar antes de sair?', function() {
-                    document.getElementById('segmentoForm').requestSubmit();
-                    closeSegmentScreen();
-                });
+                showUnsavedChangesModal(
+                    'Deseja salvar antes de sair?',
+                    function() {
+                        document.getElementById('segmentoForm').requestSubmit();
+                        closeSegmentScreen();
+                    },
+                    function() { // Descartar
+                        resetSegmentForm();
+                        closeSegmentScreen();
+                    }
+                );
             } else {
                 closeSegmentScreen();
                 closeAllModals();
@@ -302,15 +383,22 @@ document.addEventListener('DOMContentLoaded', function() {
         // ========== NOVO SEGMENTO ==========
         window.novoSegmento = function() {
             if (isDirty) {
-                showConfirm('Alterações não salvas', 'Deseja salvar antes de criar um novo segmento?', function() {
-                    document.getElementById('segmentoForm').requestSubmit();
-                    resetSegmentForm();
-                });
+                showUnsavedChangesModal(
+                    'Deseja salvar antes de criar um novo segmento?',
+                    function() {
+                        document.getElementById('segmentoForm').requestSubmit();
+                        resetSegmentForm();
+                    },
+                    function() { // Descartar
+                        resetSegmentForm();
+                    }
+                );
             } else {
                 resetSegmentForm();
             }
         };
 
+        // ========== RESET DO FORMULÁRIO ==========
         function resetSegmentForm() {
             segmentNome.value = '';
             editingSegmentId = null;
@@ -503,60 +591,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
 
-        // ========== MODAIS ==========
-        function closeAllModals() {
-            if (detailsModal.style.display === 'flex') detailsModal.style.display = 'none';
-            if (genericModal.style.display === 'flex') genericModal.style.display = 'none';
-            if (confirmModal.style.display === 'flex') confirmModal.style.display = 'none';
-            confirmCallback = null;
-        }
-
-        document.addEventListener('keydown', function(event) { if (event.key === 'Escape') closeAllModals(); });
-
-        detailsClose.addEventListener('click', function() { detailsModal.style.display = 'none'; });
-        genericClose.addEventListener('click', function() { genericModal.style.display = 'none'; });
-        confirmClose.addEventListener('click', function() { confirmModal.style.display = 'none'; });
-
-        detailsModal.addEventListener('click', function(e) { if(e.target === this) detailsModal.style.display = 'none'; });
-        genericModal.addEventListener('click', function(e) { if(e.target === this) genericModal.style.display = 'none'; });
-        confirmModal.addEventListener('click', function(e) { if(e.target === this) confirmModal.style.display = 'none'; });
-
-        function showConfirm(title, message, callback) {
-            confirmTitle.innerText = title;
-            confirmMessage.innerText = message;
-            btnConfirmOk.innerText = 'Confirmar';
-            btnConfirmCancel.innerText = 'Cancelar';
-            confirmCallback = callback;
-            btnConfirmCancel.style.display = 'inline-block';
-            confirmModal.style.display = 'flex';
-        }
-
-        function showWarning(message, title = 'Aviso') {
-            confirmTitle.innerText = title;
-            confirmMessage.innerText = message;
-            btnConfirmCancel.style.display = 'none';
-            btnConfirmOk.innerText = 'OK';
-            confirmCallback = null;
-            confirmModal.style.display = 'flex';
-        }
-
-        // Eventos dos botões do modal
-        btnConfirmOk.addEventListener('click', function() {
-            if (confirmCallback) {
-                const callback = confirmCallback;
-                confirmCallback = null;
-                callback();
-            }
-            confirmModal.style.display = 'none';
-            btnConfirmCancel.style.display = 'inline-block';
-            btnConfirmOk.innerText = 'Confirmar';
-        });
-
-        btnConfirmCancel.addEventListener('click', function() {
-            confirmModal.style.display = 'none';
-            confirmCallback = null;
-        });
-
         // ========== TABELA PRINCIPAL ==========
         function renderTable(data) {
             tbody.innerHTML = '';
@@ -734,6 +768,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         });
+
+                    // ===== CONFIRMAÇÃO AO IGNORAR CADASTRO =====
+                    const btnIgnoreCadastro = document.getElementById('btn-ignore-cadastro');
+
+                    if (btnIgnoreCadastro) {
+                        btnIgnoreCadastro.addEventListener('click', function() {
+                            showConfirm('Ignorar Cadastro', 'Tem certeza que deseja ignorar este cadastro? Esta ação não poderá ser desfeita.', function() {
+                                // Fecha o modal de detalhes
+                                detailsModal.style.display = 'none';
+                                // FUTURAMENTE: excluir o registro da tela aqui
+                            });
+                        });
+                    }
+
 
         document.getElementById('menu-cnaes').addEventListener('click', () => {
             console.log("Clicou em CNAEs");
