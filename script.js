@@ -2,6 +2,21 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log("✅ Página carregada! O JavaScript está rodando.");
 
     try {
+        // ===== MODO ESCURO =====
+        const btnDarkMode = document.getElementById('btn-dark-mode');
+
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.body.classList.add('dark-mode');
+            btnDarkMode.innerHTML = '<i class="fas fa-sun"></i>';
+        }
+
+        btnDarkMode.addEventListener('click', function() {
+            document.body.classList.toggle('dark-mode');
+            const isDark = document.body.classList.contains('dark-mode');
+            localStorage.setItem('darkMode', isDark);
+            btnDarkMode.innerHTML = isDark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+        });
+
         // ===== SIDEBAR COLAPSÁVEL =====
         const sidebar = document.getElementById('sidebar');
         const sidebarToggle = document.getElementById('sidebar-toggle');
@@ -295,6 +310,18 @@ document.addEventListener('DOMContentLoaded', function() {
         genericClose.addEventListener('click', function() { genericModal.style.display = 'none'; });
         confirmClose.addEventListener('click', function() { confirmModal.style.display = 'none'; });
 
+        // ===== CONFIRMAÇÃO AO IGNORAR CADASTRO =====
+            const btnIgnoreCadastro = document.getElementById('btn-ignore-cadastro');
+
+            if (btnIgnoreCadastro) {
+                btnIgnoreCadastro.addEventListener('click', function() {
+                    showConfirm('Ignorar Cadastro', 'Tem certeza que deseja ignorar este cadastro? Esta ação não poderá ser desfeita.', function() {
+                        // Fecha o modal de detalhes
+                        detailsModal.style.display = 'none';
+                        // FUTURAMENTE: excluir o registro da tela aqui
+                    });
+                });
+            }
         detailsModal.addEventListener('click', function(e) { if(e.target === this) detailsModal.style.display = 'none'; });
         genericModal.addEventListener('click', function(e) { if(e.target === this) genericModal.style.display = 'none'; });
         confirmModal.addEventListener('click', function(e) { if(e.target === this) confirmModal.style.display = 'none'; });
@@ -330,7 +357,6 @@ document.addEventListener('DOMContentLoaded', function() {
             confirmCallback = onSave;
             confirmModal.style.display = 'flex';
 
-            // Configura o botão Descartar
             btnConfirmDiscard.onclick = function() {
                 if (onDiscard) onDiscard();
                 confirmModal.style.display = 'none';
@@ -341,7 +367,6 @@ document.addEventListener('DOMContentLoaded', function() {
             };
         }
 
-        // Configurações dos botões do modal
         btnConfirmOk.addEventListener('click', function() {
             if (confirmCallback) {
                 const callback = confirmCallback;
@@ -369,7 +394,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         document.getElementById('segmentoForm').requestSubmit();
                         closeSegmentScreen();
                     },
-                    function() { // Descartar
+                    function() {
                         resetSegmentForm();
                         closeSegmentScreen();
                     }
@@ -389,7 +414,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         document.getElementById('segmentoForm').requestSubmit();
                         resetSegmentForm();
                     },
-                    function() { // Descartar
+                    function() {
                         resetSegmentForm();
                     }
                 );
@@ -414,7 +439,7 @@ document.addEventListener('DOMContentLoaded', function() {
             setDirty(false);
         }
 
-        // ========== RENDER TABELA DE SEGMENTOS (com tooltip) ==========
+        // ========== RENDER TABELA DE SEGMENTOS ==========
         function renderSegmentTable(searchTerm = '') {
             segmentTableBody.innerHTML = '';
             const term = searchTerm.toLowerCase();
@@ -572,7 +597,7 @@ document.addEventListener('DOMContentLoaded', function() {
             btnCancelSegment.style.display = 'inline-block';
             formTitle.innerText = 'Editar segmento';
             segmentFormCard.classList.add('editing-mode');
-            
+
             currentLinkedCnaes = allCnaesCache.filter(cnae => segmentoCnaeLinks.some(link => link.segmentoId === id && link.cnaeCodigo === cnae.codigo));
             renderLinkedCnaes();
             populateLinkSelect();
@@ -768,20 +793,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         });
-
-                    // ===== CONFIRMAÇÃO AO IGNORAR CADASTRO =====
-                    const btnIgnoreCadastro = document.getElementById('btn-ignore-cadastro');
-
-                    if (btnIgnoreCadastro) {
-                        btnIgnoreCadastro.addEventListener('click', function() {
-                            showConfirm('Ignorar Cadastro', 'Tem certeza que deseja ignorar este cadastro? Esta ação não poderá ser desfeita.', function() {
-                                // Fecha o modal de detalhes
-                                detailsModal.style.display = 'none';
-                                // FUTURAMENTE: excluir o registro da tela aqui
-                            });
-                        });
-                    }
-
 
         document.getElementById('menu-cnaes').addEventListener('click', () => {
             console.log("Clicou em CNAEs");
