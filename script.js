@@ -349,7 +349,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td class="cell-id">#${seg.id.toString().padStart(4, '0')}</td>
                     <td>${seg.nome}</td>
                     <td>
                         <div class="cnae-tooltip">
