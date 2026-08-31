@@ -37,7 +37,7 @@ body {
     color: var(--text-main);
 }
 
-/* ================== SIDEBAR (COLAPSÁVEL) ================== */
+/* ================== SIDEBAR (COLAPSÃVEL) ================== */
 .sidebar {
     position: fixed;
     left: 0;
@@ -1164,8 +1164,8 @@ body.dark-mode .btn-secondary:hover {
     align-items: center;
 }
 
-/* ===== ANIMAÇÃO DE ELEVAÇÃO NOS BOTÕES DA TABELA DE SEGMENTOS ===== */
-/* ===== ANIMAÇÃO DE ELEVAÇÃO NOS BOTÕES DA TABELA DE SEGMENTOS ===== */
+/* ===== ANIMAÃ‡ÃƒO DE ELEVAÃ‡ÃƒO NOS BOTÃ•ES DA TABELA DE SEGMENTOS ===== */
+/* ===== ANIMAÃ‡ÃƒO DE ELEVAÃ‡ÃƒO NOS BOTÃ•ES DA TABELA DE SEGMENTOS ===== */
 #segmentosTable .btn-table {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     border-radius: 8px;
@@ -1176,7 +1176,7 @@ body.dark-mode .btn-secondary:hover {
     cursor: pointer;
 }
 
-/* Botão Editar - MODO CLARO */
+/* BotÃ£o Editar - MODO CLARO */
 #segmentosTable .btn-table[data-action="edit"] {
     background: #eff6ff;
     color: #1d4ed8;
@@ -1190,7 +1190,7 @@ body.dark-mode .btn-secondary:hover {
     box-shadow: 0 6px 16px rgba(29, 78, 216, 0.3);
 }
 
-/* Botão Excluir - MODO CLARO */
+/* BotÃ£o Excluir - MODO CLARO */
 #segmentosTable .btn-delete {
     background: #fef2f2;
     color: #dc2626;
@@ -1204,7 +1204,7 @@ body.dark-mode .btn-secondary:hover {
     box-shadow: 0 6px 16px rgba(220, 38, 38, 0.3);
 }
 
-/* Botão Editar - MODO ESCURO (mais vivo, mas não estourado) */
+/* BotÃ£o Editar - MODO ESCURO (mais vivo, mas nÃ£o estourado) */
 body.dark-mode #segmentosTable .btn-table[data-action="edit"] {
     background: #1e3a5f;
     color: #60a5fa;
@@ -1218,7 +1218,7 @@ body.dark-mode #segmentosTable .btn-table[data-action="edit"]:hover {
     box-shadow: 0 6px 16px rgba(37, 99, 235, 0.5);
 }
 
-/* Botão Excluir - MODO ESCURO (vermelho equilibrado) */
+/* BotÃ£o Excluir - MODO ESCURO (vermelho equilibrado) */
 body.dark-mode #segmentosTable .btn-delete {
     background: #1e3a5f;
     color: #f87171;
@@ -1248,7 +1248,7 @@ body.dark-mode #segmentosTable .btn-delete:hover {
     border: 1px solid #bfdbfe;
 }
 
-/* Botão Editar - MODO ESCURO */
+/* BotÃ£o Editar - MODO ESCURO */
 body.dark-mode #segmentosTable .btn-table[data-action="edit"] {
     background: #1d4ed8;         /* Azul mais vivo */
     color: #ffffff;
@@ -1262,7 +1262,7 @@ body.dark-mode #segmentosTable .btn-table[data-action="edit"]:hover {
     box-shadow: 0 6px 16px rgba(37, 99, 235, 0.5);
 }
 
-/* Botão Excluir - MODO ESCURO */
+/* BotÃ£o Excluir - MODO ESCURO */
 body.dark-mode #segmentosTable .btn-delete {
     background: #dc2626;         /* Vermelho vivo */
     color: #ffffff;
@@ -1563,7 +1563,7 @@ body.dark-mode .btn-light-blue {
     margin-right: 4px;
 }
 
-/* ================== MODAL GENÉRICO (PESQUISA) ================== */
+/* ================== MODAL GENÃ‰RICO (PESQUISA) ================== */
 .generic-search-box {
     position: relative;
     margin-bottom: 24px;
@@ -1689,7 +1689,7 @@ body.dark-mode .generic-card.selected {
     transform: scale(1.03);
 }
 
-/* ================== MODAL DE CONFIRMAÇÃO ================== */
+/* ================== MODAL DE CONFIRMAÃ‡ÃƒO ================== */
 .confirm-icon {
     font-size: 48px;
     color: #f59e0b;
@@ -1808,8 +1808,8 @@ body.dark-mode .generic-card.selected {
     padding: 6px;
 }
 .filter-box {
-    position: relative;   /* ⬅️ Adicione */
-    z-index: 100;         /* ⬅️ Adicione */
+    position: relative;   /* â¬…ï¸ Adicione */
+    z-index: 100;         /* â¬…ï¸ Adicione */
 }
 .custom-select.open .custom-select-options {
     display: block;
@@ -1856,7 +1856,7 @@ body.dark-mode .custom-option.selected {
     pointer-events: none;
 }
 
-/* ================== BOTÃO DETALHES MODERNO ================== */
+/* ================== BOTÃƒO DETALHES MODERNO ================== */
 .details-btn,
 .btn-detail {
     display: inline-flex;
@@ -1892,7 +1892,7 @@ body.dark-mode .custom-option.selected {
     font-size: 14px;
 }
 
-/* ================== BOTÃO NOVO SEGMENTO (MELHORADO) ================== */
+/* ================== BOTÃƒO NOVO SEGMENTO (MELHORADO) ================== */
 .btn-primary[onclick="novoSegmento()"] {
     background: linear-gradient(135deg, #2463eb 0%, #1a4fc4 100%);
     border: none;
@@ -2145,7 +2145,7 @@ body.dark-mode .tooltip-trigger {
     }
 
     .results {
-    position: static;     /* Padrão, caso esteja algo diferente */
+    position: static;     /* PadrÃ£o, caso esteja algo diferente */
     z-index: auto;
 }
     table {
@@ -2157,7 +2157,7 @@ body.dark-mode #segmentosTable .btn-table[data-action="edit"] {
     color: #ffffff;
 }
 
-/* ============ BOTÕES DO MODAL - AJUSTES ============ */
+/* ============ BOTÃ•ES DO MODAL - AJUSTES ============ */
 
 #btn-confirm-cancel.btn-secondary:hover {
     background: var(--bg-hover);
@@ -2172,7 +2172,7 @@ body.dark-mode #segmentosTable .btn-table[data-action="edit"] {
     box-shadow: 0 4px 12px rgba(29, 78, 216, 0.3);
 }
 
-/* Botão Ignorar Cadastro - estilo vermelho */
+/* BotÃ£o Ignorar Cadastro - estilo vermelho */
 #btn-ignore-cadastro.btn-secondary {
     background: #fef2f2;
     color: #dc2626;
@@ -2206,7 +2206,7 @@ body.dark-mode #btn-ignore-cadastro.btn-secondary {
     box-shadow: 0 4px 8px rgba(220, 38, 38, 0.2);
 }
 
-/* Botão Ignorar Cadastro (se for usado em outro contexto) */
+/* BotÃ£o Ignorar Cadastro (se for usado em outro contexto) */
 .btn-secondary:active {
     transform: translateY(0);
     background: #e2e8f0;
@@ -2216,25 +2216,25 @@ body.dark-mode .btn-secondary:active {
     background: #334155;
 }
 
-/* ===== RODAPÉ DA SIDEBAR (BOTÃO MODO ESCURO) - CORRIGIDO ===== */
-/* Garante que a sidebar use flexbox para o rodapé ficar embaixo */
+/* ===== RODAPÃ‰ DA SIDEBAR (BOTÃƒO MODO ESCURO) - CORRIGIDO ===== */
+/* Garante que a sidebar use flexbox para o rodapÃ© ficar embaixo */
 .sidebar {
     display: flex !important;
     flex-direction: column !important;
 }
 
-/* O rodapé ocupa o espaço restante e fica no final */
+/* O rodapÃ© ocupa o espaÃ§o restante e fica no final */
 .sidebar-footer {
     margin-top: auto !important;
     padding-top: 20px !important;
     border-top: 1px solid rgba(255,255,255,0.1) !important;
     width: 100% !important;
     display: flex !important;
-    justify-content: flex-start !important; /* Alinha à esquerda */
+    justify-content: flex-start !important; /* Alinha Ã  esquerda */
     padding-left: 15px !important; /* Mesmo padding lateral dos itens do menu */
 }
 
-/* Botão sem position absolute */
+/* BotÃ£o sem position absolute */
 .dark-mode-toggle {
     background: rgba(255,255,255,0.1) !important;
     border: none !important;
@@ -2270,7 +2270,7 @@ body.dark-mode .dark-mode-toggle:hover {
     color: #fff !important;
 }
 
-/* Quando a sidebar está colapsada (75px) */
+/* Quando a sidebar estÃ¡ colapsada (75px) */
 .sidebar.collapsed .sidebar-footer {
     padding-top: 10px !important;
     padding-left: 0 !important;
