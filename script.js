@@ -568,77 +568,95 @@ document.addEventListener('DOMContentLoaded', function() {
         // ===== PESQUISA DE PROSPECÇÃO =====
         let pesquisaController = null;
 
-        async function pesquisarProspeccao() {
-            const uf = filterUf.value.trim();
-            const ddd = filterDdd.value;
-            const segmento = filterSegmento.value;
-            
-            let cnae = selectedCnaeCode;
-            if (!cnae && filterCnaeInput.value.trim() !== '') {
-                filterCnaeInput.value = '';
-                cnae = null;
-            }
-            
-            const escopoCnae = filterTipoCnae ? filterTipoCnae.value : 'PRINCIPAL';
+        async function pesquisarProspeccao(botao = null) {
+    const btn = botao || btnSearch;
 
-            const body = {
-                uf: uf || null,
-                ddd: uf ? null : (ddd || null),
-                cnae: cnae || null,
-                segmento: cnae ? null : (segmento ? parseInt(segmento) : null),
-                escopoCnae: (cnae || segmento) ? escopoCnae : null,
-                ultimoCnpj: ultimoCnpj,
-                limite: 50
-            };
+    const uf = filterUf.value.trim();
+    const ddd = filterDdd.value;
+    const segmento = filterSegmento.value;
+    
+    let cnae = selectedCnaeCode;
+    if (!cnae && filterCnaeInput.value.trim() !== '') {
+        filterCnaeInput.value = '';
+        cnae = null;
+    }
+    
+    const escopoCnae = filterTipoCnae ? filterTipoCnae.value : 'PRINCIPAL';
 
-            if (!body.uf && !body.ddd && !body.segmento && !body.cnae) {
-                alert("Informe pelo menos um filtro de pesquisa (UF, DDD, Segmento ou CNAE).");
-                return;
-            }
+    const body = {
+        uf: uf || null,
+        ddd: uf ? null : (ddd || null),
+        cnae: cnae || null,
+        segmento: cnae ? null : (segmento ? parseInt(segmento) : null),
+        escopoCnae: (cnae || segmento) ? escopoCnae : null,
+        ultimoCnpj: ultimoCnpj,
+        limite: 50
+    };
 
-            btnSearch.disabled = true;
-            btnSearch.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Pesquisando...';
+    if (!body.uf && !body.ddd && !body.segmento && !body.cnae) {
+        alert("Informe pelo menos um filtro de pesquisa (UF, DDD, Segmento ou CNAE).");
+        return;
+    }
 
-            if (pesquisaController) {
-                pesquisaController.abort();
-            }
-            pesquisaController = new AbortController();
+    // Desabilita o botão
+    btn.disabled = true;
 
+    // Guarda HTML original do botão e do indicador de página
+    const originalBtnHtml = btn.innerHTML;
+    const originalPageHtml = pageIndicator.innerHTML;
+
+    // Se for botão de página, troca o indicador por spinner (e NÃO mexe no botão)
+    if (btn.classList.contains('page-btn')) {
+        pageIndicator.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    } else {
+        // Botão Pesquisar: altera o botão
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Carregando...';
+    }
+
+    if (pesquisaController) {
+        pesquisaController.abort();
+    }
+    pesquisaController = new AbortController();
+
+    try {
+        const response = await fetch(`${API_URL}/api/prospeccao/pesquisar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify(body),
+            signal: pesquisaController.signal
+        });
+
+        const text = await response.text();
+        if (!response.ok) {
+            let errorMessage = `HTTP ${response.status}`;
             try {
-                const response = await fetch(`${API_URL}/api/prospeccao/pesquisar`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                    body: JSON.stringify(body),
-                    signal: pesquisaController.signal
-                });
-
-                const text = await response.text();
-                if (!response.ok) {
-                    let errorMessage = `HTTP ${response.status}`;
-                    try {
-                        const errorData = JSON.parse(text);
-                        errorMessage = errorData.message || errorMessage;
-                    } catch (e) {}
-                    throw new Error(errorMessage);
-                }
-
-                const data = text ? JSON.parse(text) : {};
-                
-                registros = data.registros || [];
-                temMais = data.temMais || false;
-                ultimoCnpj = data.ultimoCnpj || null;
-                renderTable(registros);
-            } catch (error) {
-                if (error.name !== 'AbortError') {
-                    console.error("❌ Erro na pesquisa:", error);
-                    alert("Erro ao pesquisar. Verifique o console (F12).");
-                }
-            } finally {
-                btnSearch.disabled = false;
-                btnSearch.innerHTML = '<i class="fas fa-search"></i> &nbsp; Pesquisar';
-                pesquisaController = null;
-            }
+                const errorData = JSON.parse(text);
+                errorMessage = errorData.message || errorMessage;
+            } catch (e) {}
+            throw new Error(errorMessage);
         }
+
+        const data = text ? JSON.parse(text) : {};
+        
+        registros = data.registros || [];
+        temMais = data.temMais || false;
+        ultimoCnpj = data.ultimoCnpj || null;
+        renderTable(registros); // renderTable atualiza o indicador com "Página X"
+    } catch (error) {
+        if (error.name !== 'AbortError') {
+            console.error("❌ Erro na pesquisa:", error);
+            alert("Erro ao pesquisar. Verifique o console (F12).");
+        }
+        // Em caso de erro, restaura o indicador para o valor anterior
+        if (btn.classList.contains('page-btn')) {
+            pageIndicator.innerHTML = originalPageHtml;
+        }
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalBtnHtml; // Restaura o HTML do botão (seta ou texto "Pesquisar")
+        pesquisaController = null;
+    }
+}
 
         // ===== RENDERIZAR TABELA =====
         function renderTable(data) {
@@ -1350,14 +1368,15 @@ document.addEventListener('DOMContentLoaded', function() {
             renderTable([]);
         }
 
-        function changePage(direction) {
-            if (direction === 'next' && temMais) {
-                currentPage++;
-                pesquisarProspeccao();
-            } else if (direction === 'prev' && currentPage > 1) {
-                showWarning('A navegação para páginas anteriores não é suportada pela API no momento. Use a pesquisa novamente para recomeçar.', 'Aviso');
-            }
-        }
+        function changePage(direction, botao) {
+    if (direction === 'next' && temMais) {
+        currentPage++;
+        pesquisarProspeccao(botao);
+    } else if (direction === 'prev' && currentPage > 1) {
+        showWarning('A navegação para páginas anteriores não é suportada pela API no momento. Use a pesquisa novamente para recomeçar.', 'Aviso');
+        // Se quiser, pode reabilitar o botão aqui, mas como não há requisição, não precisa
+    }
+}
 
         // ===== EVENTOS =====
         btnSearch.addEventListener('click', function() {
@@ -1367,8 +1386,12 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         btnClear.addEventListener('click', clearFilters);
-        btnPrev.addEventListener('click', function() { changePage('prev'); });
-        btnNext.addEventListener('click', function() { changePage('next'); });
+        btnPrev.addEventListener('click', function() { 
+    changePage('prev', this); 
+});
+        btnNext.addEventListener('click', function() { 
+    changePage('next', this); 
+});
 
         tbody.addEventListener('click', function(e) {
             if(e.target.classList.contains('btn-detail')) {
