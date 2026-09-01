@@ -100,7 +100,9 @@ document.addEventListener('DOMContentLoaded', function() {
         let temMais = false;
         let registros = [];
         let municipiosCache = null; // Cache para a lista de municípios da sidebar
-
+        let municipiosCarregando = false; // Flag para saber se está buscando
+        let municipiosPromise = null; // Nova variável para guardar a promessa
+        
         // Controle de alterações não salvas
         let isDirty = false;
 
@@ -348,24 +350,50 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // ===== CARREGAR MUNICÍPIOS VIA API (para o menu) =====
-        async function carregarMunicipiosDaAPI() {
+        // ===== CARREGAR MUNICÍPIOS VIA API (COM CACHE E PRÉ-CARREGAMENTO) =====
+async function carregarMunicipiosDaAPI() {
+    // Se já tiver os dados em cache, retorna imediatamente
+    if (municipiosCache) {
+        console.log("⚡ Usando cache de municípios");
+        return municipiosCache;
+    }
+
+    // Se já estiver carregando, aguarda (opcional: retorna null ou uma promessa)
+    if (municipiosCarregando) {
+        console.log("⏳ Municípios já estão sendo carregados...");
+        return null;
+    }
+
+    municipiosCarregando = true;
+
+    try {
+        const dddData = await apiGet(`${API_URL}/api/ddds`);
+
+        // Dispara TODAS as requisições ao mesmo tempo
+        const promises = dddData.map(async (ddd) => {
             try {
-                const dddData = await apiGet(`${API_URL}/api/ddds`);
-                const listaMunicipios = [];
-                for (const ddd of dddData) {
-                    try {
-                        const municipios = await apiGet(`${API_URL}/api/ddds/${ddd.ddd}/municipios`);
-                        municipios.forEach(m => {
-                            listaMunicipios.push(`${m.municipio} - ${ddd.ddd}`);
-                        });
-                    } catch (e) {}
-                }
-                return [...new Set(listaMunicipios)].sort();
-            } catch (error) {
-                console.error("Erro ao carregar municípios:", error);
-                return ['São Paulo - SP', 'Rio de Janeiro - RJ', 'Belo Horizonte - MG', 'Porto Alegre - RS'];
+                const municipios = await apiGet(`${API_URL}/api/ddds/${ddd.ddd}/municipios`);
+                return municipios.map(m => `${m.municipio} - ${ddd.ddd}`);
+            } catch (e) {
+                return [];
             }
-        }
+        });
+
+        const resultados = await Promise.all(promises);
+        const listaMunicipios = [...new Set(resultados.flat())].sort();
+
+        // Salva no cache
+        municipiosCache = listaMunicipios;
+        municipiosCarregando = false;
+
+        console.log("✅ Municípios carregados:", listaMunicipios.length);
+        return listaMunicipios;
+    } catch (error) {
+        console.error("Erro ao carregar municípios:", error);
+        municipiosCarregando = false;
+        return ['São Paulo - SP', 'Rio de Janeiro - RJ', 'Belo Horizonte - MG', 'Porto Alegre - RS'];
+    }
+}
 
         // ===== CARREGAR SITUAÇÕES CADASTRAIS =====
         async function carregarSituacoesCadastrais() {
@@ -1192,9 +1220,37 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         document.getElementById('menu-municipios').addEventListener('click', async () => {
-            const municipios = await carregarMunicipiosDaAPI();
-            openGenericModal('Pesquisa Município', 'Informe o município:', municipios, 'municipio');
-        });
+    // Se já está carregando, apenas mostra o modal e aguarda
+    if (municipiosCarregando) {
+        openGenericModal('Pesquisa Município', 'Carregando municípios...', [], 'municipio');
+        // Aguarda a promessa que já está em andamento (sem iniciar outra)
+        const resultado = await municipiosPromise; // Vamos criar essa variável
+        if (resultado) {
+            renderGenericList(resultado);
+            genericModalSubtitle.innerText = 'Informe o município:';
+        }
+        return;
+    }
+
+    // Se já tem cache, abre direto
+    if (municipiosCache) {
+        openGenericModal('Pesquisa Município', 'Informe o município:', municipiosCache, 'municipio');
+        return;
+    }
+
+    // Se não tem cache, inicia a busca e abre com loading
+    municipiosCarregando = true;
+    openGenericModal('Pesquisa Município', 'Carregando municípios...', [], 'municipio');
+    
+    // Cria uma promessa que será reutilizada
+    municipiosPromise = carregarMunicipiosDaAPI();
+    const municipios = await municipiosPromise;
+    
+    if (municipios) {
+        renderGenericList(municipios);
+        genericModalSubtitle.innerText = 'Informe o município:';
+    }
+});
 
         document.getElementById('menu-natureza').addEventListener('click', async () => {
             const situacoes = await carregarSituacoesCadastrais();
@@ -1274,6 +1330,11 @@ document.addEventListener('DOMContentLoaded', function() {
         carregarCnaesIniciais();
         carregarDDDs();
         updateSegmentFilter();
+
+        // ===== PRÉ-CARREGAR MUNICÍPIOS EM SEGUNDO PLANO =====
+carregarMunicipiosDaAPI().then(municipios => {
+    console.log("Municípios pré-carregados com sucesso!");
+});
 
     } catch (error) {
         console.error('❌ Erro durante a inicialização:', error);
