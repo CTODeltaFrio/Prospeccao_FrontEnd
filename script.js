@@ -99,6 +99,7 @@ document.addEventListener('DOMContentLoaded', function() {
         let ultimoCnpj = null;
         let temMais = false;
         let registros = [];
+        let municipiosCache = null; // Cache para a lista de municípios da sidebar
 
         // Controle de alterações não salvas
         let isDirty = false;
@@ -378,71 +379,137 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // ===== DROPDOWNS CUSTOMIZADOS =====
         function initializeCustomSelects() {
-            const selects = document.querySelectorAll('select.input');
-            selects.forEach(select => {
-                if (select.closest('.custom-select')) return;
+    const selects = document.querySelectorAll('select.input');
 
-                const wrapper = document.createElement('div');
-                wrapper.className = 'custom-select';
-                select.parentNode.insertBefore(wrapper, select);
-                wrapper.appendChild(select);
+    selects.forEach(select => {
+        if (select.closest('.custom-select')) return;
 
-                const trigger = document.createElement('div');
-                trigger.className = 'custom-select-trigger';
-                const textSpan = document.createElement('span');
-                textSpan.className = 'custom-select-text';
-                textSpan.textContent = select.options[select.selectedIndex] ? select.options[select.selectedIndex].text : '';
-                const icon = document.createElement('i');
-                icon.className = 'fas fa-chevron-down';
-                trigger.appendChild(textSpan);
-                trigger.appendChild(icon);
+        const wrapper = document.createElement('div');
+        wrapper.className = 'custom-select';
+        select.parentNode.insertBefore(wrapper, select);
+        wrapper.appendChild(select);
 
-                const optionsContainer = document.createElement('div');
-                optionsContainer.className = 'custom-select-options';
+        const trigger = document.createElement('div');
+        trigger.className = 'custom-select-trigger';
+        const textSpan = document.createElement('span');
+        textSpan.className = 'custom-select-text';
+        textSpan.textContent = select.options[select.selectedIndex] ? select.options[select.selectedIndex].text : '';
+        const icon = document.createElement('i');
+        icon.className = 'fas fa-chevron-down';
+        trigger.appendChild(textSpan);
+        trigger.appendChild(icon);
 
-                Array.from(select.options).forEach((option, index) => {
-                    const optionDiv = document.createElement('div');
-                    optionDiv.className = 'custom-option' + (option.selected ? ' selected' : '');
-                    optionDiv.dataset.value = option.value;
-                    optionDiv.textContent = option.text;
-                    if (option.selected) optionDiv.classList.add('selected');
+        const optionsContainer = document.createElement('div');
+        optionsContainer.className = 'custom-select-options';
 
-                    optionDiv.addEventListener('click', function() {
-                        select.selectedIndex = index;
-                        textSpan.textContent = this.textContent;
-                        optionsContainer.querySelectorAll('.custom-option').forEach(opt => opt.classList.remove('selected'));
-                        this.classList.add('selected');
-                        wrapper.classList.remove('open');
-                        select.dispatchEvent(new Event('change'));
-                    });
+        // Função para renderizar opções (com filtro)
+        function renderOptions(filterText = '') {
+            optionsContainer.innerHTML = '';
+            const termo = filterText.toLowerCase().trim();
 
-                    optionsContainer.appendChild(optionDiv);
+            Array.from(select.options).forEach((option, index) => {
+                const optionDiv = document.createElement('div');
+                optionDiv.className = 'custom-option' + (option.selected ? ' selected' : '');
+                optionDiv.dataset.value = option.value;
+                optionDiv.textContent = option.text;
+
+                // Filtro por texto (se houver termo digitado)
+                if (termo && !option.text.toLowerCase().includes(termo) && !option.value.toLowerCase().includes(termo)) {
+                    optionDiv.style.display = 'none';
+                } else {
+                    optionDiv.style.display = 'block';
+                }
+
+                optionDiv.addEventListener('click', function() {
+                    select.selectedIndex = index;
+                    textSpan.textContent = this.textContent;
+                    optionsContainer.querySelectorAll('.custom-option').forEach(opt => opt.classList.remove('selected'));
+                    this.classList.add('selected');
+                    wrapper.classList.remove('open');
+                    select.dispatchEvent(new Event('change'));
+                    // Limpa o filtro após selecionar
+                    inputBuffer = '';
                 });
 
-                wrapper.appendChild(trigger);
-                wrapper.appendChild(optionsContainer);
-
-                trigger.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    document.querySelectorAll('.custom-select.open').forEach(cs => {
-                        if (cs !== wrapper) cs.classList.remove('open');
-                    });
-                    wrapper.classList.toggle('open');
-                });
-
-                document.addEventListener('click', function(e) {
-                    if (!wrapper.contains(e.target)) wrapper.classList.remove('open');
-                });
-
-                select.addEventListener('change', function() {
-                    const selectedText = select.options[select.selectedIndex].text;
-                    textSpan.textContent = selectedText;
-                    optionsContainer.querySelectorAll('.custom-option').forEach(opt => {
-                        opt.classList.toggle('selected', opt.dataset.value === select.value);
-                    });
-                });
+                optionsContainer.appendChild(optionDiv);
             });
         }
+
+        // Renderiza inicialmente
+        renderOptions();
+
+        wrapper.appendChild(trigger);
+        wrapper.appendChild(optionsContainer);
+
+        // ===== BUSCA POR TECLADO =====
+        let inputBuffer = '';
+
+        trigger.addEventListener('click', function(e) {
+            e.stopPropagation();
+            document.querySelectorAll('.custom-select.open').forEach(cs => {
+                if (cs !== wrapper) cs.classList.remove('open');
+            });
+            wrapper.classList.toggle('open');
+            
+            // Se abriu, limpa o filtro e renderiza tudo
+            if (wrapper.classList.contains('open')) {
+                inputBuffer = '';
+                renderOptions('');
+            }
+        });
+
+        // Adiciona evento de digitação no trigger
+        trigger.setAttribute('tabindex', '0'); // Permite foco via teclado
+        trigger.addEventListener('keydown', function(e) {
+            if (!wrapper.classList.contains('open')) return;
+            
+            // Se for Backspace, remove último caractere
+            if (e.key === 'Backspace') {
+                inputBuffer = inputBuffer.slice(0, -1);
+            } 
+            // Se for Escape, fecha o dropdown
+            else if (e.key === 'Escape') {
+                wrapper.classList.remove('open');
+                inputBuffer = ''; // Limpa ao fechar
+                renderOptions(''); // Restaura lista completa
+                return;
+            }
+            // Se for Enter, seleciona a primeira opção visível (se houver)
+            else if (e.key === 'Enter') {
+                const firstVisible = optionsContainer.querySelector('.custom-option:not([style*="display: none"])');
+                if (firstVisible) {
+                    firstVisible.click();
+                }
+                return;
+            }
+            // Se for letra ou número, adiciona ao buffer
+            else if (e.key.length === 1 && e.key.match(/[a-zA-Z0-9]/)) {
+                inputBuffer += e.key;
+            } else {
+                return; // ignora outras teclas
+            }
+
+            // Atualiza o filtro imediatamente
+            renderOptions(inputBuffer);
+        });
+
+        document.addEventListener('click', function(e) {
+            if (!wrapper.contains(e.target)) {
+                wrapper.classList.remove('open');
+                inputBuffer = '';
+                renderOptions(''); // Restaura lista completa ao fechar
+            }
+        });
+
+        select.addEventListener('change', function() {
+            const selectedText = select.options[select.selectedIndex].text;
+            textSpan.textContent = selectedText;
+            optionsContainer.querySelectorAll('.custom-option').forEach(opt => {
+                opt.classList.toggle('selected', opt.dataset.value === select.value);
+            });
+        });
+    });
+}
 
         function refreshCustomSelect(select) {
             if (!select) return;
