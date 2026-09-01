@@ -87,7 +87,6 @@ document.addEventListener('DOMContentLoaded', function() {
         let allCnaesCache = [];
         let segmentoCnaeLinks = [];
         let segmentData = [];
-        let nextSegmentId = 1;
         let ufData = [];
         let selectedCnaeCode = null;
         let cnaeData = [];
@@ -99,15 +98,49 @@ document.addEventListener('DOMContentLoaded', function() {
         let ultimoCnpj = null;
         let temMais = false;
         let registros = [];
-        let municipiosCache = null; // Cache para a lista de municípios da sidebar
-        let municipiosCarregando = false; // Flag para saber se está buscando
-        let municipiosPromise = null; // Nova variável para guardar a promessa
-        
+        let municipiosCache = null;
+        let municipiosCarregando = false;
+        let municipiosPromise = null;
+
         // Controle de alterações não salvas
         let isDirty = false;
 
-        function setDirty(value) {
-            isDirty = value;
+        // ===== GERENCIAMENTO DO ITEM ATIVO NA SIDEBAR =====
+        function setActiveMenuItem(id) {
+            document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
+            const target = document.getElementById(id);
+            if (target) target.classList.add('active');
+        }
+
+        let previousMenuItemId = null;
+
+        function saveActiveMenuItem() {
+            const active = document.querySelector('.menu-item.active');
+            if (active) previousMenuItemId = active.id;
+        }
+
+        function restoreActiveMenuItem() {
+            if (previousMenuItemId) {
+                setActiveMenuItem(previousMenuItemId);
+                previousMenuItemId = null;
+            }
+        }
+
+        // ===== NAVEGAÇÃO ENTRE TELAS =====
+        function showScreen(screen) {
+            if (screen === 'main') {
+                mainScreen.style.display = 'block';
+                segmentScreen.style.display = 'none';
+                setActiveMenuItem('menu-dashboard');
+            } else if (screen === 'segment') {
+                mainScreen.style.display = 'none';
+                segmentScreen.style.display = 'block';
+                setActiveMenuItem('menu-segmentos');
+                // Recarrega dados ao abrir
+                resetSegmentForm();
+                renderSegmentTable();
+                populateLinkSelect();
+            }
         }
 
         // ===== FUNÇÃO PARA NORMALIZAR TEXTOS =====
@@ -236,34 +269,13 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        // ===== CARREGAR MUNICÍPIOS POR DDD =====
+        // ===== CARREGAR MUNICÍPIOS POR DDD (DESATIVADO) =====
         async function carregarMunicipiosPorDDD(ddd) {
             const selectMunicipio = document.getElementById('filter-municipio');
             const campoMunicipio = document.getElementById('campo-municipio');
-            
-            if (!ddd) {
-                campoMunicipio.style.display = 'none';
-                selectMunicipio.innerHTML = '<option value="">Todos</option>';
-                return;
-            }
-
-            try {
-                const data = await apiGet(`${API_URL}/api/ddds/${ddd}/municipios`);
-                campoMunicipio.style.display = 'block';
-                
-                selectMunicipio.innerHTML = '<option value="">Todos</option>';
-                data.forEach(item => {
-                    const option = document.createElement('option');
-                    option.value = item.municipio;
-                    option.textContent = item.municipio;
-                    selectMunicipio.appendChild(option);
-                });
-                refreshCustomSelect(selectMunicipio);
-            } catch (error) {
-                console.error("Erro ao carregar municípios:", error);
-                campoMunicipio.style.display = 'none';
-                selectMunicipio.innerHTML = '<option value="">Todos</option>';
-            }
+            campoMunicipio.style.display = 'none';
+            selectMunicipio.innerHTML = '<option value="">Todos</option>';
+            refreshCustomSelect(selectMunicipio);
         }
 
         // ===== CARREGAR SEGMENTOS E SEUS VÍNCULOS =====
@@ -272,7 +284,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 const data = await apiGet(`${API_URL}/api/segmentos`);
                 segmentData = data.map(item => ({ id: item.codigo, nome: item.descricao }));
                 
-                // Busca os CNAEs vinculados para cada segmento e atualiza o array segmentoCnaeLinks
                 segmentoCnaeLinks = [];
                 for (const seg of segmentData) {
                     try {
@@ -349,51 +360,46 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        // ===== CARREGAR MUNICÍPIOS VIA API (para o menu) =====
         // ===== CARREGAR MUNICÍPIOS VIA API (COM CACHE E PRÉ-CARREGAMENTO) =====
-async function carregarMunicipiosDaAPI() {
-    // Se já tiver os dados em cache, retorna imediatamente
-    if (municipiosCache) {
-        console.log("⚡ Usando cache de municípios");
-        return municipiosCache;
-    }
-
-    // Se já estiver carregando, aguarda (opcional: retorna null ou uma promessa)
-    if (municipiosCarregando) {
-        console.log("⏳ Municípios já estão sendo carregados...");
-        return null;
-    }
-
-    municipiosCarregando = true;
-
-    try {
-        const dddData = await apiGet(`${API_URL}/api/ddds`);
-
-        // Dispara TODAS as requisições ao mesmo tempo
-        const promises = dddData.map(async (ddd) => {
-            try {
-                const municipios = await apiGet(`${API_URL}/api/ddds/${ddd.ddd}/municipios`);
-                return municipios.map(m => `${m.municipio} - ${ddd.ddd}`);
-            } catch (e) {
-                return [];
+        async function carregarMunicipiosDaAPI() {
+            if (municipiosCache) {
+                console.log("⚡ Usando cache de municípios");
+                return municipiosCache;
             }
-        });
 
-        const resultados = await Promise.all(promises);
-        const listaMunicipios = [...new Set(resultados.flat())].sort();
+            if (municipiosCarregando) {
+                console.log("⏳ Municípios já estão sendo carregados...");
+                return null;
+            }
 
-        // Salva no cache
-        municipiosCache = listaMunicipios;
-        municipiosCarregando = false;
+            municipiosCarregando = true;
 
-        console.log("✅ Municípios carregados:", listaMunicipios.length);
-        return listaMunicipios;
-    } catch (error) {
-        console.error("Erro ao carregar municípios:", error);
-        municipiosCarregando = false;
-        return ['São Paulo - SP', 'Rio de Janeiro - RJ', 'Belo Horizonte - MG', 'Porto Alegre - RS'];
-    }
-}
+            try {
+                const dddData = await apiGet(`${API_URL}/api/ddds`);
+
+                const promises = dddData.map(async (ddd) => {
+                    try {
+                        const municipios = await apiGet(`${API_URL}/api/ddds/${ddd.ddd}/municipios`);
+                        return municipios.map(m => `${m.municipio} - ${ddd.ddd}`);
+                    } catch (e) {
+                        return [];
+                    }
+                });
+
+                const resultados = await Promise.all(promises);
+                const listaMunicipios = [...new Set(resultados.flat())].sort();
+
+                municipiosCache = listaMunicipios;
+                municipiosCarregando = false;
+
+                console.log("✅ Municípios carregados:", listaMunicipios.length);
+                return listaMunicipios;
+            } catch (error) {
+                console.error("Erro ao carregar municípios:", error);
+                municipiosCarregando = false;
+                return ['São Paulo - SP', 'Rio de Janeiro - RJ', 'Belo Horizonte - MG', 'Porto Alegre - RS'];
+            }
+        }
 
         // ===== CARREGAR SITUAÇÕES CADASTRAIS =====
         async function carregarSituacoesCadastrais() {
@@ -407,137 +413,122 @@ async function carregarMunicipiosDaAPI() {
 
         // ===== DROPDOWNS CUSTOMIZADOS =====
         function initializeCustomSelects() {
-    const selects = document.querySelectorAll('select.input');
+            const selects = document.querySelectorAll('select.input');
 
-    selects.forEach(select => {
-        if (select.closest('.custom-select')) return;
+            selects.forEach(select => {
+                if (select.closest('.custom-select')) return;
 
-        const wrapper = document.createElement('div');
-        wrapper.className = 'custom-select';
-        select.parentNode.insertBefore(wrapper, select);
-        wrapper.appendChild(select);
+                const wrapper = document.createElement('div');
+                wrapper.className = 'custom-select';
+                select.parentNode.insertBefore(wrapper, select);
+                wrapper.appendChild(select);
 
-        const trigger = document.createElement('div');
-        trigger.className = 'custom-select-trigger';
-        const textSpan = document.createElement('span');
-        textSpan.className = 'custom-select-text';
-        textSpan.textContent = select.options[select.selectedIndex] ? select.options[select.selectedIndex].text : '';
-        const icon = document.createElement('i');
-        icon.className = 'fas fa-chevron-down';
-        trigger.appendChild(textSpan);
-        trigger.appendChild(icon);
+                const trigger = document.createElement('div');
+                trigger.className = 'custom-select-trigger';
+                const textSpan = document.createElement('span');
+                textSpan.className = 'custom-select-text';
+                textSpan.textContent = select.options[select.selectedIndex] ? select.options[select.selectedIndex].text : '';
+                const icon = document.createElement('i');
+                icon.className = 'fas fa-chevron-down';
+                trigger.appendChild(textSpan);
+                trigger.appendChild(icon);
 
-        const optionsContainer = document.createElement('div');
-        optionsContainer.className = 'custom-select-options';
+                const optionsContainer = document.createElement('div');
+                optionsContainer.className = 'custom-select-options';
 
-        // Função para renderizar opções (com filtro)
-        function renderOptions(filterText = '') {
-            optionsContainer.innerHTML = '';
-            const termo = filterText.toLowerCase().trim();
+                function renderOptions(filterText = '') {
+                    optionsContainer.innerHTML = '';
+                    const termo = filterText.toLowerCase().trim();
 
-            Array.from(select.options).forEach((option, index) => {
-                const optionDiv = document.createElement('div');
-                optionDiv.className = 'custom-option' + (option.selected ? ' selected' : '');
-                optionDiv.dataset.value = option.value;
-                optionDiv.textContent = option.text;
+                    Array.from(select.options).forEach((option, index) => {
+                        const optionDiv = document.createElement('div');
+                        optionDiv.className = 'custom-option' + (option.selected ? ' selected' : '');
+                        optionDiv.dataset.value = option.value;
+                        optionDiv.textContent = option.text;
 
-                // Filtro por texto (se houver termo digitado)
-                if (termo && !option.text.toLowerCase().includes(termo) && !option.value.toLowerCase().includes(termo)) {
-                    optionDiv.style.display = 'none';
-                } else {
-                    optionDiv.style.display = 'block';
+                        if (termo && !option.text.toLowerCase().includes(termo) && !option.value.toLowerCase().includes(termo)) {
+                            optionDiv.style.display = 'none';
+                        } else {
+                            optionDiv.style.display = 'block';
+                        }
+
+                        optionDiv.addEventListener('click', function() {
+                            select.selectedIndex = index;
+                            textSpan.textContent = this.textContent;
+                            optionsContainer.querySelectorAll('.custom-option').forEach(opt => opt.classList.remove('selected'));
+                            this.classList.add('selected');
+                            wrapper.classList.remove('open');
+                            select.dispatchEvent(new Event('change'));
+                            inputBuffer = '';
+                        });
+
+                        optionsContainer.appendChild(optionDiv);
+                    });
                 }
 
-                optionDiv.addEventListener('click', function() {
-                    select.selectedIndex = index;
-                    textSpan.textContent = this.textContent;
-                    optionsContainer.querySelectorAll('.custom-option').forEach(opt => opt.classList.remove('selected'));
-                    this.classList.add('selected');
-                    wrapper.classList.remove('open');
-                    select.dispatchEvent(new Event('change'));
-                    // Limpa o filtro após selecionar
-                    inputBuffer = '';
+                renderOptions();
+
+                wrapper.appendChild(trigger);
+                wrapper.appendChild(optionsContainer);
+
+                let inputBuffer = '';
+
+                trigger.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    document.querySelectorAll('.custom-select.open').forEach(cs => {
+                        if (cs !== wrapper) cs.classList.remove('open');
+                    });
+                    wrapper.classList.toggle('open');
+                    
+                    if (wrapper.classList.contains('open')) {
+                        inputBuffer = '';
+                        renderOptions('');
+                    }
                 });
 
-                optionsContainer.appendChild(optionDiv);
+                trigger.setAttribute('tabindex', '0');
+                trigger.addEventListener('keydown', function(e) {
+                    if (!wrapper.classList.contains('open')) return;
+                    
+                    if (e.key === 'Backspace') {
+                        inputBuffer = inputBuffer.slice(0, -1);
+                    } else if (e.key === 'Escape') {
+                        wrapper.classList.remove('open');
+                        inputBuffer = '';
+                        renderOptions('');
+                        return;
+                    } else if (e.key === 'Enter') {
+                        const firstVisible = optionsContainer.querySelector('.custom-option:not([style*="display: none"])');
+                        if (firstVisible) {
+                            firstVisible.click();
+                        }
+                        return;
+                    } else if (e.key.length === 1 && e.key.match(/[a-zA-Z0-9]/)) {
+                        inputBuffer += e.key;
+                    } else {
+                        return;
+                    }
+
+                    renderOptions(inputBuffer);
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (!wrapper.contains(e.target)) {
+                        wrapper.classList.remove('open');
+                        inputBuffer = '';
+                        renderOptions('');
+                    }
+                });
+
+                select.addEventListener('change', function() {
+                    const selectedText = select.options[select.selectedIndex].text;
+                    textSpan.textContent = selectedText;
+                    optionsContainer.querySelectorAll('.custom-option').forEach(opt => {
+                        opt.classList.toggle('selected', opt.dataset.value === select.value);
+                    });
+                });
             });
         }
-
-        // Renderiza inicialmente
-        renderOptions();
-
-        wrapper.appendChild(trigger);
-        wrapper.appendChild(optionsContainer);
-
-        // ===== BUSCA POR TECLADO =====
-        let inputBuffer = '';
-
-        trigger.addEventListener('click', function(e) {
-            e.stopPropagation();
-            document.querySelectorAll('.custom-select.open').forEach(cs => {
-                if (cs !== wrapper) cs.classList.remove('open');
-            });
-            wrapper.classList.toggle('open');
-            
-            // Se abriu, limpa o filtro e renderiza tudo
-            if (wrapper.classList.contains('open')) {
-                inputBuffer = '';
-                renderOptions('');
-            }
-        });
-
-        // Adiciona evento de digitação no trigger
-        trigger.setAttribute('tabindex', '0'); // Permite foco via teclado
-        trigger.addEventListener('keydown', function(e) {
-            if (!wrapper.classList.contains('open')) return;
-            
-            // Se for Backspace, remove último caractere
-            if (e.key === 'Backspace') {
-                inputBuffer = inputBuffer.slice(0, -1);
-            } 
-            // Se for Escape, fecha o dropdown
-            else if (e.key === 'Escape') {
-                wrapper.classList.remove('open');
-                inputBuffer = ''; // Limpa ao fechar
-                renderOptions(''); // Restaura lista completa
-                return;
-            }
-            // Se for Enter, seleciona a primeira opção visível (se houver)
-            else if (e.key === 'Enter') {
-                const firstVisible = optionsContainer.querySelector('.custom-option:not([style*="display: none"])');
-                if (firstVisible) {
-                    firstVisible.click();
-                }
-                return;
-            }
-            // Se for letra ou número, adiciona ao buffer
-            else if (e.key.length === 1 && e.key.match(/[a-zA-Z0-9]/)) {
-                inputBuffer += e.key;
-            } else {
-                return; // ignora outras teclas
-            }
-
-            // Atualiza o filtro imediatamente
-            renderOptions(inputBuffer);
-        });
-
-        document.addEventListener('click', function(e) {
-            if (!wrapper.contains(e.target)) {
-                wrapper.classList.remove('open');
-                inputBuffer = '';
-                renderOptions(''); // Restaura lista completa ao fechar
-            }
-        });
-
-        select.addEventListener('change', function() {
-            const selectedText = select.options[select.selectedIndex].text;
-            textSpan.textContent = selectedText;
-            optionsContainer.querySelectorAll('.custom-option').forEach(opt => {
-                opt.classList.toggle('selected', opt.dataset.value === select.value);
-            });
-        });
-    });
-}
 
         function refreshCustomSelect(select) {
             if (!select) return;
@@ -597,7 +588,7 @@ async function carregarMunicipiosDaAPI() {
                 segmento: cnae ? null : (segmento ? parseInt(segmento) : null),
                 escopoCnae: (cnae || segmento) ? escopoCnae : null,
                 ultimoCnpj: ultimoCnpj,
-                limite: 20
+                limite: 50
             };
 
             if (!body.uf && !body.ddd && !body.segmento && !body.cnae) {
@@ -636,7 +627,6 @@ async function carregarMunicipiosDaAPI() {
                 registros = data.registros || [];
                 temMais = data.temMais || false;
                 ultimoCnpj = data.ultimoCnpj || null;
-                currentPage = 1;
                 renderTable(registros);
             } catch (error) {
                 if (error.name !== 'AbortError') {
@@ -656,9 +646,9 @@ async function carregarMunicipiosDaAPI() {
 
             if (data.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:20px;">Nenhum resultado encontrado.</td></tr>`;
-                recordsFooter.textContent = 'Exibindo 0 registros';
+                recordsFooter.textContent = 'Nenhum registro encontrado';
                 btnPrev.disabled = true;
-                btnNext.disabled = !temMais;
+                btnNext.disabled = true;
                 pageIndicator.textContent = 'Página 1';
                 return;
             }
@@ -676,12 +666,19 @@ async function carregarMunicipiosDaAPI() {
                 tbody.innerHTML += row;
             });
 
-            const start = (currentPage - 1) * 50 + 1;
-            const end = Math.min(currentPage * 50, data.length);
-            recordsFooter.textContent = `Exibindo ${start} - ${end} de ${data.length} registros`;
+            const limite = 50;
+            const start = (currentPage - 1) * limite + 1;
+            const end = start + data.length - 1;
+
+            recordsFooter.textContent = `Exibindo ${start} - ${end}`;
             pageIndicator.textContent = `Página ${currentPage}`;
-            btnPrev.disabled = true;
+
+            btnPrev.disabled = (currentPage === 1);
             btnNext.disabled = !temMais;
+
+            if (!temMais && data.length < limite) {
+                btnNext.disabled = true;
+            }
         }
 
         // ===== DETALHES =====
@@ -713,59 +710,7 @@ async function carregarMunicipiosDaAPI() {
             detailsModal.style.display = 'flex';
         }
 
-        // ===== TELA DE SEGMENTOS =====
-        function openSegmentScreen() {
-            mainScreen.style.display = 'none';
-            segmentScreen.style.display = 'block';
-            resetSegmentForm();
-            renderSegmentTable();
-            populateLinkSelect();
-        }
-
-        function closeSegmentScreen() {
-            setDirty(false);
-            segmentScreen.style.display = 'none';
-            mainScreen.style.display = 'block';
-        }
-
-        if (document.getElementById('menu-dashboard')) {
-            document.getElementById('menu-dashboard').addEventListener('click', function() {
-                if (isDirty) {
-                    showUnsavedChangesModal(
-                        'Deseja salvar antes de sair?',
-                        function() {
-                            document.getElementById('segmentoForm').requestSubmit();
-                            closeSegmentScreen();
-                        },
-                        function() {
-                            resetSegmentForm();
-                            closeSegmentScreen();
-                        }
-                    );
-                } else {
-                    closeSegmentScreen();
-                    closeAllModals();
-                }
-            });
-        }
-
-        window.novoSegmento = function() {
-            if (isDirty) {
-                showUnsavedChangesModal(
-                    'Deseja salvar antes de criar um novo segmento?',
-                    function() {
-                        document.getElementById('segmentoForm').requestSubmit();
-                        resetSegmentForm();
-                    },
-                    function() {
-                        resetSegmentForm();
-                    }
-                );
-            } else {
-                resetSegmentForm();
-            }
-        };
-
+        // ===== SEGMENTOS - FUNÇÕES =====
         function resetSegmentForm() {
             segmentNome.value = '';
             editingSegmentId = null;
@@ -916,7 +861,6 @@ async function carregarMunicipiosDaAPI() {
             try {
                 let segId = editingSegmentId;
 
-                // 1. Salva o segmento (cria ou atualiza)
                 if (editingSegmentId !== null) {
                     await apiPut(`${API_URL}/api/segmentos/${editingSegmentId}`, { descricao: nome });
                     const seg = segmentData.find(s => s.id === editingSegmentId);
@@ -927,12 +871,10 @@ async function carregarMunicipiosDaAPI() {
                     segmentData.push({ id: segId, nome });
                 }
 
-                // 2. Sincroniza os CNAEs vinculados
                 if (segId) {
                     const cnaesAtuais = currentLinkedCnaes.map(c => c.codigo);
                     const cnaesOriginais = originalLinkedCnaes.map(c => c.codigo);
 
-                    // Remove os CNAEs que estavam vinculados antes e não estão mais
                     for (const cnae of cnaesOriginais) {
                         if (!cnaesAtuais.includes(cnae)) {
                             try {
@@ -943,9 +885,8 @@ async function carregarMunicipiosDaAPI() {
                         }
                     }
 
-                    // Adiciona APENAS os CNAEs NOVOS (que não estavam na lista original)
                     for (const cnae of currentLinkedCnaes) {
-                        if (cnaesOriginais.includes(cnae.codigo)) continue; // Pula os que já estavam vinculados
+                        if (cnaesOriginais.includes(cnae.codigo)) continue;
                         try {
                             await apiPost(`${API_URL}/api/segmentos/${segId}/cnaes`, { cnae: cnae.codigo });
                         } catch (e) {
@@ -954,7 +895,6 @@ async function carregarMunicipiosDaAPI() {
                     }
                 }
 
-                // 3. Reseta o formulário e recarrega dados
                 setDirty(false);
                 resetSegmentForm();
                 await carregarSegmentos();
@@ -1024,20 +964,50 @@ async function carregarMunicipiosDaAPI() {
         // ===== MODAIS =====
         function closeAllModals() {
             if (detailsModal && detailsModal.style.display === 'flex') detailsModal.style.display = 'none';
-            if (genericModal && genericModal.style.display === 'flex') genericModal.style.display = 'none';
-            if (confirmModal && confirmModal.style.display === 'flex') confirmModal.style.display = 'none';
+            if (genericModal && genericModal.style.display === 'flex') {
+                genericModal.style.display = 'none';
+                restoreActiveMenuItem();
+            }
+            if (confirmModal && confirmModal.style.display === 'flex') {
+                confirmModal.style.display = 'none';
+                restoreActiveMenuItem();
+            }
             confirmCallback = null;
         }
 
         document.addEventListener('keydown', function(event) { if (event.key === 'Escape') closeAllModals(); });
 
         if (detailsClose) detailsClose.addEventListener('click', function() { detailsModal.style.display = 'none'; });
-        if (genericClose) genericClose.addEventListener('click', function() { genericModal.style.display = 'none'; });
-        if (confirmClose) confirmClose.addEventListener('click', function() { confirmModal.style.display = 'none'; });
+        if (genericClose) {
+            genericClose.addEventListener('click', function() {
+                genericModal.style.display = 'none';
+                restoreActiveMenuItem();
+            });
+        }
+        if (confirmClose) {
+            confirmClose.addEventListener('click', function() {
+                confirmModal.style.display = 'none';
+                restoreActiveMenuItem();
+            });
+        }
 
         if (detailsModal) detailsModal.addEventListener('click', function(e) { if(e.target === this) detailsModal.style.display = 'none'; });
-        if (genericModal) genericModal.addEventListener('click', function(e) { if(e.target === this) genericModal.style.display = 'none'; });
-        if (confirmModal) confirmModal.addEventListener('click', function(e) { if(e.target === this) confirmModal.style.display = 'none'; });
+        if (genericModal) {
+            genericModal.addEventListener('click', function(e) {
+                if(e.target === this) {
+                    genericModal.style.display = 'none';
+                    restoreActiveMenuItem();
+                }
+            });
+        }
+        if (confirmModal) {
+            confirmModal.addEventListener('click', function(e) {
+                if(e.target === this) {
+                    confirmModal.style.display = 'none';
+                    restoreActiveMenuItem();
+                }
+            });
+        }
 
         if (btnIgnoreCadastro) {
             btnIgnoreCadastro.addEventListener('click', function() {
@@ -1084,6 +1054,7 @@ async function carregarMunicipiosDaAPI() {
                 btnConfirmCancel.style.display = 'inline-block';
                 btnConfirmOk.innerText = 'Confirmar';
                 confirmCallback = null;
+                restoreActiveMenuItem();
             };
         }
 
@@ -1097,12 +1068,14 @@ async function carregarMunicipiosDaAPI() {
             btnConfirmCancel.style.display = 'inline-block';
             btnConfirmOk.innerText = 'Confirmar';
             btnConfirmDiscard.style.display = 'none';
+            restoreActiveMenuItem();
         });
 
         btnConfirmCancel.addEventListener('click', function() {
             confirmModal.style.display = 'none';
             confirmCallback = null;
             btnConfirmDiscard.style.display = 'none';
+            restoreActiveMenuItem();
         });
 
         // ===== AUTOCOMPLETE DE CNAE =====
@@ -1155,11 +1128,16 @@ async function carregarMunicipiosDaAPI() {
             currentGenericContext = context || null;
             currentItems = items;
             genericSearch.value = '';
-            renderGenericList(items);
+            renderGenericList();
             genericModal.style.display = 'flex';
+            saveActiveMenuItem();
+            if (context === 'cnae') setActiveMenuItem('menu-cnaes');
+            else if (context === 'municipio') setActiveMenuItem('menu-municipios');
+            else if (context === 'natureza') setActiveMenuItem('menu-natureza');
         }
 
-        function renderGenericList(items) {
+        function renderGenericList() {
+            const items = currentItems;
             if (!items || items.length === 0) {
                 genericModalBody.innerHTML = '<p style="padding:15px; text-align:center; color:#666;">Nenhum item encontrado.</p>';
                 return;
@@ -1167,7 +1145,9 @@ async function carregarMunicipiosDaAPI() {
             let html = '<ul class="generic-list">';
             items.forEach((item, index) => {
                 const card = formatAsCard(item);
-                const cardHtml = card.sigla ? `<div class="card-info"><span class="card-sigla">${card.sigla}</span><span class="card-nome" style="color:#9ca3af; font-size:12px;">${card.nome}</span></div>` : `<div class="card-info"><span class="card-nome" style="font-weight:bold;">${card.nome}</span></div>`;
+                const cardHtml = card.sigla
+                    ? `<div class="card-info"><span class="card-sigla">${card.sigla}</span><span class="card-nome" style="color:#9ca3af; font-size:12px;">${card.nome}</span></div>`
+                    : `<div class="card-info"><span class="card-nome" style="font-weight:bold;">${card.nome}</span></div>`;
                 html += `<li class="generic-card" data-index="${index}">${cardHtml}<button class="card-btn">OK</button></li>`;
             });
             html += '</ul>';
@@ -1175,91 +1155,170 @@ async function carregarMunicipiosDaAPI() {
         }
 
         genericSearch.addEventListener('input', async function() {
-            const searchTerm = this.value.toLowerCase();
-            if (currentGenericContext === 'cnae') {
-                const resultados = await buscarCnaes(searchTerm);
-                renderGenericList(resultados);
-            } else {
-                const filteredItems = currentItems.filter(item => {
-                    const card = formatAsCard(item);
-                    return card.full.toLowerCase().includes(searchTerm) || card.nome.toLowerCase().includes(searchTerm);
-                });
-                renderGenericList(filteredItems);
+            const searchTerm = this.value.toLowerCase().trim();
+            if (!searchTerm) {
+                if (originalItems) {
+                    currentItems = [...originalItems];
+                    renderGenericList();
+                    return;
+                }
+                return;
             }
+            const filteredItems = currentItems.filter(item => {
+                const card = formatAsCard(item);
+                return card.full.toLowerCase().includes(searchTerm) || card.nome.toLowerCase().includes(searchTerm);
+            });
+            currentItems = filteredItems;
+            renderGenericList();
         });
 
-        genericModalBody.addEventListener('click', function(e) {
-            const li = e.target.closest('.generic-card');
-            if (li) {
-                genericModalBody.querySelectorAll('.generic-card').forEach(item => item.classList.remove('selected'));
-                li.classList.add('selected');
-                if (e.target.classList.contains('card-btn')) {
-                    const index = li.getAttribute('data-index');
-                    const originalItem = currentItems[index];
-                    if (currentGenericContext === 'cnae') {
-                        if (originalItem && originalItem.codigo) {
-                            filterCnaeInput.value = originalItem.full;
-                            selectedCnaeCode = originalItem.codigo;
-                        }
-                        genericModal.style.display = 'none';
-                    } else if (currentGenericContext === 'uf') {
-                        if (originalItem && originalItem.sigla) {
-                            filterUf.value = originalItem.sigla;
-                        }
-                        pesquisarProspeccao();
-                        genericModal.style.display = 'none';
-                    } else { genericModal.style.display = 'none'; }
+        let originalItems = [];
+
+    genericModalBody.addEventListener('click', function(e) {
+    const li = e.target.closest('.generic-card');
+    if (!li) return;
+
+    genericModalBody.querySelectorAll('.generic-card').forEach(item => item.classList.remove('selected'));
+    li.classList.add('selected');
+
+    const isOkButton = e.target.classList.contains('card-btn') || e.target.closest('.card-btn');
+    if (!isOkButton) return;
+
+    const index = parseInt(li.dataset.index);
+    const originalItem = currentItems[index];
+
+    // Fecha o modal imediatamente
+    genericModal.style.display = 'none';
+
+    // Aplica o filtro e navega para a prospecção (SEM pesquisar automaticamente)
+    switch (currentGenericContext) {
+        case 'cnae':
+            if (originalItem && originalItem.codigo) {
+                filterCnaeInput.value = originalItem.full;
+                selectedCnaeCode = originalItem.codigo;
+                cnaeSuggestions.classList.remove('active');
+                showScreen('main');
+                // NÃO chama pesquisarProspeccao()
+            }
+            break;
+
+        case 'uf':
+            if (originalItem && originalItem.sigla) {
+                filterUf.value = originalItem.sigla;
+                refreshCustomSelect(filterUf);
+                showScreen('main');
+                // NÃO chama pesquisarProspeccao()
+            }
+            break;
+
+        case 'municipio':
+            if (originalItem && typeof originalItem === 'string') {
+                const idx = originalItem.lastIndexOf(' - ');
+                if (idx !== -1) {
+                    const ddd = originalItem.substring(idx + 3).trim();
+                    filterDdd.value = ddd;
+                    refreshCustomSelect(filterDdd);
+                    if (filterMunicipio) {
+                        filterMunicipio.value = '';
+                        refreshCustomSelect(filterMunicipio);
+                    }
+                    showScreen('main');
+                    // NÃO chama pesquisarProspeccao()
                 }
             }
-        });
+            break;
+
+        case 'natureza':
+            // Apenas navega para a prospecção (sem filtro específico)
+            showScreen('main');
+            break;
+
+        default:
+            showScreen('main');
+            break;
+    }
+});
 
         // ===== MENUS DA SIDEBAR =====
         document.getElementById('menu-cnaes').addEventListener('click', async () => {
             const cnaesDaApi = await buscarCnaes('');
+            originalItems = cnaesDaApi;
             openGenericModal('Pesquisa CNAE', 'Informe o CNAE:', cnaesDaApi, 'cnae');
         });
 
         document.getElementById('menu-municipios').addEventListener('click', async () => {
-    // Se já está carregando, apenas mostra o modal e aguarda
-    if (municipiosCarregando) {
-        openGenericModal('Pesquisa Município', 'Carregando municípios...', [], 'municipio');
-        // Aguarda a promessa que já está em andamento (sem iniciar outra)
-        const resultado = await municipiosPromise; // Vamos criar essa variável
-        if (resultado) {
-            renderGenericList(resultado);
-            genericModalSubtitle.innerText = 'Informe o município:';
-        }
-        return;
-    }
+            if (municipiosCarregando) {
+                openGenericModal('Pesquisa Município e DDDs', 'Carregando municípios e DDDs...', [], 'municipio');
+                const resultado = await municipiosPromise;
+                if (resultado) {
+                    originalItems = resultado;
+                    currentItems = resultado;
+                    renderGenericList();
+                    genericModalSubtitle.innerText = 'Informe o município ou DDD:';
+                }
+                return;
+            }
 
-    // Se já tem cache, abre direto
-    if (municipiosCache) {
-        openGenericModal('Pesquisa Município', 'Informe o município:', municipiosCache, 'municipio');
-        return;
-    }
+            if (municipiosCache) {
+                originalItems = municipiosCache;
+                openGenericModal('Pesquisa Município e DDDs', 'Informe o município ou DDD:', municipiosCache, 'municipio');
+                return;
+            }
 
-    // Se não tem cache, inicia a busca e abre com loading
-    municipiosCarregando = true;
-    openGenericModal('Pesquisa Município', 'Carregando municípios...', [], 'municipio');
-    
-    // Cria uma promessa que será reutilizada
-    municipiosPromise = carregarMunicipiosDaAPI();
-    const municipios = await municipiosPromise;
-    
-    if (municipios) {
-        renderGenericList(municipios);
-        genericModalSubtitle.innerText = 'Informe o município:';
-    }
-});
+            municipiosCarregando = true;
+            openGenericModal('Pesquisa Município e DDDs', 'Carregando municípios...', [], 'municipio');
+            
+            municipiosPromise = carregarMunicipiosDaAPI();
+            const municipios = await municipiosPromise;
+            
+            if (municipios) {
+                originalItems = municipios;
+                currentItems = municipios;
+                renderGenericList();
+                genericModalSubtitle.innerText = 'Informe o município ou DDD:';
+            }
+        });
 
         document.getElementById('menu-natureza').addEventListener('click', async () => {
             const situacoes = await carregarSituacoesCadastrais();
+            originalItems = situacoes;
             openGenericModal('Pesquisa Natureza Jurídica', 'Informe a natureza:', situacoes, 'natureza');
         });
 
-        document.getElementById('menu-segmentos').addEventListener('click', () => {
-            openSegmentScreen();
-        });
+        // ===== EVENTOS DE NAVEGAÇÃO ENTRE TELAS =====
+        document.getElementById('menu-dashboard').addEventListener('click', function() {
+    // Se estiver na tela de segmentos e houver alterações, pergunta antes
+    if (segmentScreen.style.display === 'block') {
+        if (isDirty) {
+            showUnsavedChangesModal(
+                'Deseja salvar antes de sair?',
+                function() {
+                    document.getElementById('segmentoForm').requestSubmit();
+                    showScreen('main');
+                },
+                function() {
+                    resetSegmentForm();
+                    showScreen('main');
+                }
+            );
+        } else {
+            showScreen('main');
+        }
+    } else {
+        // Já está na prospecção: apenas garante que o item fique ativo
+        setActiveMenuItem('menu-dashboard');
+        closeAllModals();
+    }
+});
+
+        document.getElementById('menu-segmentos').addEventListener('click', function() {
+    if (segmentScreen.style.display === 'block') {
+        // Já está na tela de segmentos: apenas garante que o item fique ativo
+        setActiveMenuItem('menu-segmentos');
+        return;
+    }
+    showScreen('segment');
+});
 
         // ===== LIMPAR FILTROS =====
         function clearFilters() {
@@ -1271,18 +1330,18 @@ async function carregarMunicipiosDaAPI() {
             filterTipoCnae.value = 'PRINCIPAL';
             cnaeSuggestions.classList.remove('active');
             
-            if (filterMunicipio) {
-                filterMunicipio.innerHTML = '<option value="">Todos</option>';
-            }
             if (campoMunicipio) {
                 campoMunicipio.style.display = 'none';
+            }
+            if (filterMunicipio) {
+                filterMunicipio.innerHTML = '<option value="">Todos</option>';
+                refreshCustomSelect(filterMunicipio);
             }
 
             refreshCustomSelect(filterUf);
             refreshCustomSelect(filterDdd);
             refreshCustomSelect(filterSegmento);
             refreshCustomSelect(filterTipoCnae);
-            if (filterMunicipio) refreshCustomSelect(filterMunicipio);
 
             registros = [];
             ultimoCnpj = null;
@@ -1296,12 +1355,13 @@ async function carregarMunicipiosDaAPI() {
                 currentPage++;
                 pesquisarProspeccao();
             } else if (direction === 'prev' && currentPage > 1) {
-                console.warn("Paginação anterior não suportada pela API");
+                showWarning('A navegação para páginas anteriores não é suportada pela API no momento. Use a pesquisa novamente para recomeçar.', 'Aviso');
             }
         }
 
         // ===== EVENTOS =====
         btnSearch.addEventListener('click', function() {
+            currentPage = 1;
             ultimoCnpj = null;
             pesquisarProspeccao();
         });
@@ -1317,13 +1377,16 @@ async function carregarMunicipiosDaAPI() {
             }
         });
 
-        // ===== EVENTO DE MUDANÇA DO DDD =====
+        // ===== EVENTO DE MUDANÇA DO DDD (DESATIVADO) =====
         document.getElementById('filter-ddd').addEventListener('change', function() {
-            const ddd = this.value;
-            carregarMunicipiosPorDDD(ddd);
+            // Não faz nada
         });
 
         // ===== INICIALIZAÇÃO =====
+        if (campoMunicipio) {
+            campoMunicipio.style.display = 'none';
+        }
+
         initializeCustomSelects();
         carregarUFs();
         carregarSegmentos();
@@ -1331,10 +1394,13 @@ async function carregarMunicipiosDaAPI() {
         carregarDDDs();
         updateSegmentFilter();
 
+        // Garante que a tela inicial seja a prospecção
+        showScreen('main');
+
         // ===== PRÉ-CARREGAR MUNICÍPIOS EM SEGUNDO PLANO =====
-carregarMunicipiosDaAPI().then(municipios => {
-    console.log("Municípios pré-carregados com sucesso!");
-});
+        carregarMunicipiosDaAPI().then(municipios => {
+            console.log("Municípios pré-carregados com sucesso!");
+        });
 
     } catch (error) {
         console.error('❌ Erro durante a inicialização:', error);

@@ -37,7 +37,7 @@ body {
     color: var(--text-main);
 }
 
-/* ================== SIDEBAR (COLAPSÃVEL) ================== */
+/* ================== SIDEBAR (COLAPSÁVEL) ================== */
 .sidebar {
     position: fixed;
     left: 0;
@@ -46,7 +46,7 @@ body {
     width: 245px;
     background: linear-gradient(180deg, #071a3d 0%, #061b48 100%);
     color: white;
-    padding: 22px 15px;
+    padding: 70px 22px 22px; /* Corrigido: 70px sem espaço, garante que o botão não sobreponha o menu */
     z-index: 10;
     display: flex;
     flex-direction: column;
@@ -110,10 +110,7 @@ body.dark-mode .dark-mode-toggle i {
     transform: rotate(180deg);
 }
 
-.menu-item.active {
-    margin-top: 50px;
-}
-
+/* REMOVIDO: .menu-item.active { margin-top: 50px; } para não quebrar o layout */
 .menu-title {
     color: #8492ae;
     font-size: 11px;
@@ -198,7 +195,7 @@ body.dark-mode .dark-mode-toggle i {
 /* ================== ESTADO COLAPSADO ================== */
 .sidebar.collapsed {
     width: 75px;
-    padding: 22px 8px;
+    padding: 70px 8px 22px; /* Mantém o mesmo padding-top */
 }
 
 .sidebar.collapsed .menu-title,
@@ -720,8 +717,18 @@ table {
     border-collapse: collapse;
 }
 
+/* ADICIONADO: Barra de rolagem na tabela */
+tbody {
+    display: block;
+    max-height: 500px;
+    overflow-y: auto;
+    width: 100%;
+}
+
 thead {
-    background: var(--bg-card);
+    display: table;
+    width: 100%;
+    table-layout: fixed; /* Mantém o cabeçalho alinhado com o corpo */
 }
 
 th {
@@ -742,6 +749,9 @@ td {
 
 tbody tr {
     transition: background 0.2s ease;
+    display: table;
+    width: 100%;
+    table-layout: fixed;
 }
 
 tbody tr:hover {
@@ -1164,8 +1174,7 @@ body.dark-mode .btn-secondary:hover {
     align-items: center;
 }
 
-/* ===== ANIMAÃ‡ÃƒO DE ELEVAÃ‡ÃƒO NOS BOTÃ•ES DA TABELA DE SEGMENTOS ===== */
-/* ===== ANIMAÃ‡ÃƒO DE ELEVAÃ‡ÃƒO NOS BOTÃ•ES DA TABELA DE SEGMENTOS ===== */
+/* ===== ANIMAÇÃO DE ELEVAÇÃO NOS BOTÕES DA TABELA DE SEGMENTOS ===== */
 #segmentosTable .btn-table {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     border-radius: 8px;
@@ -1176,7 +1185,7 @@ body.dark-mode .btn-secondary:hover {
     cursor: pointer;
 }
 
-/* BotÃ£o Editar - MODO CLARO */
+/* Botão Editar - MODO CLARO */
 #segmentosTable .btn-table[data-action="edit"] {
     background: #eff6ff;
     color: #1d4ed8;
@@ -1190,7 +1199,7 @@ body.dark-mode .btn-secondary:hover {
     box-shadow: 0 6px 16px rgba(29, 78, 216, 0.3);
 }
 
-/* BotÃ£o Excluir - MODO CLARO */
+/* Botão Excluir - MODO CLARO */
 #segmentosTable .btn-delete {
     background: #fef2f2;
     color: #dc2626;
@@ -1204,7 +1213,7 @@ body.dark-mode .btn-secondary:hover {
     box-shadow: 0 6px 16px rgba(220, 38, 38, 0.3);
 }
 
-/* BotÃ£o Editar - MODO ESCURO (mais vivo, mas nÃ£o estourado) */
+/* Botão Editar - MODO ESCURO */
 body.dark-mode #segmentosTable .btn-table[data-action="edit"] {
     background: #1e3a5f;
     color: #60a5fa;
@@ -1218,7 +1227,7 @@ body.dark-mode #segmentosTable .btn-table[data-action="edit"]:hover {
     box-shadow: 0 6px 16px rgba(37, 99, 235, 0.5);
 }
 
-/* BotÃ£o Excluir - MODO ESCURO (vermelho equilibrado) */
+/* Botão Excluir - MODO ESCURO */
 body.dark-mode #segmentosTable .btn-delete {
     background: #1e3a5f;
     color: #f87171;
@@ -1242,42 +1251,6 @@ body.dark-mode #segmentosTable .btn-delete:hover {
     box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
 }
 
-#segmentosTable .btn-table[data-action="edit"] {
-    background: #eff6ff;
-    color: #1d4ed8;
-    border: 1px solid #bfdbfe;
-}
-
-/* BotÃ£o Editar - MODO ESCURO */
-body.dark-mode #segmentosTable .btn-table[data-action="edit"] {
-    background: #1d4ed8;         /* Azul mais vivo */
-    color: #ffffff;
-    border-color: #1d4ed8;
-}
-
-body.dark-mode #segmentosTable .btn-table[data-action="edit"]:hover {
-    background: #2563eb;         /* Azul mais claro */
-    color: #ffffff;
-    border-color: #2563eb;
-    box-shadow: 0 6px 16px rgba(37, 99, 235, 0.5);
-}
-
-/* BotÃ£o Excluir - MODO ESCURO */
-body.dark-mode #segmentosTable .btn-delete {
-    background: #dc2626;         /* Vermelho vivo */
-    color: #ffffff;
-    border-color: #dc2626;
-}
-
-body.dark-mode #segmentosTable .btn-delete:hover {
-    background: #ef4444;         /* Vermelho mais claro */
-    color: #ffffff;
-    border-color: #ef4444;
-    box-shadow: 0 6px 16px rgba(239, 68, 68, 0.5);
-}
-body.dark-mode {
-    --bg-hover: #061734;  /* Um pouco mais escuro que o fundo dos cards */
-}
 #segment-form-card.editing-mode {
     border: 2px solid #2563eb;
     background: var(--bg-card);
@@ -1310,6 +1283,7 @@ body.dark-mode {
 }
 
 /* ================== MODAIS ================== */
+/* MODAIS */
 .modal-overlay {
     position: fixed;
     top: 0;
@@ -1330,26 +1304,68 @@ body.dark-mode {
     padding: 24px;
     width: 100%;
     max-width: 600px;
+    height: 600px; /* ALTURA FIXA */
     max-height: 90vh;
     overflow-y: auto;
     box-shadow: 0 10px 30px rgba(0,0,0,0.3);
     position: relative;
     color: var(--text-main);
+    display: flex;
+    flex-direction: column; /* Para o conteúdo interno rolar */
 }
 
 .modal-content.large-modal {
     max-width: 900px;
+    height: 700px; /* ALTURA FIXA PARA MODAL GRANDE */
 }
 
 .modal-content.generic-content {
-    max-width: 750px;   
-    width: 90%;         
-    padding: 30px;     
+    max-width: 750px;
+    width: 90%;
+    padding: 30px;
+    height: 650px; /* ALTURA FIXA PARA MODAL GENÉRICO */
+    display: flex;
+    flex-direction: column;
 }
 
 .modal-content.confirm-content {
     max-width: 400px;
     text-align: center;
+    height: auto; /* Altura automática, sem fixação */
+    min-height: auto;
+    display: block;
+}
+
+/* Ajustes para áreas internas roláveis */
+.modal-scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 10px;
+    margin-bottom: 20px;
+}
+
+.generic-modal-list-container {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 5px;
+    margin-bottom: 20px;
+}
+
+.generic-search-box {
+    margin-bottom: 20px;
+    flex-shrink: 0; /* Para não encolher */
+}
+
+.modal-header {
+    flex-shrink: 0; /* Não encolhe */
+    margin-bottom: 20px;
+}
+
+.modal-footer {
+    flex-shrink: 0;
+    margin-top: auto; /* Empurra para o final */
+    border-top: 1px solid var(--border-color);
+    padding-top: 15px;
 }
 
 .close-modal {
@@ -1563,7 +1579,7 @@ body.dark-mode .btn-light-blue {
     margin-right: 4px;
 }
 
-/* ================== MODAL GENÃ‰RICO (PESQUISA) ================== */
+/* ================== MODAL GENÉRICO (PESQUISA) ================== */
 .generic-search-box {
     position: relative;
     margin-bottom: 24px;
@@ -1689,7 +1705,7 @@ body.dark-mode .generic-card.selected {
     transform: scale(1.03);
 }
 
-/* ================== MODAL DE CONFIRMAÃ‡ÃƒO ================== */
+/* ================== MODAL DE CONFIRMAÇÃO ================== */
 .confirm-icon {
     font-size: 48px;
     color: #f59e0b;
@@ -1807,10 +1823,12 @@ body.dark-mode .generic-card.selected {
     display: none;
     padding: 6px;
 }
+
 .filter-box {
-    position: relative;   /* â¬…ï¸ Adicione */
-    z-index: 100;         /* â¬…ï¸ Adicione */
+    position: relative;
+    z-index: 100;
 }
+
 .custom-select.open .custom-select-options {
     display: block;
     animation: fadeIn 0.15s ease;
@@ -1856,7 +1874,7 @@ body.dark-mode .custom-option.selected {
     pointer-events: none;
 }
 
-/* ================== BOTÃƒO DETALHES MODERNO ================== */
+/* ================== BOTÃO DETALHES MODERNO ================== */
 .details-btn,
 .btn-detail {
     display: inline-flex;
@@ -1892,7 +1910,7 @@ body.dark-mode .custom-option.selected {
     font-size: 14px;
 }
 
-/* ================== BOTÃƒO NOVO SEGMENTO (MELHORADO) ================== */
+/* ================== BOTÃO NOVO SEGMENTO (MELHORADO) ================== */
 .btn-primary[onclick="novoSegmento()"] {
     background: linear-gradient(135deg, #2463eb 0%, #1a4fc4 100%);
     border: none;
@@ -2145,19 +2163,21 @@ body.dark-mode .tooltip-trigger {
     }
 
     .results {
-    position: static;     /* PadrÃ£o, caso esteja algo diferente */
-    z-index: auto;
-}
+        position: static;
+        z-index: auto;
+    }
+
     table {
         min-width: 900px;
     }
 }
+
 body.dark-mode #segmentosTable .btn-table[data-action="edit"] {
-    background: #1e40af;   /* Azul mais vibrante */
+    background: #1e40af;
     color: #ffffff;
 }
 
-/* ============ BOTÃ•ES DO MODAL - AJUSTES ============ */
+/* ============ BOTÕES DO MODAL - AJUSTES ============ */
 
 #btn-confirm-cancel.btn-secondary:hover {
     background: var(--bg-hover);
@@ -2172,7 +2192,7 @@ body.dark-mode #segmentosTable .btn-table[data-action="edit"] {
     box-shadow: 0 4px 12px rgba(29, 78, 216, 0.3);
 }
 
-/* BotÃ£o Ignorar Cadastro - estilo vermelho */
+/* Botão Ignorar Cadastro - estilo vermelho */
 #btn-ignore-cadastro.btn-secondary {
     background: #fef2f2;
     color: #dc2626;
@@ -2206,7 +2226,7 @@ body.dark-mode #btn-ignore-cadastro.btn-secondary {
     box-shadow: 0 4px 8px rgba(220, 38, 38, 0.2);
 }
 
-/* BotÃ£o Ignorar Cadastro (se for usado em outro contexto) */
+/* Botão Ignorar Cadastro (se for usado em outro contexto) */
 .btn-secondary:active {
     transform: translateY(0);
     background: #e2e8f0;
@@ -2216,25 +2236,22 @@ body.dark-mode .btn-secondary:active {
     background: #334155;
 }
 
-/* ===== RODAPÃ‰ DA SIDEBAR (BOTÃƒO MODO ESCURO) - CORRIGIDO ===== */
-/* Garante que a sidebar use flexbox para o rodapÃ© ficar embaixo */
+/* ===== RODAPÉ DA SIDEBAR (BOTÃO MODO ESCURO) - CORRIGIDO ===== */
 .sidebar {
     display: flex !important;
     flex-direction: column !important;
 }
 
-/* O rodapÃ© ocupa o espaÃ§o restante e fica no final */
 .sidebar-footer {
     margin-top: auto !important;
     padding-top: 20px !important;
     border-top: 1px solid rgba(255,255,255,0.1) !important;
     width: 100% !important;
     display: flex !important;
-    justify-content: flex-start !important; /* Alinha Ã  esquerda */
-    padding-left: 15px !important; /* Mesmo padding lateral dos itens do menu */
+    justify-content: flex-start !important;
+    padding-left: 15px !important;
 }
 
-/* BotÃ£o sem position absolute */
 .dark-mode-toggle {
     background: rgba(255,255,255,0.1) !important;
     border: none !important;
@@ -2270,10 +2287,50 @@ body.dark-mode .dark-mode-toggle:hover {
     color: #fff !important;
 }
 
-/* Quando a sidebar estÃ¡ colapsada (75px) */
 .sidebar.collapsed .sidebar-footer {
     padding-top: 10px !important;
     padding-left: 0 !important;
     flex-direction: column !important;
-    align-items: center !important; /* Quando colapsada, centraliza */
+    align-items: center !important;
+}
+
+/* Contêiner com rolagem */
+.table-responsive {
+    max-height: 500px;
+    overflow-y: auto;
+    overflow-x: auto; /* Para telas pequenas, se necessário */
+}
+
+/* Garante que o cabeçalho fique fixo no topo */
+.table-responsive thead {
+    position: sticky;
+    top: 0;
+    background: var(--bg-card);
+    z-index: 1;
+}
+
+/* Ajuste para manter as larguras das colunas alinhadas */
+.table-responsive table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table-responsive th, .table-responsive td {
+    white-space: nowrap; /* Evita quebra de linha */
+}
+
+#main-screen, #segment-screen {
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+/* Classe auxiliar para animar a entrada */
+.fade-in {
+    opacity: 0;
+    transform: translateY(10px);
+}
+
+/* Quando a tela for exibida, anima para opacidade 1 e posição normal */
+.fade-in.active {
+    opacity: 1;
+    transform: translateY(0);
 }
