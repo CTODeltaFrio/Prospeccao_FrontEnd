@@ -96,6 +96,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // Paginação (API)
         let currentPage = 1;
         let ultimoCnpj = null;
+        let cursorAtual = null;
+        let historicoCursors = [null]; 
         let temMais = false;
         let registros = [];
         let municipiosCache = null;
@@ -104,6 +106,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Controle de alterações não salvas
         let isDirty = false;
+
+        function setDirty(value) {
+            isDirty = value;
+        }
 
         // ===== GERENCIAMENTO DO ITEM ATIVO NA SIDEBAR =====
         function setActiveMenuItem(id) {
@@ -136,7 +142,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 mainScreen.style.display = 'none';
                 segmentScreen.style.display = 'block';
                 setActiveMenuItem('menu-segmentos');
-                // Recarrega dados ao abrir
                 resetSegmentForm();
                 renderSegmentTable();
                 populateLinkSelect();
@@ -278,30 +283,71 @@ document.addEventListener('DOMContentLoaded', function() {
             refreshCustomSelect(selectMunicipio);
         }
 
+        // ===== FUNÇÃO AUXILIAR PARA BUSCAR DETALHES DE UM CNAE =====
+        async function buscarDetalhesCnae(codigo) {
+    try {
+        const data = await apiGet(`${API_URL}/api/cnaes/${codigo}`);
+        if (data) {
+            return {
+                codigo: data.codigo || data.cnae || data.id || codigo,
+                descricao: data.descricao || data.nome || '',
+                full: data.codigoDescricao || `${data.codigo} - ${data.descricao}`
+            };
+        }
+    } catch (e) {
+        console.warn(`CNAE ${codigo} não encontrado na API.`);
+    }
+    return null;
+}
+
         // ===== CARREGAR SEGMENTOS E SEUS VÍNCULOS =====
         async function carregarSegmentos() {
+    try {
+        const data = await apiGet(`${API_URL}/api/segmentos`);
+        segmentData = data.map(item => ({ id: item.codigo, nome: item.descricao }));
+
+        // LIMPA o array de links antes de recarregar (evita duplicatas)
+        segmentoCnaeLinks = [];
+        const promises = []; // Array para armazenar promessas de busca de detalhes
+
+        for (const seg of segmentData) {
             try {
-                const data = await apiGet(`${API_URL}/api/segmentos`);
-                segmentData = data.map(item => ({ id: item.codigo, nome: item.descricao }));
+                const cnaesVinculados = await apiGet(`${API_URL}/api/segmentos/${seg.id}/cnaes`);
                 
-                segmentoCnaeLinks = [];
-                for (const seg of segmentData) {
-                    try {
-                        const cnaesVinculados = await apiGet(`${API_URL}/api/segmentos/${seg.id}/cnaes`);
-                        cnaesVinculados.forEach(cnae => {
-                            segmentoCnaeLinks.push({ segmentoId: seg.id, cnaeCodigo: cnae.codigo });
-                        });
-                    } catch (e) {
-                        console.warn(`Erro ao buscar CNAEs do segmento ${seg.id}:`, e);
+                cnaesVinculados.forEach(cnae => {
+                    // Evita duplicatas no segmentoCnaeLinks
+                    const exists = segmentoCnaeLinks.some(link => 
+                        link.segmentoId === seg.id && link.cnaeCodigo === cnae.codigo
+                    );
+                    if (!exists) {
+                        segmentoCnaeLinks.push({ segmentoId: seg.id, cnaeCodigo: cnae.codigo });
                     }
-                }
-                
-                updateSegmentFilter();
-                renderSegmentTable();
-            } catch (error) {
-                console.error("Erro ao carregar Segmentos:", error);
+
+                    // Se o CNAE não estiver no cache, adiciona uma promessa para buscá-lo
+                    if (!allCnaesCache.some(c => c.codigo === cnae.codigo)) {
+                        const promise = buscarDetalhesCnae(cnae.codigo).then(detalhes => {
+                            if (detalhes) {
+                                allCnaesCache.push(detalhes);
+                                populateLinkSelect();
+                            }
+                        });
+                        promises.push(promise);
+                    }
+                });
+            } catch (e) {
+                console.warn(`Erro ao buscar CNAEs do segmento ${seg.id}:`, e);
             }
         }
+
+        // Aguarda TODAS as buscas de detalhes serem concluídas
+        await Promise.all(promises);
+
+        updateSegmentFilter();
+        renderSegmentTable();
+    } catch (error) {
+        console.error("Erro ao carregar Segmentos:", error);
+    }
+}
 
         // ===== BUSCAR CNAES (CONSULTA DIRETA NA API) =====
         async function buscarCnaes(filtro) {
@@ -568,95 +614,93 @@ document.addEventListener('DOMContentLoaded', function() {
         // ===== PESQUISA DE PROSPECÇÃO =====
         let pesquisaController = null;
 
-        async function pesquisarProspeccao(botao = null) {
-    const btn = botao || btnSearch;
+        async function pesquisarProspeccao(botao = null, cursor = null) {
+            const btn = botao || btnSearch;
+            const cursorParaEnvio = (cursor !== undefined) ? cursor : cursorAtual;
 
-    const uf = filterUf.value.trim();
-    const ddd = filterDdd.value;
-    const segmento = filterSegmento.value;
-    
-    let cnae = selectedCnaeCode;
-    if (!cnae && filterCnaeInput.value.trim() !== '') {
-        filterCnaeInput.value = '';
-        cnae = null;
-    }
-    
-    const escopoCnae = filterTipoCnae ? filterTipoCnae.value : 'PRINCIPAL';
+            const uf = filterUf.value.trim();
+            const ddd = filterDdd.value;
+            const segmento = filterSegmento.value;
+            
+            let cnae = selectedCnaeCode;
+            if (!cnae && filterCnaeInput.value.trim() !== '') {
+                filterCnaeInput.value = '';
+                cnae = null;
+            }
+            
+            const escopoCnae = filterTipoCnae ? filterTipoCnae.value : 'PRINCIPAL';
 
-    const body = {
-        uf: uf || null,
-        ddd: uf ? null : (ddd || null),
-        cnae: cnae || null,
-        segmento: cnae ? null : (segmento ? parseInt(segmento) : null),
-        escopoCnae: (cnae || segmento) ? escopoCnae : null,
-        ultimoCnpj: ultimoCnpj,
-        limite: 50
-    };
+            const body = {
+                uf: uf || null,
+                ddd: uf ? null : (ddd || null),
+                cnae: cnae || null,
+                segmento: cnae ? null : (segmento ? parseInt(segmento) : null),
+                escopoCnae: (cnae || segmento) ? escopoCnae : null,
+                ultimoCnpj: cursorParaEnvio,
+                limite: 50
+            };
 
-    if (!body.uf && !body.ddd && !body.segmento && !body.cnae) {
-        alert("Informe pelo menos um filtro de pesquisa (UF, DDD, Segmento ou CNAE).");
-        return;
-    }
+            if (!body.uf && !body.ddd && !body.segmento && !body.cnae) {
+                alert("Informe pelo menos um filtro de pesquisa (UF, DDD, Segmento ou CNAE).");
+                return;
+            }
 
-    // Desabilita o botão
-    btn.disabled = true;
+            btn.disabled = true;
+            const originalBtnHtml = btn.innerHTML;
+            const originalPageHtml = pageIndicator.innerHTML;
 
-    // Guarda HTML original do botão e do indicador de página
-    const originalBtnHtml = btn.innerHTML;
-    const originalPageHtml = pageIndicator.innerHTML;
+            if (btn.classList.contains('page-btn')) {
+                pageIndicator.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            } else {
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Carregando...';
+            }
 
-    // Se for botão de página, troca o indicador por spinner (e NÃO mexe no botão)
-    if (btn.classList.contains('page-btn')) {
-        pageIndicator.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-    } else {
-        // Botão Pesquisar: altera o botão
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Carregando...';
-    }
+            if (pesquisaController) {
+                pesquisaController.abort();
+            }
+            pesquisaController = new AbortController();
 
-    if (pesquisaController) {
-        pesquisaController.abort();
-    }
-    pesquisaController = new AbortController();
-
-    try {
-        const response = await fetch(`${API_URL}/api/prospeccao/pesquisar`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify(body),
-            signal: pesquisaController.signal
-        });
-
-        const text = await response.text();
-        if (!response.ok) {
-            let errorMessage = `HTTP ${response.status}`;
             try {
-                const errorData = JSON.parse(text);
-                errorMessage = errorData.message || errorMessage;
-            } catch (e) {}
-            throw new Error(errorMessage);
-        }
+                const response = await fetch(`${API_URL}/api/prospeccao/pesquisar`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify(body),
+                    signal: pesquisaController.signal
+                });
 
-        const data = text ? JSON.parse(text) : {};
-        
-        registros = data.registros || [];
-        temMais = data.temMais || false;
-        ultimoCnpj = data.ultimoCnpj || null;
-        renderTable(registros); // renderTable atualiza o indicador com "Página X"
-    } catch (error) {
-        if (error.name !== 'AbortError') {
-            console.error("❌ Erro na pesquisa:", error);
-            alert("Erro ao pesquisar. Verifique o console (F12).");
+                const text = await response.text();
+                if (!response.ok) {
+                    let errorMessage = `HTTP ${response.status}`;
+                    try {
+                        const errorData = JSON.parse(text);
+                        errorMessage = errorData.message || errorMessage;
+                    } catch (e) {}
+                    throw new Error(errorMessage);
+                }
+
+                const data = text ? JSON.parse(text) : {};
+                
+                registros = data.registros || [];
+                temMais = data.temMais || false;
+                const ultimoCnpjRetornado = data.ultimoCnpj || null;
+
+                cursorAtual = ultimoCnpjRetornado;
+
+                renderTable(registros);
+            } catch (error) {
+                if (error.name !== 'AbortError') {
+                    console.error("❌ Erro na pesquisa:", error);
+                    alert("Erro ao pesquisar. Verifique o console (F12).");
+                }
+                if (btn.classList.contains('page-btn')) {
+                    pageIndicator.innerHTML = originalPageHtml;
+                }
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalBtnHtml;
+                pesquisaController = null;
+            }
         }
-        // Em caso de erro, restaura o indicador para o valor anterior
-        if (btn.classList.contains('page-btn')) {
-            pageIndicator.innerHTML = originalPageHtml;
-        }
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = originalBtnHtml; // Restaura o HTML do botão (seta ou texto "Pesquisar")
-        pesquisaController = null;
-    }
-}
 
         // ===== RENDERIZAR TABELA =====
         function renderTable(data) {
@@ -668,6 +712,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 btnPrev.disabled = true;
                 btnNext.disabled = true;
                 pageIndicator.textContent = 'Página 1';
+                if (tbody) tbody.scrollTop = 0;
                 return;
             }
 
@@ -697,6 +742,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!temMais && data.length < limite) {
                 btnNext.disabled = true;
             }
+
+            if (tbody) tbody.scrollTop = 0;
         }
 
         // ===== DETALHES =====
@@ -728,7 +775,27 @@ document.addEventListener('DOMContentLoaded', function() {
             detailsModal.style.display = 'flex';
         }
 
-        // ===== SEGMENTOS - FUNÇÕES =====
+        // ========================================================================
+        // ===== SEÇÃO DE SEGMENTOS =====
+        // ========================================================================
+
+        window.novoSegmento = function() {
+            if (isDirty) {
+                showUnsavedChangesModal(
+                    'Deseja salvar antes de criar um novo segmento?',
+                    function() {
+                        document.getElementById('segmentoForm').requestSubmit();
+                        resetSegmentForm();
+                    },
+                    function() {
+                        resetSegmentForm();
+                    }
+                );
+            } else {
+                resetSegmentForm();
+            }
+        };
+
         function resetSegmentForm() {
             segmentNome.value = '';
             editingSegmentId = null;
@@ -747,7 +814,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         function renderSegmentTable(searchTerm = '') {
             segmentTableBody.innerHTML = '';
-            const term = searchTerm.toLowerCase();
+            const term = searchTerm.toLowerCase().trim();
 
             segmentData.filter(seg => seg.nome.toLowerCase().includes(term)).forEach(seg => {
                 const links = segmentoCnaeLinks.filter(link => link.segmentoId === seg.id);
@@ -755,11 +822,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 let tooltipContent = '';
                 if (qtdLinks > 0) {
-                    tooltipContent += '<div class="cnae-tooltip-content">';
+                    tooltipContent = '<div class="cnae-tooltip-content">';
                     links.forEach(link => {
                         const cnae = allCnaesCache.find(c => c.codigo === link.cnaeCodigo);
                         if (cnae) {
                             tooltipContent += `<div class="tooltip-item"><strong>${cnae.codigo}</strong> - ${cnae.descricao}</div>`;
+                        } else {
+                            tooltipContent += `<div class="tooltip-item"><strong>${link.cnaeCodigo}</strong> - (descrição não disponível)</div>`;
                         }
                     });
                     tooltipContent += '</div>';
@@ -784,6 +853,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 segmentTableBody.appendChild(tr);
             });
 
+            // Tooltips
+            segmentTableBody.querySelectorAll('.cnae-tooltip').forEach(tooltip => {
+                const trigger = tooltip.querySelector('.tooltip-trigger');
+                if (trigger) {
+                    trigger.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        document.querySelectorAll('.cnae-tooltip.open').forEach(t => {
+                            if (t !== tooltip) t.classList.remove('open');
+                        });
+                        tooltip.classList.toggle('open');
+                    });
+                }
+            });
+
+            // Botões
             segmentTableBody.querySelectorAll('button[data-action]').forEach(btn => {
                 btn.addEventListener('click', function() {
                     const id = parseInt(this.dataset.id);
@@ -795,15 +879,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             });
 
-            segmentTableBody.querySelectorAll('.cnae-tooltip').forEach(tooltip => {
-                const trigger = tooltip.querySelector('.tooltip-trigger');
-                trigger.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    document.querySelectorAll('.cnae-tooltip.open').forEach(t => {
-                        if (t !== tooltip) t.classList.remove('open');
-                    });
-                    tooltip.classList.toggle('open');
-                });
+            // Fecha tooltips ao clicar fora
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('.cnae-tooltip')) {
+                    document.querySelectorAll('.cnae-tooltip.open').forEach(t => t.classList.remove('open'));
+                }
             });
         }
 
@@ -868,6 +948,7 @@ document.addEventListener('DOMContentLoaded', function() {
             setDirty(true);
         };
 
+        // ===== EVENTO DE SUBMIT DO FORMULÁRIO (SALVAR) =====
         document.getElementById('segmentoForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             const nome = segmentNome.value.trim();
@@ -914,51 +995,75 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 setDirty(false);
-                resetSegmentForm();
-                await carregarSegmentos();
-                updateSegmentFilter();
-                confirmModal.style.display = 'none';
-                showWarning('Segmento salvo com sucesso!', 'Sucesso');
+originalLinkedCnaes = [...currentLinkedCnaes]; // <- ADICIONE ESTA LINHA
+resetSegmentForm();
+await carregarSegmentos();
+updateSegmentFilter();
+confirmModal.style.display = 'none';
+showWarning('Segmento salvo com sucesso!', 'Sucesso');
             } catch (error) {
                 console.error("Erro ao salvar segmento:", error);
-                showWarning('Erro ao salvar segmento.');
+                showWarning('Erro ao salvar segmento. Detalhes no console (F12).');
             }
         });
 
+        // ===== BOTÃO CANCELAR =====
         if (btnCancelSegment) {
             btnCancelSegment.addEventListener('click', function() {
                 resetSegmentForm();
             });
         }
 
+        // ===== BUSCA NA TABELA DE SEGMENTOS =====
         segmentSearch.addEventListener('input', function() { renderSegmentTable(this.value); });
 
+        // ===== EDITAR SEGMENTO =====
         async function editarSegmento(id) {
-            const seg = segmentData.find(s => s.id === id);
-            if (!seg) return;
-            editingSegmentId = id;
-            segmentNome.value = seg.nome;
-            btnSaveSegment.innerText = 'Atualizar segmento';
-            btnSaveSegment.classList.add('editing-btn');
-            btnCancelSegment.style.display = 'inline-block';
-            formTitle.innerText = 'Editar segmento';
-            segmentFormCard.classList.add('editing-mode');
+    const seg = segmentData.find(s => s.id === id);
+    if (!seg) return;
 
-            try {
-                const cnaesVinculados = await apiGet(`${API_URL}/api/segmentos/${id}/cnaes`);
-                currentLinkedCnaes = allCnaesCache.filter(cnae => cnaesVinculados.some(v => v.codigo === cnae.codigo));
-                originalLinkedCnaes = [...currentLinkedCnaes];
-                renderLinkedCnaes();
-                populateLinkSelect();
-            } catch (e) {
-                currentLinkedCnaes = [];
-                originalLinkedCnaes = [];
-                renderLinkedCnaes();
-                populateLinkSelect();
+    editingSegmentId = id;
+    segmentNome.value = seg.nome;
+    btnSaveSegment.innerText = 'Atualizar segmento';
+    btnSaveSegment.classList.add('editing-btn');
+    btnCancelSegment.style.display = 'inline-block';
+    formTitle.innerText = 'Editar segmento';
+    segmentFormCard.classList.add('editing-mode');
+
+    try {
+        const cnaesVinculados = await apiGet(`${API_URL}/api/segmentos/${id}/cnaes`);
+        
+        // Constrói a lista de CNAEs completos (com descrição)
+        const cnaesCompletos = [];
+        for (const cnae of cnaesVinculados) {
+            let cnaeCompleto = allCnaesCache.find(c => c.codigo === cnae.codigo);
+            if (!cnaeCompleto) {
+                cnaeCompleto = await buscarDetalhesCnae(cnae.codigo);
+                if (cnaeCompleto) {
+                    allCnaesCache.push(cnaeCompleto);
+                } else {
+                    // Fallback
+                    cnaeCompleto = { codigo: cnae.codigo, descricao: 'CNAE não encontrado', full: cnae.codigo };
+                }
             }
-            setDirty(true);
+            cnaesCompletos.push(cnaeCompleto);
         }
 
+        currentLinkedCnaes = cnaesCompletos;
+        originalLinkedCnaes = [...currentLinkedCnaes];
+        renderLinkedCnaes();
+        populateLinkSelect();
+    } catch (e) {
+        console.error("Erro ao carregar CNAEs vinculados:", e);
+        currentLinkedCnaes = [];
+        originalLinkedCnaes = [];
+        renderLinkedCnaes();
+        populateLinkSelect();
+    }
+    setDirty(true);
+}
+
+        // ===== EXCLUIR SEGMENTO =====
         function excluirSegmento(id) {
             const seg = segmentData.find(s => s.id === id);
             if (!seg) {
@@ -978,6 +1083,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         }
+
+        // ========================================================================
+        // ===== FIM DA SEÇÃO DE SEGMENTOS =====
+        // ========================================================================
 
         // ===== MODAIS =====
         function closeAllModals() {
@@ -1192,70 +1301,64 @@ document.addEventListener('DOMContentLoaded', function() {
 
         let originalItems = [];
 
-    genericModalBody.addEventListener('click', function(e) {
-    const li = e.target.closest('.generic-card');
-    if (!li) return;
+        genericModalBody.addEventListener('click', function(e) {
+            const li = e.target.closest('.generic-card');
+            if (!li) return;
 
-    genericModalBody.querySelectorAll('.generic-card').forEach(item => item.classList.remove('selected'));
-    li.classList.add('selected');
+            genericModalBody.querySelectorAll('.generic-card').forEach(item => item.classList.remove('selected'));
+            li.classList.add('selected');
 
-    const isOkButton = e.target.classList.contains('card-btn') || e.target.closest('.card-btn');
-    if (!isOkButton) return;
+            const isOkButton = e.target.classList.contains('card-btn') || e.target.closest('.card-btn');
+            if (!isOkButton) return;
 
-    const index = parseInt(li.dataset.index);
-    const originalItem = currentItems[index];
+            const index = parseInt(li.dataset.index);
+            const originalItem = currentItems[index];
 
-    // Fecha o modal imediatamente
-    genericModal.style.display = 'none';
+            genericModal.style.display = 'none';
 
-    // Aplica o filtro e navega para a prospecção (SEM pesquisar automaticamente)
-    switch (currentGenericContext) {
-        case 'cnae':
-            if (originalItem && originalItem.codigo) {
-                filterCnaeInput.value = originalItem.full;
-                selectedCnaeCode = originalItem.codigo;
-                cnaeSuggestions.classList.remove('active');
-                showScreen('main');
-                // NÃO chama pesquisarProspeccao()
-            }
-            break;
-
-        case 'uf':
-            if (originalItem && originalItem.sigla) {
-                filterUf.value = originalItem.sigla;
-                refreshCustomSelect(filterUf);
-                showScreen('main');
-                // NÃO chama pesquisarProspeccao()
-            }
-            break;
-
-        case 'municipio':
-            if (originalItem && typeof originalItem === 'string') {
-                const idx = originalItem.lastIndexOf(' - ');
-                if (idx !== -1) {
-                    const ddd = originalItem.substring(idx + 3).trim();
-                    filterDdd.value = ddd;
-                    refreshCustomSelect(filterDdd);
-                    if (filterMunicipio) {
-                        filterMunicipio.value = '';
-                        refreshCustomSelect(filterMunicipio);
+            switch (currentGenericContext) {
+                case 'cnae':
+                    if (originalItem && originalItem.codigo) {
+                        filterCnaeInput.value = originalItem.full;
+                        selectedCnaeCode = originalItem.codigo;
+                        cnaeSuggestions.classList.remove('active');
+                        showScreen('main');
                     }
+                    break;
+
+                case 'uf':
+                    if (originalItem && originalItem.sigla) {
+                        filterUf.value = originalItem.sigla;
+                        refreshCustomSelect(filterUf);
+                        showScreen('main');
+                    }
+                    break;
+
+                case 'municipio':
+                    if (originalItem && typeof originalItem === 'string') {
+                        const idx = originalItem.lastIndexOf(' - ');
+                        if (idx !== -1) {
+                            const ddd = originalItem.substring(idx + 3).trim();
+                            filterDdd.value = ddd;
+                            refreshCustomSelect(filterDdd);
+                            if (filterMunicipio) {
+                                filterMunicipio.value = '';
+                                refreshCustomSelect(filterMunicipio);
+                            }
+                            showScreen('main');
+                        }
+                    }
+                    break;
+
+                case 'natureza':
                     showScreen('main');
-                    // NÃO chama pesquisarProspeccao()
-                }
+                    break;
+
+                default:
+                    showScreen('main');
+                    break;
             }
-            break;
-
-        case 'natureza':
-            // Apenas navega para a prospecção (sem filtro específico)
-            showScreen('main');
-            break;
-
-        default:
-            showScreen('main');
-            break;
-    }
-});
+        });
 
         // ===== MENUS DA SIDEBAR =====
         document.getElementById('menu-cnaes').addEventListener('click', async () => {
@@ -1305,38 +1408,35 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // ===== EVENTOS DE NAVEGAÇÃO ENTRE TELAS =====
         document.getElementById('menu-dashboard').addEventListener('click', function() {
-    // Se estiver na tela de segmentos e houver alterações, pergunta antes
-    if (segmentScreen.style.display === 'block') {
-        if (isDirty) {
-            showUnsavedChangesModal(
-                'Deseja salvar antes de sair?',
-                function() {
-                    document.getElementById('segmentoForm').requestSubmit();
-                    showScreen('main');
-                },
-                function() {
-                    resetSegmentForm();
+            if (segmentScreen.style.display === 'block') {
+                if (isDirty) {
+                    showUnsavedChangesModal(
+                        'Deseja salvar antes de sair?',
+                        function() {
+                            document.getElementById('segmentoForm').requestSubmit();
+                            showScreen('main');
+                        },
+                        function() {
+                            resetSegmentForm();
+                            showScreen('main');
+                        }
+                    );
+                } else {
                     showScreen('main');
                 }
-            );
-        } else {
-            showScreen('main');
-        }
-    } else {
-        // Já está na prospecção: apenas garante que o item fique ativo
-        setActiveMenuItem('menu-dashboard');
-        closeAllModals();
-    }
-});
+            } else {
+                setActiveMenuItem('menu-dashboard');
+                closeAllModals();
+            }
+        });
 
         document.getElementById('menu-segmentos').addEventListener('click', function() {
-    if (segmentScreen.style.display === 'block') {
-        // Já está na tela de segmentos: apenas garante que o item fique ativo
-        setActiveMenuItem('menu-segmentos');
-        return;
-    }
-    showScreen('segment');
-});
+            if (segmentScreen.style.display === 'block') {
+                setActiveMenuItem('menu-segmentos');
+                return;
+            }
+            showScreen('segment');
+        });
 
         // ===== LIMPAR FILTROS =====
         function clearFilters() {
@@ -1361,37 +1461,54 @@ document.addEventListener('DOMContentLoaded', function() {
             refreshCustomSelect(filterSegmento);
             refreshCustomSelect(filterTipoCnae);
 
-            registros = [];
-            ultimoCnpj = null;
-            temMais = false;
             currentPage = 1;
+            historicoCursors = [null];
+            cursorAtual = null;
+            registros = [];
+            temMais = false;
             renderTable([]);
         }
 
         function changePage(direction, botao) {
-    if (direction === 'next' && temMais) {
-        currentPage++;
-        pesquisarProspeccao(botao);
-    } else if (direction === 'prev' && currentPage > 1) {
-        showWarning('A navegação para páginas anteriores não é suportada pela API no momento. Use a pesquisa novamente para recomeçar.', 'Aviso');
-        // Se quiser, pode reabilitar o botão aqui, mas como não há requisição, não precisa
-    }
-}
+            if (direction === 'next' && temMais) {
+                currentPage++;
+                pesquisarProspeccao(botao);
+            } else if (direction === 'prev' && currentPage > 1) {
+                showWarning('A navegação para páginas anteriores não é suportada pela API no momento. Use a pesquisa novamente para recomeçar.', 'Aviso');
+            }
+        }
 
         // ===== EVENTOS =====
         btnSearch.addEventListener('click', function() {
             currentPage = 1;
-            ultimoCnpj = null;
+            historicoCursors = [null];
+            cursorAtual = null;
             pesquisarProspeccao();
         });
 
         btnClear.addEventListener('click', clearFilters);
-        btnPrev.addEventListener('click', function() { 
-    changePage('prev', this); 
-});
-        btnNext.addEventListener('click', function() { 
-    changePage('next', this); 
-});
+        
+        btnPrev.addEventListener('click', function() {
+            if (currentPage > 1 && historicoCursors.length > 1) {
+                historicoCursors.pop();
+                currentPage--;
+                const cursorAnterior = historicoCursors[historicoCursors.length - 1];
+                cursorAtual = cursorAnterior;
+                pesquisarProspeccao(this, cursorAnterior);
+            } else {
+                showWarning('Você já está na primeira página.', 'Aviso');
+            }
+        });
+
+        btnNext.addEventListener('click', function() {
+            if (temMais) {
+                historicoCursors.push(cursorAtual);
+                currentPage++;
+                pesquisarProspeccao(this, cursorAtual);
+            } else {
+                showWarning('Você já está na última página.', 'Aviso');
+            }
+        });
 
         tbody.addEventListener('click', function(e) {
             if(e.target.classList.contains('btn-detail')) {
@@ -1417,10 +1534,8 @@ document.addEventListener('DOMContentLoaded', function() {
         carregarDDDs();
         updateSegmentFilter();
 
-        // Garante que a tela inicial seja a prospecção
         showScreen('main');
 
-        // ===== PRÉ-CARREGAR MUNICÍPIOS EM SEGUNDO PLANO =====
         carregarMunicipiosDaAPI().then(municipios => {
             console.log("Municípios pré-carregados com sucesso!");
         });

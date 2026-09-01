@@ -1993,10 +1993,12 @@ body.dark-mode #linked-cnae-list .linked-item:hover {
 }
 
 /* ================== TOOLTIP DE CNAEs ================== */
+/* ===== TOOLTIP DE CNAEs - CORREÇÃO DE SOBREPOSIÇÃO ===== */
 .cnae-tooltip {
     position: relative;
     display: inline-block;
     cursor: help;
+    z-index: 10; /* Garante que o trigger fique acima */
 }
 
 .tooltip-trigger {
@@ -2009,6 +2011,9 @@ body.dark-mode #linked-cnae-list .linked-item:hover {
     transition: all 0.2s;
     cursor: pointer;
     user-select: none;
+    display: inline-block;
+    position: relative;
+    z-index: 5;
 }
 
 body.dark-mode .tooltip-trigger {
@@ -2022,6 +2027,7 @@ body.dark-mode .tooltip-trigger {
     color: white;
 }
 
+/* ===== CONTEÚDO DO TOOLTIP - AGORA FIXO E SOBRE TUDO ===== */
 .cnae-tooltip-content {
     display: none;
     position: absolute;
@@ -2036,9 +2042,8 @@ body.dark-mode .tooltip-trigger {
     max-width: 400px;
     max-height: 300px;
     overflow-y: auto;
-    overflow-x: hidden;
     box-shadow: 0 6px 20px rgba(0,0,0,0.25);
-    z-index: 1000;
+    z-index: 99999 !important;
     font-size: 13px;
     line-height: 1.5;
     cursor: default;
@@ -2061,6 +2066,7 @@ body.dark-mode .tooltip-trigger {
     border-top-color: #1e3a8a;
 }
 
+/* Itens dentro do tooltip */
 .tooltip-item {
     margin-bottom: 8px;
     padding-bottom: 8px;
@@ -2077,6 +2083,7 @@ body.dark-mode .tooltip-trigger {
     color: #93c5fd;
 }
 
+/* Scrollbar */
 .cnae-tooltip-content::-webkit-scrollbar {
     width: 8px;
 }
@@ -2094,6 +2101,36 @@ body.dark-mode .tooltip-trigger {
 
 .cnae-tooltip-content::-webkit-scrollbar-thumb:hover {
     background: rgba(255,255,255,0.7);
+}
+
+/* Ajuste para tabela - garante que o tooltip não seja cortado */
+#segmentosTable {
+    overflow: visible !important;
+}
+
+#segmentosTable tbody {
+    overflow: visible !important;
+}
+
+#segmentosTable tr {
+    overflow: visible !important;
+}
+
+#segmentosTable td {
+    overflow: visible !important;
+}
+
+/* Remove qualquer overflow oculto nos containers pais */
+.table-responsive {
+    overflow: visible !important;
+}
+
+.card-segmento {
+    overflow: visible !important;
+}
+
+.container {
+    overflow: visible !important;
 }
 
 /* ================== RESPONSIVO ================== */
