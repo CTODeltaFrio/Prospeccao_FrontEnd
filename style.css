@@ -769,27 +769,27 @@ body.dark-mode .icon-btn.active {
     vertical-align: middle;
 }
 
-/* Larguras das colunas */
+/* Larguras das colunas - MÁXIMO ESPAÇO PARA NOMES */
 .table-responsive th:nth-child(1),
-.table-responsive td:nth-child(1) { width: 14%; } /* CNPJ */
+.table-responsive td:nth-child(1) { width: 11%; } /* CNPJ */
 
 .table-responsive th:nth-child(2),
-.table-responsive td:nth-child(2) { width: 18%; } /* Nome Fantasia */
+.table-responsive td:nth-child(2) { width: 28%; } /* Nome Fantasia */
 
 .table-responsive th:nth-child(3),
-.table-responsive td:nth-child(3) { width: 22%; } /* Razão Social */
+.table-responsive td:nth-child(3) { width: 34%; } /* Razão Social */
 
 .table-responsive th:nth-child(4),
-.table-responsive td:nth-child(4) { width: 12%; } /* Situação */
+.table-responsive td:nth-child(4) { width: 6%; } /* Situação */
 
 .table-responsive th:nth-child(5),
-.table-responsive td:nth-child(5) { width: 6%; } /* UF */
+.table-responsive td:nth-child(5) { width: 4%; } /* UF */
 
 .table-responsive th:nth-child(6),
-.table-responsive td:nth-child(6) { width: 16%; } /* Telefone */
+.table-responsive td:nth-child(6) { width: 9%; } /* Telefone */
 
 .table-responsive th:nth-child(7),
-.table-responsive td:nth-child(7) { width: 12%; } /* Ações */
+.table-responsive td:nth-child(7) { width: 8%; } /* Ações */
 
 /* Ajuste para o status e botão detalhes */
 .status {
@@ -1207,7 +1207,7 @@ body.dark-mode .btn-secondary:hover {
 
 #segment-screen .table-responsive th,
 #segment-screen .table-responsive td {
-    padding: 12px 16px;
+    padding: 10px 12px;
     text-align: left;
     white-space: nowrap;
 }
@@ -2872,3 +2872,18 @@ body.dark-mode #ignorados-screen .btn-restore:hover {
     text-overflow: clip !important;
     word-break: break-word;
 }
+
+#ignorados-screen .table-responsive th:nth-child(1),
+#ignorados-screen .table-responsive td:nth-child(1) { width: 12%; }
+#ignorados-screen .table-responsive th:nth-child(2),
+#ignorados-screen .table-responsive td:nth-child(2) { width: 24%; }
+#ignorados-screen .table-responsive th:nth-child(3),
+#ignorados-screen .table-responsive td:nth-child(3) { width: 30%; }
+#ignorados-screen .table-responsive th:nth-child(4),
+#ignorados-screen .table-responsive td:nth-child(4) { width: 7%; }
+#ignorados-screen .table-responsive th:nth-child(5),
+#ignorados-screen .table-responsive td:nth-child(5) { width: 4%; }
+#ignorados-screen .table-responsive th:nth-child(6),
+#ignorados-screen .table-responsive td:nth-child(6) { width: 12%; }
+#ignorados-screen .table-responsive th:nth-child(7),
+#ignorados-screen .table-responsive td:nth-child(7) { width: 11%; }
