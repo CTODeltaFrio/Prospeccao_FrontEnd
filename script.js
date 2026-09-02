@@ -689,6 +689,38 @@ document.addEventListener('DOMContentLoaded', function() {
     return `(${dddNum}) ${numeroLimpo}`;
 }
 
+// ===== FUNÇÃO PARA ADICIONAR TOOLTIP EM CÉLULAS CORTADAS =====
+function setupCellTooltips() {
+    // Seleciona todas as células das tabelas principais (prospecção e ignorados)
+    const tables = document.querySelectorAll('#main-screen .table-responsive tbody, #ignorados-screen .table-responsive tbody');
+    
+    tables.forEach(tbody => {
+        // Remove eventos antigos para evitar duplicidade
+        const cells = tbody.querySelectorAll('td');
+        cells.forEach(td => {
+            // Ignora células que contêm botões (ações)
+            if (td.querySelector('button')) return;
+            
+            // Remove listener antigo se existir (usando uma referência)
+            if (td._tooltipHandler) {
+                td.removeEventListener('mouseenter', td._tooltipHandler);
+            }
+            
+            const handler = function() {
+                // Verifica se o texto está cortado
+                if (this.scrollWidth > this.clientWidth) {
+                    this.title = this.textContent.trim();
+                } else {
+                    this.title = ''; // Remove o tooltip se não estiver cortado
+                }
+            };
+            
+            td.addEventListener('mouseenter', handler);
+            td._tooltipHandler = handler; // Guarda referência para remover depois
+        });
+    });
+}
+
         // ===== RENDERIZAR TABELA =====
         function renderTable(data) {
             tbody.innerHTML = '';
@@ -702,7 +734,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (tbody) tbody.scrollTop = 0;
                 return;
             }
-
+                setupCellTooltips();
             data.forEach(item => {
                 const row = `<tr>
                     <td>${item.cnpjFormatado}</td>
@@ -738,6 +770,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     openDetailsModal(cnpj, false);
                 });
             });
+            setupCellTooltips();
         }
 
         // ===== RENDERIZAR TABELA DE IGNORADOS =====
@@ -746,7 +779,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const footerIgnorados = document.getElementById('ignorados-footer');
             if (!tbodyIgnorados || !footerIgnorados) return;
             tbodyIgnorados.innerHTML = '';
-
+            
             const showingDiv = footerIgnorados.querySelector('.showing');
             if (!showingDiv) return;
 
@@ -796,6 +829,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 renderIgnoradosTable();
                 showWarning('Registro restaurado com sucesso!', 'Sucesso');
             }
+            setupCellTooltips();
         }
 
         // ===== PESQUISA DE PROSPECÇÃO =====
