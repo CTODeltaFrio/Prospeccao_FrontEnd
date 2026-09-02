@@ -650,16 +650,44 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-function formatarTelefone(ddd, numero) {
+        // ===== FUNÇÃO AUXILIAR PARA FORMATAR TELEFONE =====
+        function formatarTelefone(ddd, numero) {
     if (!numero) return '-';
-    const dddStr = ddd ? String(ddd).trim() : '';
-    // Verifica se o DDD é válido (não vazio, não '0' e não 'null')
+    
+    let numeroLimpo = String(numero).replace(/\D/g, ''); // Remove tudo que não é dígito
+    if (numeroLimpo.length === 0) return '-';
+    
+    let dddNum = null;
+    const dddStr = String(ddd || '').trim();
+    
+    // 1. Tenta usar o DDD informado (se for válido)
     if (dddStr && dddStr !== '0' && dddStr !== 'null') {
-        return `(${dddStr}) ${numero}`;
+        const parsed = parseInt(dddStr, 10);
+        if (!isNaN(parsed) && parsed > 0) {
+            dddNum = parsed;
+        }
     }
-    return numero;
+    
+    // 2. Se o DDD não for válido, tenta extrair do próprio número
+    if (!dddNum) {
+        // Se o número tem 10 ou 11 dígitos, os dois primeiros são DDD
+        if (numeroLimpo.length >= 10) {
+            const possivelDDD = parseInt(numeroLimpo.substring(0, 2), 10);
+            if (possivelDDD >= 10 && possivelDDD <= 99) {
+                dddNum = possivelDDD;
+                numeroLimpo = numeroLimpo.substring(2); // Remove o DDD do número
+            }
+        }
+    }
+    
+    // 3. Se ainda não tiver DDD, exibe só o número
+    if (!dddNum) {
+        return numeroLimpo;
+    }
+    
+    // 4. Formata com DDD
+    return `(${dddNum}) ${numeroLimpo}`;
 }
-
 
         // ===== RENDERIZAR TABELA =====
         function renderTable(data) {
@@ -682,7 +710,7 @@ function formatarTelefone(ddd, numero) {
                     <td>${item.razaoSocial || '-'}</td>
                     <td><span class="status"><span class="status-dot-small"></span> ATIVA</span></td>
                     <td>${item.uf || '-'}</td>
-                    <td>${item.telefone1 ? (item.ddd && item.ddd !== '0' ? `(${item.ddd}) ${item.telefone1}` : item.telefone1) : '-'}</td>
+                    <td>${formatarTelefone(item.ddd, item.telefone1)}</td>
                     <td><button class="btn-detail" data-cnpj="${item.cnpj}"><i class="fas fa-info-circle"></i> Detalhes</button></td>
                 </tr>`;
                 tbody.innerHTML += row;
@@ -737,7 +765,7 @@ function formatarTelefone(ddd, numero) {
                     <td>${item.razaoSocial || '-'}</td>
                     <td><span class="status"><span class="status-dot-small"></span> ATIVA</span></td>
                     <td>${item.uf || '-'}</td>
-                    <td>${item.telefone1 ? (item.ddd && item.ddd !== '0' ? `(${item.ddd}) ${item.telefone1}` : item.telefone1) : '-'}</td>
+                    <td>${formatarTelefone(item.ddd, item.telefone1)}</td>
                     <td>
                         <button class="btn-detail" data-cnpj="${item.cnpj}"><i class="fas fa-info-circle"></i> Detalhes</button>
                     </td>
@@ -886,8 +914,8 @@ function formatarTelefone(ddd, numero) {
             document.getElementById('det-bairro').innerText = '-';
             document.getElementById('det-cep').innerText = '-';
             document.getElementById('det-municipio').innerText = company.municipio || '-';
-            document.getElementById('det-tel1').innerText = company.telefone1 ? (company.ddd && company.ddd !== '0' ? `(${company.ddd}) ${company.telefone1}` : company.telefone1) : '-';
-            document.getElementById('det-tel2').innerText = company.telefone2 || '-';
+            document.getElementById('det-tel1').innerText = formatarTelefone(company.ddd, company.telefone1);
+            document.getElementById('det-tel2').innerText = formatarTelefone(company.ddd, company.telefone2);
             document.getElementById('det-email').innerText = company.email || '-';
 
             const btn = document.getElementById('btn-ignore-cadastro');
