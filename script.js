@@ -107,6 +107,9 @@ document.addEventListener('DOMContentLoaded', function() {
         let municipiosCarregando = false;
         let municipiosPromise = null;
 
+        // === EXPOR VARIÁVEIS PARA DEPURAÇÃO NO CONSOLE ===
+        window.registros = registros; // <-- ADICIONADO
+
         // Controle de alterações não salvas
         let isDirty = false;
 
@@ -652,77 +655,46 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // ===== FUNÇÃO AUXILIAR PARA FORMATAR TELEFONE =====
         function formatarTelefone(ddd, numero) {
-    if (!numero) return '-';
-    
-    let numeroLimpo = String(numero).replace(/\D/g, ''); // Remove tudo que não é dígito
-    if (numeroLimpo.length === 0) return '-';
-    
-    let dddNum = null;
-    const dddStr = String(ddd || '').trim();
-    
-    // 1. Tenta usar o DDD informado (se for válido)
-    if (dddStr && dddStr !== '0' && dddStr !== 'null') {
-        const parsed = parseInt(dddStr, 10);
-        if (!isNaN(parsed) && parsed > 0) {
-            dddNum = parsed;
-        }
-    }
-    
-    // 2. Se o DDD não for válido, tenta extrair do próprio número
-    if (!dddNum) {
-        // Se o número tem 10 ou 11 dígitos, os dois primeiros são DDD
-        if (numeroLimpo.length >= 10) {
-            const possivelDDD = parseInt(numeroLimpo.substring(0, 2), 10);
-            if (possivelDDD >= 10 && possivelDDD <= 99) {
-                dddNum = possivelDDD;
-                numeroLimpo = numeroLimpo.substring(2); // Remove o DDD do número
-            }
-        }
-    }
-    
-    // 3. Se ainda não tiver DDD, exibe só o número
-    if (!dddNum) {
-        return numeroLimpo;
-    }
-    
-    // 4. Formata com DDD
-    return `(${dddNum}) ${numeroLimpo}`;
-}
-
-// ===== FUNÇÃO PARA ADICIONAR TOOLTIP EM CÉLULAS CORTADAS =====
-function setupCellTooltips() {
-    // Seleciona todas as células das tabelas principais (prospecção e ignorados)
-    const tables = document.querySelectorAll('#main-screen .table-responsive tbody, #ignorados-screen .table-responsive tbody');
-    
-    tables.forEach(tbody => {
-        // Remove eventos antigos para evitar duplicidade
-        const cells = tbody.querySelectorAll('td');
-        cells.forEach(td => {
-            // Ignora células que contêm botões (ações)
-            if (td.querySelector('button')) return;
+            if (!numero) return '-';
+            let numeroLimpo = String(numero).replace(/\D/g, '');
+            if (numeroLimpo.length === 0) return '-';
             
-            // Remove listener antigo se existir (usando uma referência)
-            if (td._tooltipHandler) {
-                td.removeEventListener('mouseenter', td._tooltipHandler);
-            }
+            let dddNum = null;
+            const dddStr = String(ddd || '').trim();
             
-            const handler = function() {
-                // Verifica se o texto está cortado
-                if (this.scrollWidth > this.clientWidth) {
-                    this.title = this.textContent.trim();
-                } else {
-                    this.title = ''; // Remove o tooltip se não estiver cortado
+            // 1. Tenta usar o DDD informado (se for válido)
+            if (dddStr && dddStr !== '0' && dddStr !== 'null') {
+                const parsed = parseInt(dddStr, 10);
+                if (!isNaN(parsed) && parsed > 0) {
+                    dddNum = parsed;
                 }
-            };
+            }
             
-            td.addEventListener('mouseenter', handler);
-            td._tooltipHandler = handler; // Guarda referência para remover depois
-        });
-    });
-}
+            // 2. Se o DDD não for válido, tenta extrair do próprio número
+            if (!dddNum) {
+                if (numeroLimpo.length >= 10) {
+                    const possivelDDD = parseInt(numeroLimpo.substring(0, 2), 10);
+                    if (possivelDDD >= 10 && possivelDDD <= 99) {
+                        dddNum = possivelDDD;
+                        numeroLimpo = numeroLimpo.substring(2);
+                    }
+                }
+            }
+            
+            // 3. Se ainda não tiver DDD, exibe só o número
+            if (!dddNum) {
+                return numeroLimpo;
+            }
+            
+            // 4. Formata com DDD
+            return `(${dddNum}) ${numeroLimpo}`;
+        }
 
         // ===== RENDERIZAR TABELA =====
         function renderTable(data) {
+            // ===== LOG DE DEPURAÇÃO =====
+            console.log('📊 Dados recebidos para renderizar:', data);
+
             tbody.innerHTML = '';
 
             if (data.length === 0) {
@@ -734,8 +706,11 @@ function setupCellTooltips() {
                 if (tbody) tbody.scrollTop = 0;
                 return;
             }
-                setupCellTooltips();
+
             data.forEach(item => {
+                // ===== LOG DE CADA REGISTRO =====
+                console.log(`🔍 CNPJ: ${item.cnpjFormatado} | Razão: ${item.razaoSocial}`);
+
                 const row = `<tr>
                     <td>${item.cnpjFormatado}</td>
                     <td>${item.nomeFantasia || '-'}</td>
@@ -770,7 +745,33 @@ function setupCellTooltips() {
                     openDetailsModal(cnpj, false);
                 });
             });
+
+            // ===== ADICIONA TOOLTIP EM CÉLULAS CORTADAS =====
             setupCellTooltips();
+        }
+
+        // ===== FUNÇÃO PARA ADICIONAR TOOLTIP EM CÉLULAS CORTADAS =====
+        function setupCellTooltips() {
+            const tables = document.querySelectorAll('#main-screen .table-responsive tbody, #ignorados-screen .table-responsive tbody');
+            
+            tables.forEach(tbody => {
+                const cells = tbody.querySelectorAll('td');
+                cells.forEach(td => {
+                    if (td.querySelector('button')) return;
+                    if (td._tooltipHandler) {
+                        td.removeEventListener('mouseenter', td._tooltipHandler);
+                    }
+                    const handler = function() {
+                        if (this.scrollWidth > this.clientWidth) {
+                            this.title = this.textContent.trim();
+                        } else {
+                            this.title = '';
+                        }
+                    };
+                    td.addEventListener('mouseenter', handler);
+                    td._tooltipHandler = handler;
+                });
+            });
         }
 
         // ===== RENDERIZAR TABELA DE IGNORADOS =====
@@ -779,7 +780,7 @@ function setupCellTooltips() {
             const footerIgnorados = document.getElementById('ignorados-footer');
             if (!tbodyIgnorados || !footerIgnorados) return;
             tbodyIgnorados.innerHTML = '';
-            
+
             const showingDiv = footerIgnorados.querySelector('.showing');
             if (!showingDiv) return;
 
@@ -814,6 +815,9 @@ function setupCellTooltips() {
                     openDetailsModal(cnpj, true);
                 });
             });
+
+            // ===== ADICIONA TOOLTIP EM CÉLULAS CORTADAS =====
+            setupCellTooltips();
         }
 
         function restaurarIgnorado(index) {
@@ -829,7 +833,6 @@ function setupCellTooltips() {
                 renderIgnoradosTable();
                 showWarning('Registro restaurado com sucesso!', 'Sucesso');
             }
-            setupCellTooltips();
         }
 
         // ===== PESQUISA DE PROSPECÇÃO =====
