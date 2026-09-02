@@ -46,7 +46,7 @@ body {
     width: 245px;
     background: linear-gradient(180deg, #071a3d 0%, #061b48 100%);
     color: white;
-    padding: 70px 22px 22px; /* Corrigido: 70px sem espaço, garante que o botão não sobreponha o menu */
+    padding: 70px 22px 22px;
     z-index: 10;
     display: flex;
     flex-direction: column;
@@ -110,7 +110,6 @@ body.dark-mode .dark-mode-toggle i {
     transform: rotate(180deg);
 }
 
-/* REMOVIDO: .menu-item.active { margin-top: 50px; } para não quebrar o layout */
 .menu-title {
     color: #8492ae;
     font-size: 11px;
@@ -195,7 +194,7 @@ body.dark-mode .dark-mode-toggle i {
 /* ================== ESTADO COLAPSADO ================== */
 .sidebar.collapsed {
     width: 75px;
-    padding: 70px 8px 22px; /* Mantém o mesmo padding-top */
+    padding: 70px 8px 22px;
 }
 
 .sidebar.collapsed .menu-title,
@@ -646,7 +645,7 @@ select.input {
     border-radius: 13px;
     overflow: hidden;
     box-shadow: var(--shadow-card);
-    margin-bottom: 24px;
+    margin-bottom: 0; /* Remove margem extra, pois o rodapé está fora */
     transition: all 0.3s ease;
 }
 
@@ -712,62 +711,98 @@ body.dark-mode .icon-btn.active {
     border-color: #1e3a5f;
 }
 
-table {
-    width: 100%;
-    border-collapse: collapse;
+/* Ajuste da tabela principal */
+.table-responsive {
+    overflow-x: auto; /* Scroll horizontal se necessário */
 }
 
-/* ADICIONADO: Barra de rolagem na tabela */
-tbody {
+.table-responsive table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed; /* Força larguras fixas */
+}
+
+.table-responsive thead {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+}
+
+.table-responsive thead th {
+    text-align: left;
+    padding: 13px 12px;
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 600;
+    border-bottom: 2px solid var(--border-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.table-responsive tbody {
     display: block;
     max-height: 500px;
     overflow-y: auto;
     width: 100%;
 }
 
-thead {
-    display: table;
-    width: 100%;
-    table-layout: fixed; /* Mantém o cabeçalho alinhado com o corpo */
-}
-
-th {
-    text-align: left;
-    padding: 13px 18px;
-    color: var(--text-secondary);
-    font-size: 11px;
-    font-weight: 600;
-    border-bottom: 1px solid var(--border-color);
-}
-
-td {
-    padding: 13px 18px;
-    color: var(--text-main);
-    font-size: 12px;
-    border-bottom: 1px solid var(--border-color);
-}
-
-tbody tr {
-    transition: background 0.2s ease;
+.table-responsive tbody tr {
     display: table;
     width: 100%;
     table-layout: fixed;
+    transition: background 0.2s ease;
 }
 
-tbody tr:hover {
+.table-responsive tbody tr:hover {
     background: var(--bg-hover);
 }
 
+.table-responsive tbody td {
+    padding: 13px 12px;
+    color: var(--text-main);
+    font-size: 13px;
+    border-bottom: 1px solid var(--border-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+}
+
+/* Larguras das colunas */
+.table-responsive th:nth-child(1),
+.table-responsive td:nth-child(1) { width: 14%; } /* CNPJ */
+
+.table-responsive th:nth-child(2),
+.table-responsive td:nth-child(2) { width: 18%; } /* Nome Fantasia */
+
+.table-responsive th:nth-child(3),
+.table-responsive td:nth-child(3) { width: 22%; } /* Razão Social */
+
+.table-responsive th:nth-child(4),
+.table-responsive td:nth-child(4) { width: 12%; } /* Situação */
+
+.table-responsive th:nth-child(5),
+.table-responsive td:nth-child(5) { width: 6%; } /* UF */
+
+.table-responsive th:nth-child(6),
+.table-responsive td:nth-child(6) { width: 16%; } /* Telefone */
+
+.table-responsive th:nth-child(7),
+.table-responsive td:nth-child(7) { width: 12%; } /* Ações */
+
+/* Ajuste para o status e botão detalhes */
 .status {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 5px 9px;
+    padding: 4px 10px;
     background: #e1f8ee;
     color: #079c68;
-    border-radius: 5px;
+    border-radius: 20px;
     font-size: 11px;
     font-weight: 700;
+    white-space: nowrap;
 }
 
 body.dark-mode .status {
@@ -780,45 +815,49 @@ body.dark-mode .status {
     height: 6px;
     background: #0ba66e;
     border-radius: 50%;
+    flex-shrink: 0;
 }
 
-.details-btn {
-    border: 1px solid #bcd2ff;
-    background: var(--bg-card);
-    color: #2463eb;
+.btn-detail {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: linear-gradient(135deg, #2463eb, #1a4fc4);
+    color: #ffffff;
+    border: none;
     border-radius: 6px;
-    padding: 7px 13px;
-    cursor: pointer;
-    font-size: 11px;
-    font-weight: 600;
-}
-
-.details-btn:hover {
-    background: #f1f5ff;
-}
-
-body.dark-mode .details-btn {
-    background: #1e3a5f;
-    color: #60a5fa;
-    border-color: #1e3a5f;
-}
-
-body.dark-mode .details-btn:hover {
-    background: #2563eb;
-    color: white;
-}
-
-.details-btn i {
+    padding: 6px 12px;
     font-size: 12px;
-    margin-right: 3px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 6px rgba(36, 99, 235, 0.2);
+    white-space: nowrap;
 }
 
+.btn-detail:hover {
+    background: linear-gradient(135deg, #1a4fc4, #0d3b9e);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(36, 99, 235, 0.35);
+}
+
+.btn-detail:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(36, 99, 235, 0.2);
+}
+
+.btn-detail i {
+    font-size: 13px;
+}
+
+/* RODAPÉ DA TABELA (FORA DA SECTION) */
 .table-footer {
     min-height: 65px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 20px;
+    padding: 0 4px;
+    margin-top: 16px;
 }
 
 .showing {
@@ -949,25 +988,6 @@ body.dark-mode .details-btn:hover {
     background: var(--bg-input);
 }
 
-.form-group input::after,
-.form-group select::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 50%;
-    width: 0;
-    height: 2px;
-    background: linear-gradient(90deg, #2463eb, #60a5fa);
-    transition: width 0.4s ease, left 0.4s ease;
-}
-
-.form-group input:focus::after,
-.form-group select:focus::after {
-    width: 100%;
-    left: 0;
-}
-
-/* ========== CAMPO CNAES VINCULADOS - CORRIGIDO ========== */
 .input-with-button {
     display: flex;
     gap: 10px;
@@ -1123,15 +1143,31 @@ body.dark-mode .btn-secondary:hover {
     box-shadow: 0 0 0 4px rgba(36, 99, 235, 0.1);
 }
 
-#segmentosTable {
-    width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
+/* ===== TABELA DE SEGMENTOS COM SCROLL ===== */
+#segment-screen .table-responsive {
+    overflow-x: auto;
     border-radius: 12px;
     border: 1px solid var(--border-color);
 }
 
-#segmentosTable thead th {
+#segment-screen .table-responsive table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    display: block;
+}
+
+#segment-screen .table-responsive thead {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: #1e3a8a;
+}
+
+#segment-screen .table-responsive thead th {
     background: #1e3a8a;
     color: #ffffff;
     font-size: 13px;
@@ -1141,40 +1177,243 @@ body.dark-mode .btn-secondary:hover {
     padding: 16px 20px;
     text-align: left;
     border: none;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    white-space: nowrap;
 }
 
-#segmentosTable thead th:first-child {
+#segment-screen .table-responsive thead th:first-child {
     border-top-left-radius: 12px;
 }
 
-#segmentosTable thead th:last-child {
+#segment-screen .table-responsive thead th:last-child {
     border-top-right-radius: 12px;
 }
 
-#segmentosTable tbody td {
-    padding: 18px 20px;
-    border-bottom: 1px solid var(--border-color);
-    color: var(--text-main);
-    font-size: 15px;
-    background: var(--bg-card);
+#segment-screen .table-responsive tbody {
+    display: block;
+    max-height: 500px;
+    overflow-y: auto;
+    width: 100%;
 }
 
-#segmentosTable tbody tr:nth-child(even) td {
-    background: var(--bg-input);
+#segment-screen .table-responsive tbody tr {
+    transition: background 0.2s ease;
+    display: table;
+    width: 100%;
+    table-layout: fixed;
 }
 
-#segmentosTable tbody tr:hover td {
-    background: var(--bg-hover);
+#segment-screen .table-responsive th,
+#segment-screen .table-responsive td {
+    padding: 12px 16px;
+    text-align: left;
+    white-space: nowrap;
 }
 
-.cell-actions {
-    display: flex;
-    gap: 8px;
-    justify-content: center;
-    align-items: center;
+/* Permite que o tooltip dos CNAEs saia da célula */
+#segment-screen .table-responsive td:nth-child(2) {
+    overflow: visible;
 }
 
-/* ===== ANIMAÇÃO DE ELEVAÇÃO NOS BOTÕES DA TABELA DE SEGMENTOS ===== */
+#segment-screen .table-responsive th:nth-child(1),
+#segment-screen .table-responsive td:nth-child(1) { width: 40%; }
+#segment-screen .table-responsive th:nth-child(2),
+#segment-screen .table-responsive td:nth-child(2) { width: 20%; }
+#segment-screen .table-responsive th:nth-child(3),
+#segment-screen .table-responsive td:nth-child(3) { width: 40%; }
+
+#segment-screen .table-responsive thead {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* ===== TOOLTIP DE CNAEs - CORREÇÃO ===== */
+.cnae-tooltip {
+    position: relative;
+    display: inline-block;
+    cursor: help;
+    z-index: 10;
+}
+
+.tooltip-trigger {
+    font-weight: 700;
+    font-size: 16px;
+    color: #2463eb;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: #eff6ff;
+    transition: all 0.2s;
+    cursor: pointer;
+    user-select: none;
+    display: inline-block;
+    position: relative;
+    z-index: 5;
+}
+
+body.dark-mode .tooltip-trigger {
+    background: #1e3a5f;
+    color: #60a5fa;
+}
+
+.cnae-tooltip:hover .tooltip-trigger,
+.cnae-tooltip.open .tooltip-trigger {
+    background: #1e3a8a;
+    color: white;
+}
+
+/* =========================================================
+   TOOLTIP DE CNAEs
+   O conteúdo é movido para o BODY pelo JavaScript.
+   Isso faz ele ficar acima de toda a interface.
+   ========================================================= */
+
+.cnae-tooltip {
+    position: relative;
+    display: inline-block;
+    cursor: help;
+    z-index: 1;
+}
+
+.cnae-tooltip.open {
+    z-index: 2147483647;
+}
+
+.tooltip-trigger {
+    font-weight: 700;
+    font-size: 16px;
+    color: #2463eb;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: #eff6ff;
+    transition: all 0.2s;
+    cursor: pointer;
+    user-select: none;
+    display: inline-block;
+}
+
+body.dark-mode .tooltip-trigger {
+    background: #1e3a5f;
+    color: #60a5fa;
+}
+
+.cnae-tooltip:hover .tooltip-trigger,
+.cnae-tooltip.open .tooltip-trigger {
+    background: #1e3a8a;
+    color: white;
+}
+
+/* =========================================================
+   TOOLTIP FLUTUANTE GLOBAL
+   ========================================================= */
+
+.cnae-tooltip-content {
+    display: none;
+
+    position: fixed !important;
+
+    background: #1e3a8a;
+    color: white;
+
+    padding: 14px 18px;
+
+    width: 360px;
+    max-width: calc(100vw - 20px);
+
+    max-height: 280px;
+
+    overflow-y: auto;
+
+    box-sizing: border-box;
+
+    border-radius: 10px;
+
+    box-shadow:
+        0 10px 30px rgba(0, 0, 0, 0.55),
+        0 0 0 1px rgba(255, 255, 255, 0.08);
+
+    /*
+     * Acima de absolutamente todos os elementos
+     */
+    z-index: 2147483647 !important;
+
+    font-size: 13px;
+    line-height: 1.5;
+
+    white-space: normal;
+    word-break: break-word;
+
+    text-align: left;
+}
+
+/*
+ * Quando o JS colocar o tooltip no BODY,
+ * esta classe controla sua exibição.
+ */
+.cnae-tooltip-content.tooltip-visible {
+    display: block !important;
+}
+
+/* =========================================================
+   SETA DO TOOLTIP
+   ========================================================= */
+
+.cnae-tooltip-content::after {
+    content: '';
+
+    position: absolute;
+
+    top: 100%;
+    left: 50%;
+
+    transform: translateX(-50%);
+
+    border: 7px solid transparent;
+    border-top-color: #1e3a8a;
+}
+
+/* =========================================================
+   ITENS DOS CNAEs
+   ========================================================= */
+
+.tooltip-item {
+    padding: 7px 0;
+
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.tooltip-item:last-child {
+    border-bottom: none;
+}
+
+.tooltip-item strong {
+    color: #93c5fd;
+}
+
+/* =========================================================
+   SCROLLBAR
+   ========================================================= */
+
+.cnae-tooltip-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.cnae-tooltip-content::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+}
+
+.cnae-tooltip-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 10px;
+}
+
+.cnae-tooltip-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.6);
+}
+
+
+/* ===== BOTÕES DA TABELA DE SEGMENTOS - ANIMAÇÃO ===== */
 #segmentosTable .btn-table {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     border-radius: 8px;
@@ -1183,37 +1422,51 @@ body.dark-mode .btn-secondary:hover {
     position: relative;
     overflow: hidden;
     cursor: pointer;
+    border: 1px solid transparent;
+    font-size: 13px;
 }
 
-/* Botão Editar - MODO CLARO */
+/* Botão Editar */
 #segmentosTable .btn-table[data-action="edit"] {
     background: #eff6ff;
     color: #1d4ed8;
-    border: 1px solid #bfdbfe;
+    border-color: #bfdbfe;
 }
 
 #segmentosTable .btn-table[data-action="edit"]:hover {
     background: #1d4ed8;
-    color: white;
+    color: #ffffff;
     border-color: #1d4ed8;
+    transform: translateY(-3px);
     box-shadow: 0 6px 16px rgba(29, 78, 216, 0.3);
 }
 
-/* Botão Excluir - MODO CLARO */
+#segmentosTable .btn-table[data-action="edit"]:active {
+    transform: translateY(0);
+    box-shadow: 0 3px 8px rgba(29, 78, 216, 0.2);
+}
+
+/* Botão Excluir */
 #segmentosTable .btn-delete {
     background: #fef2f2;
     color: #dc2626;
-    border: 1px solid #fecaca;
+    border-color: #fecaca;
 }
 
 #segmentosTable .btn-delete:hover {
     background: #dc2626;
-    color: white;
+    color: #ffffff;
     border-color: #dc2626;
+    transform: translateY(-3px);
     box-shadow: 0 6px 16px rgba(220, 38, 38, 0.3);
 }
 
-/* Botão Editar - MODO ESCURO */
+#segmentosTable .btn-delete:active {
+    transform: translateY(0);
+    box-shadow: 0 3px 8px rgba(220, 38, 38, 0.2);
+}
+
+/* Modo escuro */
 body.dark-mode #segmentosTable .btn-table[data-action="edit"] {
     background: #1e3a5f;
     color: #60a5fa;
@@ -1227,7 +1480,6 @@ body.dark-mode #segmentosTable .btn-table[data-action="edit"]:hover {
     box-shadow: 0 6px 16px rgba(37, 99, 235, 0.5);
 }
 
-/* Botão Excluir - MODO ESCURO */
 body.dark-mode #segmentosTable .btn-delete {
     background: #1e3a5f;
     color: #f87171;
@@ -1241,49 +1493,10 @@ body.dark-mode #segmentosTable .btn-delete:hover {
     box-shadow: 0 6px 16px rgba(239, 68, 68, 0.5);
 }
 
-#segmentosTable .btn-table:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
-}
-
-#segmentosTable .btn-table:active {
-    transform: translateY(-1px);
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
-}
-
-#segment-form-card.editing-mode {
-    border: 2px solid #2563eb;
-    background: var(--bg-card);
-    box-shadow: 0 6px 20px rgba(37, 99, 235, 0.15);
-}
-
-#segment-form-card.editing-mode #form-title {
-    color: #1d4ed8;
-}
-
-#btn-save-segment.btn-primary {
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease, background-color 0.3s ease;
-}
-
-#btn-save-segment.btn-primary:hover {
-    background: #1d4ed8;
-    transform: translateY(-3px);
-    box-shadow: 0 8px 16px rgba(29, 78, 216, 0.3);
-}
-
-#btn-cancel-segment.btn-secondary {
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease, background-color 0.3s ease;
-}
-
-#btn-cancel-segment.btn-secondary:hover {
-    background: var(--bg-hover);
-    border-color: var(--border-input);
-    transform: translateY(-3px);
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.08);
-}
-
 /* ================== MODAIS ================== */
-/* MODAIS */
+/* ... (mantenha o restante do CSS de modais, dropdown, etc.) */
+/* O restante do CSS permanece igual ao original */
+/* ================== MODAIS ================== */
 .modal-overlay {
     position: fixed;
     top: 0;
@@ -1304,26 +1517,26 @@ body.dark-mode #segmentosTable .btn-delete:hover {
     padding: 24px;
     width: 100%;
     max-width: 600px;
-    height: 600px; /* ALTURA FIXA */
+    height: 600px;
     max-height: 90vh;
     overflow-y: auto;
     box-shadow: 0 10px 30px rgba(0,0,0,0.3);
     position: relative;
     color: var(--text-main);
     display: flex;
-    flex-direction: column; /* Para o conteúdo interno rolar */
+    flex-direction: column;
 }
 
 .modal-content.large-modal {
     max-width: 900px;
-    height: 700px; /* ALTURA FIXA PARA MODAL GRANDE */
+    height: 700px;
 }
 
 .modal-content.generic-content {
     max-width: 750px;
     width: 90%;
     padding: 30px;
-    height: 650px; /* ALTURA FIXA PARA MODAL GENÉRICO */
+    height: 650px;
     display: flex;
     flex-direction: column;
 }
@@ -1331,12 +1544,11 @@ body.dark-mode #segmentosTable .btn-delete:hover {
 .modal-content.confirm-content {
     max-width: 400px;
     text-align: center;
-    height: auto; /* Altura automática, sem fixação */
+    height: auto;
     min-height: auto;
     display: block;
 }
 
-/* Ajustes para áreas internas roláveis */
 .modal-scroll-area {
     flex: 1;
     overflow-y: auto;
@@ -1353,17 +1565,17 @@ body.dark-mode #segmentosTable .btn-delete:hover {
 
 .generic-search-box {
     margin-bottom: 20px;
-    flex-shrink: 0; /* Para não encolher */
+    flex-shrink: 0;
 }
 
 .modal-header {
-    flex-shrink: 0; /* Não encolhe */
+    flex-shrink: 0;
     margin-bottom: 20px;
 }
 
 .modal-footer {
     flex-shrink: 0;
-    margin-top: auto; /* Empurra para o final */
+    margin-top: auto;
     border-top: 1px solid var(--border-color);
     padding-top: 15px;
 }
@@ -1383,10 +1595,6 @@ body.dark-mode #segmentosTable .btn-delete:hover {
     color: var(--text-main);
 }
 
-.modal-header {
-    margin-bottom: 20px;
-}
-
 .modal-header h2 {
     font-size: 20px;
     font-weight: 500;
@@ -1397,12 +1605,6 @@ body.dark-mode #segmentosTable .btn-delete:hover {
 .modal-header p {
     font-size: 13px;
     color: var(--text-secondary);
-}
-
-.modal-scroll-area {
-    max-height: 60vh;
-    overflow-y: auto;
-    padding-right: 10px;
 }
 
 .principal-card {
@@ -1579,7 +1781,6 @@ body.dark-mode .btn-light-blue {
     margin-right: 4px;
 }
 
-/* ================== MODAL GENÉRICO (PESQUISA) ================== */
 .generic-search-box {
     position: relative;
     margin-bottom: 24px;
@@ -1757,7 +1958,7 @@ body.dark-mode .generic-card.selected {
     box-shadow: 0 4px 8px rgba(220, 38, 38, 0.2);
 }
 
-/* ================== DROPDOWN CUSTOMIZADO (SUBSTITUI SELECT) ================== */
+/* ================== DROPDOWN CUSTOMIZADO ================== */
 .custom-select {
     position: relative;
     width: 100%;
@@ -1874,66 +2075,6 @@ body.dark-mode .custom-option.selected {
     pointer-events: none;
 }
 
-/* ================== BOTÃO DETALHES MODERNO ================== */
-.details-btn,
-.btn-detail {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: linear-gradient(135deg, #2463eb, #1a4fc4);
-    color: #ffffff;
-    border: none;
-    border-radius: 8px;
-    padding: 8px 14px;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 6px rgba(36, 99, 235, 0.25);
-}
-
-.details-btn:hover,
-.btn-detail:hover {
-    background: linear-gradient(135deg, #1a4fc4, #0d3b9e);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(36, 99, 235, 0.35);
-}
-
-.details-btn:active,
-.btn-detail:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 4px rgba(36, 99, 235, 0.2);
-}
-
-.details-btn i,
-.btn-detail i {
-    font-size: 14px;
-}
-
-/* ================== BOTÃO NOVO SEGMENTO (MELHORADO) ================== */
-.btn-primary[onclick="novoSegmento()"] {
-    background: linear-gradient(135deg, #2463eb 0%, #1a4fc4 100%);
-    border: none;
-    border-radius: 8px;
-    padding: 12px 20px;
-    font-weight: 600;
-    box-shadow: 0 4px 12px rgba(36, 99, 235, 0.25);
-    transition: all 0.3s ease;
-}
-
-.btn-primary[onclick="novoSegmento()"]:hover {
-    box-shadow: 0 6px 18px rgba(36, 99, 235, 0.35);
-    transform: translateY(-2px);
-}
-
-.btn-primary[onclick="novoSegmento()"] i {
-    transition: transform 0.3s ease;
-}
-
-.btn-primary[onclick="novoSegmento()"]:hover i {
-    transform: rotate(90deg) scale(1.1);
-}
-
 /* ================== CHIPS DE CNAEs VINCULADOS ================== */
 #linked-cnae-list {
     display: flex;
@@ -1990,147 +2131,6 @@ body.dark-mode #linked-cnae-list .linked-item:hover {
 #linked-cnae-list .linked-item button:hover {
     background: #fee2e2;
     color: #b91c1c;
-}
-
-/* ================== TOOLTIP DE CNAEs ================== */
-/* ===== TOOLTIP DE CNAEs - CORREÇÃO DE SOBREPOSIÇÃO ===== */
-.cnae-tooltip {
-    position: relative;
-    display: inline-block;
-    cursor: help;
-    z-index: 10; /* Garante que o trigger fique acima */
-}
-
-.tooltip-trigger {
-    font-weight: 700;
-    font-size: 16px;
-    color: #2463eb;
-    padding: 4px 10px;
-    border-radius: 6px;
-    background: #eff6ff;
-    transition: all 0.2s;
-    cursor: pointer;
-    user-select: none;
-    display: inline-block;
-    position: relative;
-    z-index: 5;
-}
-
-body.dark-mode .tooltip-trigger {
-    background: #1e3a5f;
-    color: #60a5fa;
-}
-
-.cnae-tooltip:hover .tooltip-trigger,
-.cnae-tooltip.open .tooltip-trigger {
-    background: #1e3a8a;
-    color: white;
-}
-
-/* ===== CONTEÚDO DO TOOLTIP - AGORA FIXO E SOBRE TUDO ===== */
-.cnae-tooltip-content {
-    display: none;
-    position: absolute;
-    bottom: calc(100% + 12px);
-    left: 50%;
-    transform: translateX(-50%);
-    background: #1e3a8a;
-    color: white;
-    padding: 14px;
-    border-radius: 10px;
-    min-width: 220px;
-    max-width: 400px;
-    max-height: 300px;
-    overflow-y: auto;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
-    z-index: 99999 !important;
-    font-size: 13px;
-    line-height: 1.5;
-    cursor: default;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255,255,255,0.4) rgba(255,255,255,0.1);
-}
-
-.cnae-tooltip:hover .cnae-tooltip-content,
-.cnae-tooltip.open .cnae-tooltip-content {
-    display: block;
-}
-
-.cnae-tooltip-content::after {
-    content: '';
-    position: absolute;
-    top: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    border: 8px solid transparent;
-    border-top-color: #1e3a8a;
-}
-
-/* Itens dentro do tooltip */
-.tooltip-item {
-    margin-bottom: 8px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid rgba(255,255,255,0.15);
-}
-
-.tooltip-item:last-child {
-    margin-bottom: 0;
-    padding-bottom: 0;
-    border-bottom: none;
-}
-
-.tooltip-item strong {
-    color: #93c5fd;
-}
-
-/* Scrollbar */
-.cnae-tooltip-content::-webkit-scrollbar {
-    width: 8px;
-}
-
-.cnae-tooltip-content::-webkit-scrollbar-track {
-    background: rgba(255,255,255,0.1);
-    border-radius: 10px;
-    margin: 5px;
-}
-
-.cnae-tooltip-content::-webkit-scrollbar-thumb {
-    background: rgba(255,255,255,0.4);
-    border-radius: 10px;
-}
-
-.cnae-tooltip-content::-webkit-scrollbar-thumb:hover {
-    background: rgba(255,255,255,0.7);
-}
-
-/* Ajuste para tabela - garante que o tooltip não seja cortado */
-#segmentosTable {
-    overflow: visible !important;
-}
-
-#segmentosTable tbody {
-    overflow: visible !important;
-}
-
-#segmentosTable tr {
-    overflow: visible !important;
-}
-
-#segmentosTable td {
-    overflow: visible !important;
-}
-
-/* Remove qualquer overflow oculto nos containers pais */
-.table-responsive {
-    overflow: visible !important;
-}
-
-.card-segmento {
-    overflow: visible !important;
-}
-
-.container {
-    overflow: visible !important;
 }
 
 /* ================== RESPONSIVO ================== */
@@ -2209,71 +2209,7 @@ body.dark-mode .tooltip-trigger {
     }
 }
 
-body.dark-mode #segmentosTable .btn-table[data-action="edit"] {
-    background: #1e40af;
-    color: #ffffff;
-}
-
-/* ============ BOTÕES DO MODAL - AJUSTES ============ */
-
-#btn-confirm-cancel.btn-secondary:hover {
-    background: var(--bg-hover);
-    border-color: var(--border-input);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-}
-
-#btn-confirm-ok.btn-primary:hover {
-    background: #1d4ed8;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(29, 78, 216, 0.3);
-}
-
-/* Botão Ignorar Cadastro - estilo vermelho */
-#btn-ignore-cadastro.btn-secondary {
-    background: #fef2f2;
-    color: #dc2626;
-    border: 1px solid #fecaca;
-    border-radius: 8px;
-    font-weight: 600;
-    padding: 10px 20px;
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-                box-shadow 0.3s ease,
-                background-color 0.3s ease,
-                color 0.3s ease,
-                border-color 0.3s ease;
-}
-
-body.dark-mode #btn-ignore-cadastro.btn-secondary {
-    background: #1e3a5f;
-    color: #f87171;
-    border-color: #1e3a5f;
-}
-
-#btn-ignore-cadastro.btn-secondary:hover {
-    background: #dc2626;
-    color: #fff;
-    border-color: #dc2626;
-    transform: translateY(-3px);
-    box-shadow: 0 8px 16px rgba(220, 38, 38, 0.3);
-}
-
-#btn-ignore-cadastro.btn-secondary:active {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(220, 38, 38, 0.2);
-}
-
-/* Botão Ignorar Cadastro (se for usado em outro contexto) */
-.btn-secondary:active {
-    transform: translateY(0);
-    background: #e2e8f0;
-}
-
-body.dark-mode .btn-secondary:active {
-    background: #334155;
-}
-
-/* ===== RODAPÉ DA SIDEBAR (BOTÃO MODO ESCURO) - CORRIGIDO ===== */
+/* ===== RODAPÉ DA SIDEBAR ===== */
 .sidebar {
     display: flex !important;
     flex-direction: column !important;
@@ -2331,52 +2267,21 @@ body.dark-mode .dark-mode-toggle:hover {
     align-items: center !important;
 }
 
-/* Contêiner com rolagem */
-.table-responsive {
-    max-height: 500px;
-    overflow-y: auto;
-    overflow-x: auto; /* Para telas pequenas, se necessário */
-}
-
-/* Garante que o cabeçalho fique fixo no topo */
-.table-responsive thead {
-    position: sticky;
-    top: 0;
-    background: var(--bg-card);
-    z-index: 1;
-}
-
-/* Ajuste para manter as larguras das colunas alinhadas */
-.table-responsive table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-.table-responsive th, .table-responsive td {
-    white-space: nowrap; /* Evita quebra de linha */
-}
-
-#main-screen, #segment-screen {
-    transition: opacity 0.3s ease, transform 0.3s ease;
-}
-
-/* Classe auxiliar para animar a entrada */
+/* ===== ANIMAÇÕES ===== */
 .fade-in {
     opacity: 0;
     transform: translateY(10px);
 }
 
-/* Quando a tela for exibida, anima para opacidade 1 e posição normal */
 .fade-in.active {
     opacity: 1;
     transform: translateY(0);
 }
-.table-responsive {
-    transition: opacity 0.3s ease;
-}
+
 .table-responsive.loading {
     opacity: 0.5;
 }
+
 .page-btn i {
     display: flex;
     align-items: center;
@@ -2384,8 +2289,586 @@ body.dark-mode .dark-mode-toggle:hover {
     width: 100%;
     height: 100%;
 }
+
 #page-indicator i {
     font-size: 18px;
     display: inline-block;
     vertical-align: middle;
+}
+
+/* ===== BARRA DE ROLAGEM PERSONALIZADA ===== */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-input);
+    border-radius: 10px;
+    margin: 4px 0;
+}
+
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #2463eb, #1a4fc4);
+    border-radius: 10px;
+    border: 2px solid var(--bg-input);
+    transition: background 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #1a4fc4, #0d3b9e);
+}
+
+::-webkit-scrollbar-thumb:active {
+    background: #0d3b9e;
+}
+
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #2463eb var(--bg-input);
+}
+
+body.dark-mode ::-webkit-scrollbar-track {
+    background: #1e293b;
+}
+
+body.dark-mode ::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #3b82f6, #2563eb);
+    border-color: #1e293b;
+}
+
+body.dark-mode ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #2563eb, #1d4ed8);
+}
+
+body.dark-mode * {
+    scrollbar-color: #3b82f6 #1e293b;
+}
+
+/* Barra de rolagem específica para as tabelas com scroll */
+.table-responsive::-webkit-scrollbar,
+#segment-screen .table-responsive::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.table-responsive::-webkit-scrollbar-track,
+#segment-screen .table-responsive::-webkit-scrollbar-track {
+    background: var(--bg-input);
+    border-radius: 10px;
+    margin: 4px 0;
+}
+
+.table-responsive::-webkit-scrollbar-thumb,
+#segment-screen .table-responsive::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #2463eb, #1a4fc4);
+    border-radius: 10px;
+    border: 2px solid var(--bg-input);
+    transition: background 0.3s ease;
+}
+
+.table-responsive::-webkit-scrollbar-thumb:hover,
+#segment-screen .table-responsive::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #1a4fc4, #0d3b9e);
+}
+
+body.dark-mode .table-responsive::-webkit-scrollbar-track,
+body.dark-mode #segment-screen .table-responsive::-webkit-scrollbar-track {
+    background: #1e293b;
+}
+
+body.dark-mode .table-responsive::-webkit-scrollbar-thumb,
+body.dark-mode #segment-screen .table-responsive::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #3b82f6, #2563eb);
+    border-color: #1e293b;
+}
+
+body.dark-mode .table-responsive::-webkit-scrollbar-thumb:hover,
+body.dark-mode #segment-screen .table-responsive::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #2563eb, #1d4ed8);
+}
+
+/* ===== ANIMAÇÃO DO BOTÃO NOVO SEGMENTO ===== */
+.btn-primary[onclick="novoSegmento()"] {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.btn-primary[onclick="novoSegmento()"]::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 60%);
+    transform: scale(0);
+    transition: transform 0.6s ease;
+    pointer-events: none;
+}
+
+.btn-primary[onclick="novoSegmento()"]:hover::before {
+    transform: scale(1);
+}
+
+.btn-primary[onclick="novoSegmento()"]:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 8px 25px rgba(36, 99, 235, 0.4);
+}
+
+.btn-primary[onclick="novoSegmento()"]:active {
+    transform: translateY(0) scale(0.98);
+    box-shadow: 0 4px 12px rgba(36, 99, 235, 0.2);
+}
+
+.btn-primary[onclick="novoSegmento()"] i {
+    transition: transform 0.6s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+    display: inline-block;
+}
+
+.btn-primary[onclick="novoSegmento()"]:hover i {
+    transform: rotate(180deg) scale(1.2);
+}
+
+@keyframes pulse-new-btn {
+    0% {
+        box-shadow: 0 0 0 0 rgba(36, 99, 235, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 12px rgba(36, 99, 235, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(36, 99, 235, 0);
+    }
+}
+/* ===== ANIMAÇÕES DOS BOTÕES DA TELA DE SEGMENTOS ===== */
+
+/* Botão Salvar segmento */
+#btn-save-segment.btn-primary {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+#btn-save-segment.btn-primary::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s ease, height 0.6s ease;
+    pointer-events: none;
+}
+
+#btn-save-segment.btn-primary:hover::before {
+    width: 300px;
+    height: 300px;
+}
+
+#btn-save-segment.btn-primary:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 8px 25px rgba(36, 99, 235, 0.4);
+    background: #1d4ed8;
+}
+
+#btn-save-segment.btn-primary:active {
+    transform: translateY(0) scale(0.98);
+    box-shadow: 0 4px 12px rgba(36, 99, 235, 0.2);
+}
+
+/* Botão Cancelar */
+#btn-cancel-segment.btn-secondary {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+#btn-cancel-segment.btn-secondary::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(220, 38, 38, 0.15);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s ease, height 0.6s ease;
+    pointer-events: none;
+}
+
+#btn-cancel-segment.btn-secondary:hover::before {
+    width: 300px;
+    height: 300px;
+}
+
+#btn-cancel-segment.btn-secondary:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 8px 25px rgba(220, 38, 38, 0.3);
+    background: #dc2626;
+    color: #ffffff;
+    border-color: #dc2626;
+}
+
+#btn-cancel-segment.btn-secondary:active {
+    transform: translateY(0) scale(0.98);
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2);
+}
+
+/* Botão Vincular CNAE */
+.btn-vincular {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.btn-vincular::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s ease, height 0.6s ease;
+    pointer-events: none;
+}
+
+.btn-vincular:hover::before {
+    width: 300px;
+    height: 300px;
+}
+
+.btn-vincular:hover {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 8px 25px rgba(36, 99, 235, 0.4);
+    background: #1d4ed8;
+}
+
+.btn-vincular:active {
+    transform: translateY(0) scale(0.95);
+    box-shadow: 0 4px 12px rgba(36, 99, 235, 0.2);
+}
+
+.btn-vincular i {
+    transition: transform 0.4s ease;
+}
+
+.btn-vincular:hover i {
+    transform: rotate(90deg) scale(1.1);
+}
+
+/* Botões Editar e Excluir da tabela de segmentos (melhorias) */
+#segmentosTable .btn-table {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+#segmentosTable .btn-table::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.6s ease, height 0.6s ease;
+    pointer-events: none;
+}
+
+/* Botão Editar */
+#segmentosTable .btn-table[data-action="edit"] {
+    background: #eff6ff;
+    color: #1d4ed8;
+    border-color: #bfdbfe;
+}
+
+#segmentosTable .btn-table[data-action="edit"]::before {
+    background: rgba(29, 78, 216, 0.15);
+}
+
+#segmentosTable .btn-table[data-action="edit"]:hover::before {
+    width: 300px;
+    height: 300px;
+}
+
+#segmentosTable .btn-table[data-action="edit"]:hover {
+    background: #1d4ed8;
+    color: #ffffff;
+    border-color: #1d4ed8;
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 8px 20px rgba(29, 78, 216, 0.3);
+}
+
+#segmentosTable .btn-table[data-action="edit"]:active {
+    transform: translateY(0) scale(0.95);
+    box-shadow: 0 4px 10px rgba(29, 78, 216, 0.2);
+}
+
+/* Botão Excluir */
+#segmentosTable .btn-delete {
+    background: #fef2f2;
+    color: #dc2626;
+    border-color: #fecaca;
+}
+
+#segmentosTable .btn-delete::before {
+    background: rgba(220, 38, 38, 0.15);
+}
+
+#segmentosTable .btn-delete:hover::before {
+    width: 300px;
+    height: 300px;
+}
+
+#segmentosTable .btn-delete:hover {
+    background: #dc2626;
+    color: #ffffff;
+    border-color: #dc2626;
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 8px 20px rgba(220, 38, 38, 0.3);
+}
+
+#segmentosTable .btn-delete:active {
+    transform: translateY(0) scale(0.95);
+    box-shadow: 0 4px 10px rgba(220, 38, 38, 0.2);
+}
+
+/* Modo escuro para os botões da tabela */
+body.dark-mode #segmentosTable .btn-table[data-action="edit"] {
+    background: #1e3a5f;
+    color: #60a5fa;
+    border-color: #1e3a5f;
+}
+
+body.dark-mode #segmentosTable .btn-table[data-action="edit"]:hover {
+    background: #2563eb;
+    color: #ffffff;
+    border-color: #2563eb;
+    box-shadow: 0 8px 20px rgba(37, 99, 235, 0.5);
+}
+
+body.dark-mode #segmentosTable .btn-delete {
+    background: #1e3a5f;
+    color: #f87171;
+    border-color: #1e3a5f;
+}
+
+body.dark-mode #segmentosTable .btn-delete:hover {
+    background: #ef4444;
+    color: #ffffff;
+    border-color: #ef4444;
+    box-shadow: 0 8px 20px rgba(239, 68, 68, 0.5);
+}
+
+/* ===== ANIMAÇÃO DOS BOTÕES ===== */
+
+/* ===== BOTÕES DO MODAL DE DETALHES - ESTILO IGUAL AOS DA TELA DE SEGMENTOS ===== */
+
+/* Botão Ignorar Cadastro */
+#btn-ignore-cadastro.btn-secondary {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 8px;
+    font-weight: 600;
+    padding: 10px 20px;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    border: 1px solid #fecaca;
+    background: #fef2f2;
+    color: #dc2626;
+    font-size: 14px;
+}
+
+#btn-ignore-cadastro.btn-secondary:hover {
+    background: #dc2626;
+    color: #ffffff;
+    border-color: #dc2626;
+    transform: translateY(-3px);
+    box-shadow: 0 6px 16px rgba(220, 38, 38, 0.3);
+}
+
+#btn-ignore-cadastro.btn-secondary:active {
+    transform: translateY(0);
+    box-shadow: 0 3px 8px rgba(220, 38, 38, 0.2);
+}
+
+/* Modo escuro - Ignorar Cadastro */
+body.dark-mode #btn-ignore-cadastro.btn-secondary {
+    background: #1e3a5f;
+    color: #f87171;
+    border-color: #1e3a5f;
+}
+
+body.dark-mode #btn-ignore-cadastro.btn-secondary:hover {
+    background: #ef4444;
+    color: #ffffff;
+    border-color: #ef4444;
+    box-shadow: 0 6px 16px rgba(239, 68, 68, 0.5);
+}
+
+/* ===== Botão Dados com IA ===== */
+.btn-light-blue {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 8px;
+    font-weight: 600;
+    padding: 10px 20px;
+    cursor: pointer;
+    border: 1px solid #bae6fd;
+    background: #e0f2fe;
+    color: #0369a1;
+    font-size: 14px;
+}
+
+.btn-light-blue:hover {
+    background: #0ea5e9;
+    color: #ffffff;
+    border-color: #0ea5e9;
+    transform: translateY(-3px);
+    box-shadow: 0 6px 16px rgba(14, 165, 233, 0.3);
+}
+
+.btn-light-blue:active {
+    transform: translateY(0);
+    box-shadow: 0 3px 8px rgba(14, 165, 233, 0.2);
+}
+
+/* Modo escuro - Dados com IA */
+body.dark-mode .btn-light-blue {
+    background: #1e3a5f;
+    color: #60a5fa;
+    border-color: #1e3a5f;
+}
+
+body.dark-mode .btn-light-blue:hover {
+    background: #0ea5e9;
+    color: #ffffff;
+    border-color: #0ea5e9;
+    box-shadow: 0 6px 16px rgba(14, 165, 233, 0.5);
+}
+
+/* ===== Botão Registro CRM ===== */
+.btn-register {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 8px;
+    font-weight: 600;
+    padding: 10px 20px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    background: linear-gradient(135deg, #2463eb 0%, #1a4fc4 100%);
+    color: #ffffff;
+    font-size: 14px;
+    box-shadow: 0 4px 12px rgba(36, 99, 235, 0.25);
+}
+
+.btn-register:hover {
+    background: linear-gradient(135deg, #1a4fc4 0%, #0d3b9e 100%);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(37, 99, 235, 0.35);
+}
+
+.btn-register:active {
+    transform: translateY(0);
+    box-shadow: 0 4px 12px rgba(36, 99, 235, 0.2);
+}
+
+/* Modo escuro - Registro CRM */
+body.dark-mode .btn-register {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+body.dark-mode .btn-register:hover {
+    background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+    box-shadow: 0 8px 20px rgba(37, 99, 235, 0.5);
+}
+
+/* ===== TELA DE IGNORADOS ===== */
+#ignorados-screen .table-responsive {
+    max-height: 500px;
+    overflow-y: auto;
+    overflow-x: auto;
+}
+
+#ignorados-screen .table-responsive thead {
+    position: sticky;
+    top: 0;
+    background: var(--bg-card);
+    z-index: 1;
+}
+
+#ignorados-screen .table-responsive tbody tr:hover {
+    background: var(--bg-hover);
+}
+
+#ignorados-screen .btn-restore {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #f59e0b;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 6px rgba(245, 158, 11, 0.2);
+}
+
+#ignorados-screen .btn-restore:hover {
+    background: #d97706;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
+}
+
+#ignorados-screen .btn-restore:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);
+}
+
+body.dark-mode #ignorados-screen .btn-restore {
+    background: #b45309;
+    box-shadow: 0 2px 6px rgba(180, 83, 9, 0.3);
+}
+
+body.dark-mode #ignorados-screen .btn-restore:hover {
+    background: #d97706;
+    box-shadow: 0 4px 12px rgba(180, 83, 9, 0.5);
+}
+
+/* ===== AJUSTE PARA TELA DE IGNORADOS ===== */
+#ignorados-screen .results {
+    margin-bottom: 0; /* Remove margem extra, igual à prospecção */
+}
+
+#ignorados-screen .table-footer {
+    margin-top: 16px;
+    padding: 0 4px;
+    min-height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+#ignorados-screen .table-footer .showing {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+/* ===== REMOVE OS PONTINHOS DA TABELA DE IGNORADOS ===== */
+#ignorados-screen .table-responsive td {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    word-break: break-word;
 }

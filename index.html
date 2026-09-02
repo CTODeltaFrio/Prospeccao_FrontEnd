@@ -7,6 +7,15 @@
     <link rel="icon" type="image.svg" href="favicon.svg">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
+    <style>
+        /* Oculta paginação e contador quando a tela de segmentos estiver ativa */
+        #segment-screen:not([style*="display: none"]) ~ .main .table-footer,
+        #segment-screen:not([style*="display: none"]) ~ .main .pagination,
+        #segment-screen:not([style*="display: none"]) ~ .main .page-indicator,
+        #segment-screen:not([style*="display: none"]) ~ .main .records-footer {
+            display: none !important;
+        }
+    </style>
 </head>
 <body>
 
@@ -44,6 +53,11 @@
         <div class="menu-item" id="menu-segmentos">
             <div class="menu-icon"><i class="fas fa-layer-group"></i></div>
             <div class="menu-text"><strong>Segmentos</strong></div>
+        </div>
+
+        <div class="menu-item" id="menu-ignorados">
+            <div class="menu-icon"><i class="fas fa-trash-alt"></i></div>
+            <div class="menu-text"><strong>Ignorados</strong></div>
         </div>
 
         <!-- Botão modo escuro no rodapé -->
@@ -112,18 +126,17 @@
                         <select id="filter-uf" class="input"><option value="">Todos</option></select>
                     </div>
                     <div class="field">
-    <label>DDD</label>
-    <select id="filter-ddd" class="input">
-        <option value="">Todos</option>
-    </select>
-</div>
-
-<div class="field" id="campo-municipio" style="display: none;">
-    <label>Município (do DDD selecionado)</label>
-    <select id="filter-municipio" class="input">
-        <option value="">Todos</option>
-    </select>
-</div>
+                        <label>DDD</label>
+                        <select id="filter-ddd" class="input">
+                            <option value="">Todos</option>
+                        </select>
+                    </div>
+                    <div class="field" id="campo-municipio" style="display: none;">
+                        <label>Município (do DDD selecionado)</label>
+                        <select id="filter-municipio" class="input">
+                            <option value="">Todos</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="filter-row-bottom">
@@ -156,7 +169,7 @@
                 <div class="results-header">
                     <div class="results-title">Resultados da Pesquisa</div>
                 </div>
-                <div class="table-responsive"></div>
+                <div class="table-responsive">
                     <table>
                         <thead>
                             <tr>
@@ -172,16 +185,17 @@
                         <tbody id="table-body"></tbody>
                     </table>
                 </div>
-                
-                <div class="table-footer">
-                    <div class="showing" id="records-footer">Exibindo 0 registros</div>
-                    <div class="pagination">
-                        <button class="page-btn" id="btn-prev"><i class="fas fa-chevron-left"></i></button>
-                        <span class="page-indicator" id="page-indicator">Página 1</span>
-                        <button class="page-btn" id="btn-next"><i class="fas fa-chevron-right"></i></button>
-                    </div>
-                </div>
             </section>
+
+            <!-- RODAPÉ DA TABELA - FORA DA SECTION .results -->
+            <div class="table-footer">
+                <div class="showing" id="records-footer">Exibindo 0 registros</div>
+                <div class="pagination">
+                    <button class="page-btn" id="btn-prev"><i class="fas fa-chevron-left"></i></button>
+                    <span class="page-indicator" id="page-indicator">Página 1</span>
+                    <button class="page-btn" id="btn-next"><i class="fas fa-chevron-right"></i></button>
+                </div>
+            </div>
         </div>
 
         <!-- TELA DE SEGMENTOS -->
@@ -228,19 +242,58 @@
                         <h2>Segmentos cadastrados</h2>
                         <input type="text" class="table-search" placeholder="Buscar segmento..." id="segment-search">
                     </div>
-                    <table id="segmentosTable">
-                        <thead>
-                            <tr>
-                                <th>Nome</th>
-                                <th>Qtd. CNAEs</th>
-                                <th style="text-align: center;">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody id="segment-table-body"></tbody>
-                    </table>
+                    <div class="table-responsive">
+                        <table id="segmentosTable">
+                            <thead>
+                                <tr>
+                                    <th>Nome</th>
+                                    <th>Qtd. CNAEs</th>
+                                    <th style="text-align: center;">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="segment-table-body"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
+
+<!-- TELA DE IGNORADOS -->
+<div id="ignorados-screen" style="display: none;">
+    <header class="header">
+        <div>
+            <h1>Cadastros Ignorados</h1>
+            <div class="subtitle">Empresas e estabelecimentos que foram marcados como ignorados</div>
+        </div>
+    </header>
+
+    <section class="results">
+        <div class="results-header">
+            <div class="results-title">Lista de Ignorados</div>
+        </div>
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>CNPJ ↓</th>
+                        <th>Nome Fantasia</th>
+                        <th>Razão Social</th>
+                        <th>Situação</th>
+                        <th>UF</th>
+                        <th>Telefone</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="ignorados-table-body"></tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- RODAPÉ FORA DA SECTION (IGUAL À PROSPECÇÃO) -->
+    <div class="table-footer" id="ignorados-footer">
+        <div class="showing">Nenhum registro ignorado.</div>
+    </div>
+</div>
 
     </main>
 

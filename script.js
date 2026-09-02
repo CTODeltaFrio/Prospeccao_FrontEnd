@@ -29,9 +29,11 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
 
-        // ===== ELEMENTOS DA TELA PRINCIPAL =====
+        // ===== ELEMENTOS DAS TELAS =====
         const mainScreen = document.getElementById('main-screen');
         const segmentScreen = document.getElementById('segment-screen');
+        const ignoradosScreen = document.getElementById('ignorados-screen');
+
         const tbody = document.getElementById('table-body');
         const pageIndicator = document.getElementById('page-indicator');
         const btnSearch = document.getElementById('btn-search');
@@ -92,6 +94,7 @@ document.addEventListener('DOMContentLoaded', function() {
         let cnaeData = [];
         let currentGenericContext = null;
         let currentItems = [];
+        let ignorados = [];
 
         // Paginação (API)
         let currentPage = 1;
@@ -137,14 +140,22 @@ document.addEventListener('DOMContentLoaded', function() {
             if (screen === 'main') {
                 mainScreen.style.display = 'block';
                 segmentScreen.style.display = 'none';
+                ignoradosScreen.style.display = 'none';
                 setActiveMenuItem('menu-dashboard');
             } else if (screen === 'segment') {
                 mainScreen.style.display = 'none';
                 segmentScreen.style.display = 'block';
+                ignoradosScreen.style.display = 'none';
                 setActiveMenuItem('menu-segmentos');
                 resetSegmentForm();
                 renderSegmentTable();
                 populateLinkSelect();
+            } else if (screen === 'ignorados') {
+                mainScreen.style.display = 'none';
+                segmentScreen.style.display = 'none';
+                ignoradosScreen.style.display = 'block';
+                setActiveMenuItem('menu-ignorados');
+                renderIgnoradosTable();
             }
         }
 
@@ -283,71 +294,99 @@ document.addEventListener('DOMContentLoaded', function() {
             refreshCustomSelect(selectMunicipio);
         }
 
-        // ===== FUNÇÃO AUXILIAR PARA BUSCAR DETALHES DE UM CNAE =====
+        // ===== BUSCAR DETALHES DE UM CNAE =====
         async function buscarDetalhesCnae(codigo) {
-    try {
-        const data = await apiGet(`${API_URL}/api/cnaes/${codigo}`);
-        if (data) {
-            return {
-                codigo: data.codigo || data.cnae || data.id || codigo,
-                descricao: data.descricao || data.nome || '',
-                full: data.codigoDescricao || `${data.codigo} - ${data.descricao}`
-            };
+            const codigoNormalizado = String(codigo).trim();
+
+            const cnaeNoCache = allCnaesCache.find(
+                c => String(c.codigo).trim() === codigoNormalizado
+            );
+            if (cnaeNoCache) {
+                return cnaeNoCache;
+            }
+            
+            try {
+                const lista = await fetchFromAPI([
+                    `${API_URL}/api/cnaes?filtro=${encodeURIComponent(codigoNormalizado)}`
+                ]);
+
+                if (Array.isArray(lista)) {
+                    const encontrado = lista.find(item => {
+                        const codigoApi = item.codigo ?? item.cnae ?? item.id;
+                        return String(codigoApi).trim() === codigoNormalizado;
+                    });
+
+                    if (encontrado) {
+                        const resultado = {
+                            codigo: encontrado.codigo ?? encontrado.cnae ?? encontrado.id,
+                            descricao: encontrado.descricao ?? encontrado.nome ?? '',
+                            full: encontrado.codigoDescricao ?? `${encontrado.codigo ?? encontrado.cnae ?? encontrado.id} - ${encontrado.descricao ?? encontrado.nome ?? ''}`
+                        };
+                        allCnaesCache.push(resultado);
+                        return resultado;
+                    }
+                }
+            } catch (e) {
+                console.error(`Erro ao procurar CNAE ${codigoNormalizado} na lista geral:`, e);
+            }
+
+            console.warn(`CNAE ${codigoNormalizado} não encontrado na lista da API.`);
+            return null;
         }
-    } catch (e) {
-        console.warn(`CNAE ${codigo} não encontrado na API.`);
-    }
-    return null;
-}
 
         // ===== CARREGAR SEGMENTOS E SEUS VÍNCULOS =====
         async function carregarSegmentos() {
-    try {
-        const data = await apiGet(`${API_URL}/api/segmentos`);
-        segmentData = data.map(item => ({ id: item.codigo, nome: item.descricao }));
-
-        // LIMPA o array de links antes de recarregar (evita duplicatas)
-        segmentoCnaeLinks = [];
-        const promises = []; // Array para armazenar promessas de busca de detalhes
-
-        for (const seg of segmentData) {
             try {
-                const cnaesVinculados = await apiGet(`${API_URL}/api/segmentos/${seg.id}/cnaes`);
-                
-                cnaesVinculados.forEach(cnae => {
-                    // Evita duplicatas no segmentoCnaeLinks
-                    const exists = segmentoCnaeLinks.some(link => 
-                        link.segmentoId === seg.id && link.cnaeCodigo === cnae.codigo
-                    );
-                    if (!exists) {
-                        segmentoCnaeLinks.push({ segmentoId: seg.id, cnaeCodigo: cnae.codigo });
-                    }
+                const data = await apiGet(`${API_URL}/api/segmentos`);
+                segmentData = data.map(item => ({ id: item.codigo, nome: item.descricao }));
 
-                    // Se o CNAE não estiver no cache, adiciona uma promessa para buscá-lo
-                    if (!allCnaesCache.some(c => c.codigo === cnae.codigo)) {
-                        const promise = buscarDetalhesCnae(cnae.codigo).then(detalhes => {
-                            if (detalhes) {
-                                allCnaesCache.push(detalhes);
-                                populateLinkSelect();
+                segmentoCnaeLinks = [];
+                const promises = [];
+
+                for (const seg of segmentData) {
+                    try {
+                        const cnaesVinculados = await apiGet(`${API_URL}/api/segmentos/${seg.id}/cnaes`);
+                        
+                        cnaesVinculados.forEach(cnae => {
+                            const exists = segmentoCnaeLinks.some(link => 
+                                link.segmentoId === seg.id && link.cnaeCodigo === cnae.codigo
+                            );
+                            if (!exists) {
+                                segmentoCnaeLinks.push({ segmentoId: seg.id, cnaeCodigo: cnae.codigo });
+                            }
+
+                            const codigoVinculado = String(cnae.codigo).trim();
+                            const cnaeJaExiste = allCnaesCache.some(
+                                c => String(c.codigo).trim() === codigoVinculado
+                            );
+                            if (!cnaeJaExiste) {
+                                const promise = buscarDetalhesCnae(codigoVinculado).then(detalhes => {
+                                    if (detalhes) {
+                                        const jaExiste = allCnaesCache.some(
+                                            c => String(c.codigo).trim() === String(detalhes.codigo).trim()
+                                        );
+                                        if (!jaExiste) {
+                                            allCnaesCache.push(detalhes);
+                                        }
+                                        populateLinkSelect();
+                                    }
+                                });
+                                promises.push(promise);
                             }
                         });
-                        promises.push(promise);
+                    } catch (e) {
+                        console.warn(`Erro ao buscar CNAEs do segmento ${seg.id}:`, e);
                     }
-                });
-            } catch (e) {
-                console.warn(`Erro ao buscar CNAEs do segmento ${seg.id}:`, e);
+                }
+
+                await Promise.all(promises);
+
+                updateSegmentFilter();
+                renderSegmentTable();
+            } catch (error) {
+                console.error("Erro ao carregar Segmentos:", error);
             }
         }
-
-        // Aguarda TODAS as buscas de detalhes serem concluídas
-        await Promise.all(promises);
-
-        updateSegmentFilter();
-        renderSegmentTable();
-    } catch (error) {
-        console.error("Erro ao carregar Segmentos:", error);
-    }
-}
 
         // ===== BUSCAR CNAES (CONSULTA DIRETA NA API) =====
         async function buscarCnaes(filtro) {
@@ -611,6 +650,126 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
+function formatarTelefone(ddd, numero) {
+    if (!numero) return '-';
+    const dddStr = ddd ? String(ddd).trim() : '';
+    // Verifica se o DDD é válido (não vazio, não '0' e não 'null')
+    if (dddStr && dddStr !== '0' && dddStr !== 'null') {
+        return `(${dddStr}) ${numero}`;
+    }
+    return numero;
+}
+
+
+        // ===== RENDERIZAR TABELA =====
+        function renderTable(data) {
+            tbody.innerHTML = '';
+
+            if (data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:20px;">Nenhum resultado encontrado.</td></tr>`;
+                recordsFooter.textContent = 'Nenhum registro encontrado';
+                btnPrev.disabled = true;
+                btnNext.disabled = true;
+                pageIndicator.textContent = 'Página 1';
+                if (tbody) tbody.scrollTop = 0;
+                return;
+            }
+
+            data.forEach(item => {
+                const row = `<tr>
+                    <td>${item.cnpjFormatado}</td>
+                    <td>${item.nomeFantasia || '-'}</td>
+                    <td>${item.razaoSocial || '-'}</td>
+                    <td><span class="status"><span class="status-dot-small"></span> ATIVA</span></td>
+                    <td>${item.uf || '-'}</td>
+                    <td>${item.telefone1 ? (item.ddd && item.ddd !== '0' ? `(${item.ddd}) ${item.telefone1}` : item.telefone1) : '-'}</td>
+                    <td><button class="btn-detail" data-cnpj="${item.cnpj}"><i class="fas fa-info-circle"></i> Detalhes</button></td>
+                </tr>`;
+                tbody.innerHTML += row;
+            });
+
+            const limite = 50;
+            const start = (currentPage - 1) * limite + 1;
+            const end = start + data.length - 1;
+
+            recordsFooter.textContent = `Exibindo ${start} - ${end}`;
+            pageIndicator.textContent = `Página ${currentPage}`;
+
+            btnPrev.disabled = (currentPage === 1);
+            btnNext.disabled = !temMais;
+
+            if (!temMais && data.length < limite) {
+                btnNext.disabled = true;
+            }
+
+            if (tbody) tbody.scrollTop = 0;
+
+            tbody.querySelectorAll('.btn-detail').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const cnpj = this.dataset.cnpj;
+                    openDetailsModal(cnpj, false);
+                });
+            });
+        }
+
+        // ===== RENDERIZAR TABELA DE IGNORADOS =====
+        function renderIgnoradosTable() {
+            const tbodyIgnorados = document.getElementById('ignorados-table-body');
+            const footerIgnorados = document.getElementById('ignorados-footer');
+            if (!tbodyIgnorados || !footerIgnorados) return;
+            tbodyIgnorados.innerHTML = '';
+
+            const showingDiv = footerIgnorados.querySelector('.showing');
+            if (!showingDiv) return;
+
+            if (ignorados.length === 0) {
+                tbodyIgnorados.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:20px;">Nenhum registro ignorado.</td></tr>`;
+                footerIgnorados.style.display = 'none';
+                return;
+            }
+
+            footerIgnorados.style.display = 'flex';
+
+            ignorados.forEach((item) => {
+                const row = `<tr>
+                    <td>${item.cnpjFormatado}</td>
+                    <td>${item.nomeFantasia || '-'}</td>
+                    <td>${item.razaoSocial || '-'}</td>
+                    <td><span class="status"><span class="status-dot-small"></span> ATIVA</span></td>
+                    <td>${item.uf || '-'}</td>
+                    <td>${item.telefone1 ? (item.ddd && item.ddd !== '0' ? `(${item.ddd}) ${item.telefone1}` : item.telefone1) : '-'}</td>
+                    <td>
+                        <button class="btn-detail" data-cnpj="${item.cnpj}"><i class="fas fa-info-circle"></i> Detalhes</button>
+                    </td>
+                </tr>`;
+                tbodyIgnorados.innerHTML += row;
+            });
+
+            showingDiv.textContent = `Total: ${ignorados.length} registros ignorados.`;
+
+            tbodyIgnorados.querySelectorAll('.btn-detail').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const cnpj = this.dataset.cnpj;
+                    openDetailsModal(cnpj, true);
+                });
+            });
+        }
+
+        function restaurarIgnorado(index) {
+            const item = ignorados[index];
+            if (item) {
+                ignorados.splice(index, 1);
+                const exists = registros.some(r => r.cnpj === item.cnpj);
+                if (!exists) {
+                    registros.push(item);
+                    registros.sort((a, b) => a.cnpj.localeCompare(b.cnpj));
+                }
+                renderTable(registros);
+                renderIgnoradosTable();
+                showWarning('Registro restaurado com sucesso!', 'Sucesso');
+            }
+        }
+
         // ===== PESQUISA DE PROSPECÇÃO =====
         let pesquisaController = null;
 
@@ -702,54 +861,12 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        // ===== RENDERIZAR TABELA =====
-        function renderTable(data) {
-            tbody.innerHTML = '';
-
-            if (data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:20px;">Nenhum resultado encontrado.</td></tr>`;
-                recordsFooter.textContent = 'Nenhum registro encontrado';
-                btnPrev.disabled = true;
-                btnNext.disabled = true;
-                pageIndicator.textContent = 'Página 1';
-                if (tbody) tbody.scrollTop = 0;
-                return;
-            }
-
-            data.forEach(item => {
-                const row = `<tr>
-                    <td>${item.cnpjFormatado}</td>
-                    <td>${item.nomeFantasia || '-'}</td>
-                    <td>${item.razaoSocial || '-'}</td>
-                    <td><span class="status"><span class="status-dot-small"></span> ATIVA</span></td>
-                    <td>${item.uf || '-'}</td>
-                    <td>${item.telefone1 ? `(${item.ddd || ''}) ${item.telefone1}` : '-'}</td>
-                    <td><button class="btn-detail"><i class="fas fa-info-circle"></i> Detalhes</button></td>
-                </tr>`;
-                tbody.innerHTML += row;
-            });
-
-            const limite = 50;
-            const start = (currentPage - 1) * limite + 1;
-            const end = start + data.length - 1;
-
-            recordsFooter.textContent = `Exibindo ${start} - ${end}`;
-            pageIndicator.textContent = `Página ${currentPage}`;
-
-            btnPrev.disabled = (currentPage === 1);
-            btnNext.disabled = !temMais;
-
-            if (!temMais && data.length < limite) {
-                btnNext.disabled = true;
-            }
-
-            if (tbody) tbody.scrollTop = 0;
-        }
-
         // ===== DETALHES =====
-        function openDetailsModal(cnpj) {
-            const company = registros.find(item => item.cnpj === cnpj);
-            if(!company) return;
+        function openDetailsModal(cnpj, isIgnorado = false) {
+            const list = isIgnorado ? ignorados : registros;
+            const company = list.find(item => item.cnpj === cnpj);
+            if (!company) return;
+
             document.getElementById('det-cnpj').innerText = company.cnpjFormatado;
             document.getElementById('det-razao').innerText = company.razaoSocial || '-';
             document.getElementById('det-fantasia').innerText = company.nomeFantasia || '-';
@@ -769,10 +886,62 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('det-bairro').innerText = '-';
             document.getElementById('det-cep').innerText = '-';
             document.getElementById('det-municipio').innerText = company.municipio || '-';
-            document.getElementById('det-tel1').innerText = company.telefone1 || '-';
+            document.getElementById('det-tel1').innerText = company.telefone1 ? (company.ddd && company.ddd !== '0' ? `(${company.ddd}) ${company.telefone1}` : company.telefone1) : '-';
             document.getElementById('det-tel2').innerText = company.telefone2 || '-';
             document.getElementById('det-email').innerText = company.email || '-';
+
+            const btn = document.getElementById('btn-ignore-cadastro');
+            if (isIgnorado) {
+                btn.innerText = 'Restaurar';
+                btn.className = 'btn-secondary';
+                btn.onclick = function() {
+                    restaurarIgnoradoPorCnpj(cnpj);
+                };
+            } else {
+                btn.innerText = 'Ignorar Cadastro';
+                btn.className = 'btn-secondary';
+                btn.onclick = function() {
+                    const companyToIgnore = registros.find(item => item.cnpj === cnpj);
+                    if (!companyToIgnore) {
+                        showWarning('Registro não encontrado.', 'Erro');
+                        return;
+                    }
+                    showConfirm('Ignorar Cadastro', 
+                        `Tem certeza que deseja ignorar o cadastro "${companyToIgnore.razaoSocial || companyToIgnore.nomeFantasia || 'sem nome'}"? Esta ação não poderá ser desfeita.`, 
+                        function() {
+                            const index = registros.findIndex(item => item.cnpj === cnpj);
+                            if (index !== -1) registros.splice(index, 1);
+                            if (!ignorados.some(item => item.cnpj === cnpj)) {
+                                ignorados.push(companyToIgnore);
+                            }
+                            renderTable(registros);
+                            renderIgnoradosTable();
+                            detailsModal.style.display = 'none';
+                            showWarning('Cadastro ignorado com sucesso!', 'Ignorado');
+                        }
+                    );
+                };
+            }
+
             detailsModal.style.display = 'flex';
+        }
+
+        function restaurarIgnoradoPorCnpj(cnpj) {
+            const index = ignorados.findIndex(item => item.cnpj === cnpj);
+            if (index === -1) {
+                showWarning('Registro não encontrado nos ignorados.', 'Erro');
+                return;
+            }
+            const item = ignorados[index];
+            ignorados.splice(index, 1);
+            if (!registros.some(r => r.cnpj === cnpj)) {
+                registros.push(item);
+                registros.sort((a, b) => a.cnpj.localeCompare(b.cnpj));
+            }
+            renderTable(registros);
+            renderIgnoradosTable();
+            detailsModal.style.display = 'none';
+            showWarning('Registro restaurado com sucesso!', 'Restaurado');
         }
 
         // ========================================================================
@@ -812,6 +981,78 @@ document.addEventListener('DOMContentLoaded', function() {
             setDirty(false);
         }
 
+        function setupTooltips() {
+            document.querySelectorAll('.cnae-tooltip').forEach(tooltip => {
+                const trigger = tooltip.querySelector('.tooltip-trigger');
+                const content = tooltip.querySelector('.cnae-tooltip-content');
+                if (!trigger || !content) return;
+
+                let hideTimeout = null;
+
+                function positionTooltip() {
+                    const rect = trigger.getBoundingClientRect();
+                    content.style.display = 'block';
+                    content.classList.add('tooltip-visible');
+                    const tooltipWidth = content.offsetWidth;
+                    const tooltipHeight = content.offsetHeight;
+
+                    let left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+                    let top = rect.top - tooltipHeight - 12;
+
+                    if (left < 10) left = 10;
+                    if (left + tooltipWidth > window.innerWidth - 10) {
+                        left = window.innerWidth - tooltipWidth - 10;
+                    }
+                    if (top < 10) top = 10;
+
+                    content.style.left = `${left}px`;
+                    content.style.top = `${top}px`;
+                    content.style.right = 'auto';
+                    content.style.bottom = 'auto';
+                    content.style.transform = 'none';
+                }
+
+                function showTooltip() {
+                    clearTimeout(hideTimeout);
+                    if (content.parentElement !== document.body) {
+                        document.body.appendChild(content);
+                    }
+                    tooltip.classList.add('open');
+                    content.classList.add('tooltip-visible');
+                    content.style.display = 'block';
+                    positionTooltip();
+                }
+
+                function hideTooltip() {
+                    hideTimeout = setTimeout(() => {
+                        content.classList.remove('tooltip-visible');
+                        content.style.display = 'none';
+                        tooltip.classList.remove('open');
+                    }, 100);
+                }
+
+                trigger.addEventListener('mouseenter', showTooltip);
+                trigger.addEventListener('mouseleave', hideTooltip);
+                content.addEventListener('mouseenter', () => clearTimeout(hideTimeout));
+                content.addEventListener('mouseleave', hideTooltip);
+                trigger.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    if (content.classList.contains('tooltip-visible')) {
+                        hideTooltip();
+                    } else {
+                        showTooltip();
+                    }
+                });
+
+                window.addEventListener('resize', () => {
+                    if (content.classList.contains('tooltip-visible')) positionTooltip();
+                });
+                window.addEventListener('scroll', () => {
+                    if (content.classList.contains('tooltip-visible')) positionTooltip();
+                }, true);
+            });
+        }
+
         function renderSegmentTable(searchTerm = '') {
             segmentTableBody.innerHTML = '';
             const term = searchTerm.toLowerCase().trim();
@@ -824,7 +1065,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (qtdLinks > 0) {
                     tooltipContent = '<div class="cnae-tooltip-content">';
                     links.forEach(link => {
-                        const cnae = allCnaesCache.find(c => c.codigo === link.cnaeCodigo);
+                        const cnae = allCnaesCache.find(
+                            c => String(c.codigo).trim() === String(link.cnaeCodigo).trim()
+                        );
                         if (cnae) {
                             tooltipContent += `<div class="tooltip-item"><strong>${cnae.codigo}</strong> - ${cnae.descricao}</div>`;
                         } else {
@@ -853,21 +1096,45 @@ document.addEventListener('DOMContentLoaded', function() {
                 segmentTableBody.appendChild(tr);
             });
 
-            // Tooltips
             segmentTableBody.querySelectorAll('.cnae-tooltip').forEach(tooltip => {
                 const trigger = tooltip.querySelector('.tooltip-trigger');
-                if (trigger) {
+                const content = tooltip.querySelector('.cnae-tooltip-content');
+                if (trigger && content) {
                     trigger.addEventListener('click', function(e) {
                         e.stopPropagation();
                         document.querySelectorAll('.cnae-tooltip.open').forEach(t => {
-                            if (t !== tooltip) t.classList.remove('open');
+                            if (t !== tooltip) {
+                                t.classList.remove('open');
+                                const otherContent = t.querySelector('.cnae-tooltip-content');
+                                if (otherContent) otherContent.style.display = 'none';
+                            }
                         });
-                        tooltip.classList.toggle('open');
+                        const isOpen = tooltip.classList.contains('open');
+                        if (isOpen) {
+                            tooltip.classList.remove('open');
+                            content.style.display = 'none';
+                            return;
+                        }
+                        tooltip.classList.add('open');
+                        content.style.display = 'block';
+                        const triggerRect = trigger.getBoundingClientRect();
+                        const tooltipWidth = content.offsetWidth;
+                        const tooltipHeight = content.offsetHeight;
+                        let left = triggerRect.left + (triggerRect.width / 2) - (tooltipWidth / 2);
+                        let top = triggerRect.top - tooltipHeight - 10;
+                        if (left < 10) left = 10;
+                        if (left + tooltipWidth > window.innerWidth - 10) {
+                            left = window.innerWidth - tooltipWidth - 10;
+                        }
+                        if (top < 10) top = 10;
+                        content.style.left = `${left}px`;
+                        content.style.top = `${top}px`;
+                        content.style.bottom = 'auto';
+                        content.style.transform = 'none';
                     });
                 }
             });
 
-            // Botões
             segmentTableBody.querySelectorAll('button[data-action]').forEach(btn => {
                 btn.addEventListener('click', function() {
                     const id = parseInt(this.dataset.id);
@@ -879,12 +1146,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             });
 
-            // Fecha tooltips ao clicar fora
             document.addEventListener('click', function(e) {
                 if (!e.target.closest('.cnae-tooltip')) {
                     document.querySelectorAll('.cnae-tooltip.open').forEach(t => t.classList.remove('open'));
                 }
             });
+
+            setupTooltips();
         }
 
         function updateSegmentFilter() {
@@ -911,20 +1179,27 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         window.vincularCNAE = function() {
-            const cnaeCodigo = linkCnaeSelect.value;
+            const cnaeCodigo = String(linkCnaeSelect.value || '').trim();
             if (!cnaeCodigo) {
                 showWarning('Selecione um CNAE para vincular.');
                 return;
             }
-            const cnae = allCnaesCache.find(c => c.codigo === cnaeCodigo);
-            if (cnae) {
-                currentLinkedCnaes.push(cnae);
-                renderLinkedCnaes();
-                populateLinkSelect();
-                linkCnaeSelect.value = '';
-                refreshCustomSelect(linkCnaeSelect);
-                setDirty(true);
+            const cnae = allCnaesCache.find(c => String(c.codigo).trim() === cnaeCodigo);
+            if (!cnae) {
+                showWarning(`O CNAE ${cnaeCodigo} não foi encontrado na lista de CNAEs carregada.`);
+                return;
             }
+            const jaVinculado = currentLinkedCnaes.some(c => String(c.codigo).trim() === cnaeCodigo);
+            if (jaVinculado) {
+                showWarning(`O CNAE ${cnaeCodigo} já está vinculado a este segmento.`);
+                return;
+            }
+            currentLinkedCnaes.push(cnae);
+            renderLinkedCnaes();
+            populateLinkSelect();
+            linkCnaeSelect.value = '';
+            refreshCustomSelect(linkCnaeSelect);
+            setDirty(true);
         };
 
         function renderLinkedCnaes() {
@@ -995,12 +1270,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 setDirty(false);
-originalLinkedCnaes = [...currentLinkedCnaes]; // <- ADICIONE ESTA LINHA
-resetSegmentForm();
-await carregarSegmentos();
-updateSegmentFilter();
-confirmModal.style.display = 'none';
-showWarning('Segmento salvo com sucesso!', 'Sucesso');
+                originalLinkedCnaes = [...currentLinkedCnaes];
+                resetSegmentForm();
+                await carregarSegmentos();
+                updateSegmentFilter();
+                confirmModal.style.display = 'none';
+                showWarning('Segmento salvo com sucesso!', 'Sucesso');
             } catch (error) {
                 console.error("Erro ao salvar segmento:", error);
                 showWarning('Erro ao salvar segmento. Detalhes no console (F12).');
@@ -1019,49 +1294,47 @@ showWarning('Segmento salvo com sucesso!', 'Sucesso');
 
         // ===== EDITAR SEGMENTO =====
         async function editarSegmento(id) {
-    const seg = segmentData.find(s => s.id === id);
-    if (!seg) return;
+            const seg = segmentData.find(s => s.id === id);
+            if (!seg) return;
 
-    editingSegmentId = id;
-    segmentNome.value = seg.nome;
-    btnSaveSegment.innerText = 'Atualizar segmento';
-    btnSaveSegment.classList.add('editing-btn');
-    btnCancelSegment.style.display = 'inline-block';
-    formTitle.innerText = 'Editar segmento';
-    segmentFormCard.classList.add('editing-mode');
+            editingSegmentId = id;
+            segmentNome.value = seg.nome;
+            btnSaveSegment.innerText = 'Atualizar segmento';
+            btnSaveSegment.classList.add('editing-btn');
+            btnCancelSegment.style.display = 'inline-block';
+            formTitle.innerText = 'Editar segmento';
+            segmentFormCard.classList.add('editing-mode');
 
-    try {
-        const cnaesVinculados = await apiGet(`${API_URL}/api/segmentos/${id}/cnaes`);
-        
-        // Constrói a lista de CNAEs completos (com descrição)
-        const cnaesCompletos = [];
-        for (const cnae of cnaesVinculados) {
-            let cnaeCompleto = allCnaesCache.find(c => c.codigo === cnae.codigo);
-            if (!cnaeCompleto) {
-                cnaeCompleto = await buscarDetalhesCnae(cnae.codigo);
-                if (cnaeCompleto) {
-                    allCnaesCache.push(cnaeCompleto);
-                } else {
-                    // Fallback
-                    cnaeCompleto = { codigo: cnae.codigo, descricao: 'CNAE não encontrado', full: cnae.codigo };
+            try {
+                const cnaesVinculados = await apiGet(`${API_URL}/api/segmentos/${id}/cnaes`);
+                
+                const cnaesCompletos = [];
+                for (const cnae of cnaesVinculados) {
+                    let cnaeCompleto = allCnaesCache.find(c => c.codigo === cnae.codigo);
+                    if (!cnaeCompleto) {
+                        cnaeCompleto = await buscarDetalhesCnae(cnae.codigo);
+                        if (cnaeCompleto) {
+                            allCnaesCache.push(cnaeCompleto);
+                        } else {
+                            cnaeCompleto = { codigo: cnae.codigo, descricao: 'CNAE não encontrado', full: cnae.codigo };
+                        }
+                    }
+                    cnaesCompletos.push(cnaeCompleto);
                 }
-            }
-            cnaesCompletos.push(cnaeCompleto);
-        }
 
-        currentLinkedCnaes = cnaesCompletos;
-        originalLinkedCnaes = [...currentLinkedCnaes];
-        renderLinkedCnaes();
-        populateLinkSelect();
-    } catch (e) {
-        console.error("Erro ao carregar CNAEs vinculados:", e);
-        currentLinkedCnaes = [];
-        originalLinkedCnaes = [];
-        renderLinkedCnaes();
-        populateLinkSelect();
-    }
-    setDirty(true);
-}
+                currentLinkedCnaes = cnaesCompletos;
+                originalLinkedCnaes = [...currentLinkedCnaes];
+                renderLinkedCnaes();
+                populateLinkSelect();
+            } catch (e) {
+                console.error("Erro ao carregar CNAEs vinculados:", e);
+                currentLinkedCnaes = [];
+                originalLinkedCnaes = [];
+                renderLinkedCnaes();
+                populateLinkSelect();
+            }
+            setDirty(true);
+        }
 
         // ===== EXCLUIR SEGMENTO =====
         function excluirSegmento(id) {
@@ -1133,14 +1406,6 @@ showWarning('Segmento salvo com sucesso!', 'Sucesso');
                     confirmModal.style.display = 'none';
                     restoreActiveMenuItem();
                 }
-            });
-        }
-
-        if (btnIgnoreCadastro) {
-            btnIgnoreCadastro.addEventListener('click', function() {
-                showConfirm('Ignorar Cadastro', 'Tem certeza que deseja ignorar este cadastro? Esta ação não poderá ser desfeita.', function() {
-                    detailsModal.style.display = 'none';
-                });
             });
         }
 
@@ -1281,13 +1546,29 @@ showWarning('Segmento salvo com sucesso!', 'Sucesso');
             genericModalBody.innerHTML = html;
         }
 
-        genericSearch.addEventListener('input', async function() {
+        let genericSearchDebounce;
+        genericSearch.addEventListener('input', function() {
+            clearTimeout(genericSearchDebounce);
             const searchTerm = this.value.toLowerCase().trim();
+
+            if (currentGenericContext === 'cnae') {
+                genericSearchDebounce = setTimeout(async () => {
+                    if (!searchTerm) {
+                        currentItems = [...originalItems];
+                        renderGenericList();
+                        return;
+                    }
+                    const resultados = await buscarCnaes(searchTerm);
+                    currentItems = resultados;
+                    renderGenericList();
+                }, 250);
+                return;
+            }
+
             if (!searchTerm) {
                 if (originalItems) {
                     currentItems = [...originalItems];
                     renderGenericList();
-                    return;
                 }
                 return;
             }
@@ -1407,6 +1688,7 @@ showWarning('Segmento salvo com sucesso!', 'Sucesso');
         });
 
         // ===== EVENTOS DE NAVEGAÇÃO ENTRE TELAS =====
+
         document.getElementById('menu-dashboard').addEventListener('click', function() {
             if (segmentScreen.style.display === 'block') {
                 if (isDirty) {
@@ -1424,6 +1706,11 @@ showWarning('Segmento salvo com sucesso!', 'Sucesso');
                 } else {
                     showScreen('main');
                 }
+                return;
+            }
+
+            if (mainScreen.style.display !== 'block') {
+                showScreen('main');
             } else {
                 setActiveMenuItem('menu-dashboard');
                 closeAllModals();
@@ -1436,6 +1723,14 @@ showWarning('Segmento salvo com sucesso!', 'Sucesso');
                 return;
             }
             showScreen('segment');
+        });
+
+        document.getElementById('menu-ignorados').addEventListener('click', function() {
+            if (ignoradosScreen.style.display === 'block') {
+                setActiveMenuItem('menu-ignorados');
+                return;
+            }
+            showScreen('ignorados');
         });
 
         // ===== LIMPAR FILTROS =====
@@ -1510,14 +1805,6 @@ showWarning('Segmento salvo com sucesso!', 'Sucesso');
             }
         });
 
-        tbody.addEventListener('click', function(e) {
-            if(e.target.classList.contains('btn-detail')) {
-                const row = e.target.closest('tr');
-                openDetailsModal(row.cells[0].innerText.replace(/\D/g, ''));
-            }
-        });
-
-        // ===== EVENTO DE MUDANÇA DO DDD (DESATIVADO) =====
         document.getElementById('filter-ddd').addEventListener('change', function() {
             // Não faz nada
         });
@@ -1528,11 +1815,15 @@ showWarning('Segmento salvo com sucesso!', 'Sucesso');
         }
 
         initializeCustomSelects();
+
         carregarUFs();
-        carregarSegmentos();
-        carregarCnaesIniciais();
         carregarDDDs();
-        updateSegmentFilter();
+
+        (async function carregarDadosSegmentos() {
+            await carregarCnaesIniciais();
+            await carregarSegmentos();
+            updateSegmentFilter();
+        })();
 
         showScreen('main');
 
