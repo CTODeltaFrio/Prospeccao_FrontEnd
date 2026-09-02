@@ -95,6 +95,7 @@ document.addEventListener('DOMContentLoaded', function() {
         let currentGenericContext = null;
         let currentItems = [];
         let ignorados = [];
+        let ignoradosCarregados = false;
 
         // Paginação (API)
         let currentPage = 1;
@@ -108,7 +109,7 @@ document.addEventListener('DOMContentLoaded', function() {
         let municipiosPromise = null;
 
         // === EXPOR VARIÁVEIS PARA DEPURAÇÃO NO CONSOLE ===
-        window.registros = registros; // <-- ADICIONADO
+        window.registros = registros;
 
         // Controle de alterações não salvas
         let isDirty = false;
@@ -662,7 +663,6 @@ document.addEventListener('DOMContentLoaded', function() {
             let dddNum = null;
             const dddStr = String(ddd || '').trim();
             
-            // 1. Tenta usar o DDD informado (se for válido)
             if (dddStr && dddStr !== '0' && dddStr !== 'null') {
                 const parsed = parseInt(dddStr, 10);
                 if (!isNaN(parsed) && parsed > 0) {
@@ -670,7 +670,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
             
-            // 2. Se o DDD não for válido, tenta extrair do próprio número
             if (!dddNum) {
                 if (numeroLimpo.length >= 10) {
                     const possivelDDD = parseInt(numeroLimpo.substring(0, 2), 10);
@@ -681,18 +680,87 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
             
-            // 3. Se ainda não tiver DDD, exibe só o número
             if (!dddNum) {
                 return numeroLimpo;
             }
             
-            // 4. Formata com DDD
             return `(${dddNum}) ${numeroLimpo}`;
+        }
+
+        // ===== PERSISTÊNCIA DOS IGNORADOS (API) =====
+        async function salvarStatusIgnorado(cnpj) {
+            try {
+                const response = await fetch(`${API_URL}/api/prospeccao/status-estabelecimentos`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({ 
+                        cnpjCompleto: cnpj, 
+                        status: 'X' // X = descartado (ignorado)
+                    })
+                });
+                if (!response.ok) {
+                    const text = await response.text();
+                    console.warn(`Erro ao salvar status (${response.status}):`, text);
+                }
+            } catch (error) {
+                console.error('Erro ao salvar status:', error);
+            }
+        }
+
+        // Nota: A API não possui endpoint DELETE para remover o status.
+        // Para "restaurar", apenas removemos localmente da lista de ignorados.
+        // O CNPJ continuará na tabela de status, mas não será exibido como ignorado.
+        // Se quiser que ele reapareça nas pesquisas, seria necessário remover o registro da tabela,
+        // mas isso não é suportado pela API atual.
+        async function removerStatusIgnorado(cnpj) {
+            // Não faz nada na API (não há DELETE), apenas remove localmente.
+            console.log(`Restaurando localmente o CNPJ ${cnpj} (não há API para remover status)`);
+            // Opcional: poderia chamar um POST com status 'C' para sobrescrever, mas isso não removeria a exclusão das pesquisas.
+            // Como a documentação diz que a presença do CNPJ na tabela exclui das pesquisas independente do status,
+            // a restauração não fará o CNPJ reaparecer nas pesquisas. Apenas removerá da lista visual de ignorados.
+        }
+
+        async function carregarIgnorados() {
+            if (ignoradosCarregados) return;
+            try {
+                const response = await fetch(`${API_URL}/api/prospeccao/status-estabelecimentos?status=X`, {
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                const data = await response.json();
+                
+                if (data && data.registros && Array.isArray(data.registros)) {
+                    // A API retorna os dados completos do estabelecimento + status + dataStatus
+                    ignorados = data.registros.map(item => {
+                        // Mapeia para o formato esperado pela tabela
+                        return {
+                            cnpj: item.cnpj,
+                            cnpjFormatado: item.cnpjFormatado,
+                            razaoSocial: item.razaoSocial,
+                            nomeFantasia: item.nomeFantasia,
+                            uf: item.uf,
+                            municipio: item.municipio,
+                            telefone1: item.telefone1,
+                            telefone2: item.telefone2,
+                            email: item.email
+                        };
+                    });
+                } else {
+                    ignorados = [];
+                }
+                ignoradosCarregados = true;
+                renderIgnoradosTable();
+            } catch (error) {
+                console.error('Erro ao carregar ignorados:', error);
+                ignorados = [];
+                renderIgnoradosTable();
+            }
         }
 
         // ===== RENDERIZAR TABELA =====
         function renderTable(data) {
-            // ===== LOG DE DEPURAÇÃO =====
             console.log('📊 Dados recebidos para renderizar:', data);
 
             tbody.innerHTML = '';
@@ -708,7 +776,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             data.forEach(item => {
-                // ===== LOG DE CADA REGISTRO =====
                 console.log(`🔍 CNPJ: ${item.cnpjFormatado} | Razão: ${item.razaoSocial}`);
 
                 const row = `<tr>
@@ -746,7 +813,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             });
 
-            // ===== ADICIONA TOOLTIP EM CÉLULAS CORTADAS =====
             setupCellTooltips();
         }
 
@@ -816,23 +882,33 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             });
 
-            // ===== ADICIONA TOOLTIP EM CÉLULAS CORTADAS =====
             setupCellTooltips();
         }
 
         function restaurarIgnorado(index) {
             const item = ignorados[index];
-            if (item) {
-                ignorados.splice(index, 1);
-                const exists = registros.some(r => r.cnpj === item.cnpj);
-                if (!exists) {
-                    registros.push(item);
-                    registros.sort((a, b) => a.cnpj.localeCompare(b.cnpj));
-                }
-                renderTable(registros);
-                renderIgnoradosTable();
-                showWarning('Registro restaurado com sucesso!', 'Sucesso');
+            if (!item) return;
+
+            ignorados.splice(index, 1);
+            // Não adiciona de volta à prospecção (pois o status permanece na API e o CNPJ continuará excluído das pesquisas)
+            // Se quiser que ele reapareça, seria necessário remover da tabela de status (não suportado)
+            removerStatusIgnorado(item.cnpj); // apenas log
+            renderIgnoradosTable();
+            showWarning('Registro removido da lista de ignorados.', 'Restaurado');
+        }
+
+        function restaurarIgnoradoPorCnpj(cnpj) {
+            const index = ignorados.findIndex(item => item.cnpj === cnpj);
+            if (index === -1) {
+                showWarning('Registro não encontrado nos ignorados.', 'Erro');
+                return;
             }
+            const item = ignorados[index];
+            ignorados.splice(index, 1);
+            removerStatusIgnorado(cnpj);
+            renderIgnoradosTable();
+            detailsModal.style.display = 'none';
+            showWarning('Registro removido da lista de ignorados.', 'Restaurado');
         }
 
         // ===== PESQUISA DE PROSPECÇÃO =====
@@ -978,6 +1054,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             if (index !== -1) registros.splice(index, 1);
                             if (!ignorados.some(item => item.cnpj === cnpj)) {
                                 ignorados.push(companyToIgnore);
+                                salvarStatusIgnorado(cnpj);
                             }
                             renderTable(registros);
                             renderIgnoradosTable();
@@ -989,24 +1066,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             detailsModal.style.display = 'flex';
-        }
-
-        function restaurarIgnoradoPorCnpj(cnpj) {
-            const index = ignorados.findIndex(item => item.cnpj === cnpj);
-            if (index === -1) {
-                showWarning('Registro não encontrado nos ignorados.', 'Erro');
-                return;
-            }
-            const item = ignorados[index];
-            ignorados.splice(index, 1);
-            if (!registros.some(r => r.cnpj === cnpj)) {
-                registros.push(item);
-                registros.sort((a, b) => a.cnpj.localeCompare(b.cnpj));
-            }
-            renderTable(registros);
-            renderIgnoradosTable();
-            detailsModal.style.display = 'none';
-            showWarning('Registro restaurado com sucesso!', 'Restaurado');
         }
 
         // ========================================================================
@@ -1044,6 +1103,69 @@ document.addEventListener('DOMContentLoaded', function() {
             linkCnaeSelect.value = '';
             refreshCustomSelect(linkCnaeSelect);
             setDirty(false);
+        }
+
+        function renderSegmentTable(searchTerm = '') {
+            segmentTableBody.innerHTML = '';
+            const term = searchTerm.toLowerCase().trim();
+
+            segmentData.filter(seg => seg.nome.toLowerCase().includes(term)).forEach(seg => {
+                const links = segmentoCnaeLinks.filter(link => link.segmentoId === seg.id);
+                const qtdLinks = links.length;
+
+                let tooltipContent = '';
+                if (qtdLinks > 0) {
+                    tooltipContent = '<div class="cnae-tooltip-content">';
+                    links.forEach(link => {
+                        const cnae = allCnaesCache.find(
+                            c => String(c.codigo).trim() === String(link.cnaeCodigo).trim()
+                        );
+                        if (cnae) {
+                            tooltipContent += `<div class="tooltip-item"><strong>${cnae.codigo}</strong> - ${cnae.descricao}</div>`;
+                        } else {
+                            tooltipContent += `<div class="tooltip-item"><strong>${link.cnaeCodigo}</strong> - (descrição não disponível)</div>`;
+                        }
+                    });
+                    tooltipContent += '</div>';
+                }
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${seg.nome}</td>
+                    <td>
+                        <div class="cnae-tooltip">
+                            <span class="tooltip-trigger">${qtdLinks}</span>
+                            ${tooltipContent}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="cell-actions">
+                            <button class="btn-table" data-action="edit" data-id="${seg.id}">Editar</button>
+                            <button class="btn-table btn-delete" data-action="delete" data-id="${seg.id}">Excluir</button>
+                        </div>
+                    </td>
+                `;
+                segmentTableBody.appendChild(tr);
+            });
+
+            segmentTableBody.querySelectorAll('button[data-action]').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const id = parseInt(this.dataset.id);
+                    if (this.dataset.action === 'edit') {
+                        editarSegmento(id);
+                    } else if (this.dataset.action === 'delete') {
+                        excluirSegmento(id);
+                    }
+                });
+            });
+
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('.cnae-tooltip')) {
+                    document.querySelectorAll('.cnae-tooltip.open').forEach(t => t.classList.remove('open'));
+                }
+            });
+
+            setupTooltips();
         }
 
         function setupTooltips() {
@@ -1116,108 +1238,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (content.classList.contains('tooltip-visible')) positionTooltip();
                 }, true);
             });
-        }
-
-        function renderSegmentTable(searchTerm = '') {
-            segmentTableBody.innerHTML = '';
-            const term = searchTerm.toLowerCase().trim();
-
-            segmentData.filter(seg => seg.nome.toLowerCase().includes(term)).forEach(seg => {
-                const links = segmentoCnaeLinks.filter(link => link.segmentoId === seg.id);
-                const qtdLinks = links.length;
-
-                let tooltipContent = '';
-                if (qtdLinks > 0) {
-                    tooltipContent = '<div class="cnae-tooltip-content">';
-                    links.forEach(link => {
-                        const cnae = allCnaesCache.find(
-                            c => String(c.codigo).trim() === String(link.cnaeCodigo).trim()
-                        );
-                        if (cnae) {
-                            tooltipContent += `<div class="tooltip-item"><strong>${cnae.codigo}</strong> - ${cnae.descricao}</div>`;
-                        } else {
-                            tooltipContent += `<div class="tooltip-item"><strong>${link.cnaeCodigo}</strong> - (descrição não disponível)</div>`;
-                        }
-                    });
-                    tooltipContent += '</div>';
-                }
-
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${seg.nome}</td>
-                    <td>
-                        <div class="cnae-tooltip">
-                            <span class="tooltip-trigger">${qtdLinks}</span>
-                            ${tooltipContent}
-                        </div>
-                    </td>
-                    <td>
-                        <div class="cell-actions">
-                            <button class="btn-table" data-action="edit" data-id="${seg.id}">Editar</button>
-                            <button class="btn-table btn-delete" data-action="delete" data-id="${seg.id}">Excluir</button>
-                        </div>
-                    </td>
-                `;
-                segmentTableBody.appendChild(tr);
-            });
-
-            segmentTableBody.querySelectorAll('.cnae-tooltip').forEach(tooltip => {
-                const trigger = tooltip.querySelector('.tooltip-trigger');
-                const content = tooltip.querySelector('.cnae-tooltip-content');
-                if (trigger && content) {
-                    trigger.addEventListener('click', function(e) {
-                        e.stopPropagation();
-                        document.querySelectorAll('.cnae-tooltip.open').forEach(t => {
-                            if (t !== tooltip) {
-                                t.classList.remove('open');
-                                const otherContent = t.querySelector('.cnae-tooltip-content');
-                                if (otherContent) otherContent.style.display = 'none';
-                            }
-                        });
-                        const isOpen = tooltip.classList.contains('open');
-                        if (isOpen) {
-                            tooltip.classList.remove('open');
-                            content.style.display = 'none';
-                            return;
-                        }
-                        tooltip.classList.add('open');
-                        content.style.display = 'block';
-                        const triggerRect = trigger.getBoundingClientRect();
-                        const tooltipWidth = content.offsetWidth;
-                        const tooltipHeight = content.offsetHeight;
-                        let left = triggerRect.left + (triggerRect.width / 2) - (tooltipWidth / 2);
-                        let top = triggerRect.top - tooltipHeight - 10;
-                        if (left < 10) left = 10;
-                        if (left + tooltipWidth > window.innerWidth - 10) {
-                            left = window.innerWidth - tooltipWidth - 10;
-                        }
-                        if (top < 10) top = 10;
-                        content.style.left = `${left}px`;
-                        content.style.top = `${top}px`;
-                        content.style.bottom = 'auto';
-                        content.style.transform = 'none';
-                    });
-                }
-            });
-
-            segmentTableBody.querySelectorAll('button[data-action]').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const id = parseInt(this.dataset.id);
-                    if (this.dataset.action === 'edit') {
-                        editarSegmento(id);
-                    } else if (this.dataset.action === 'delete') {
-                        excluirSegmento(id);
-                    }
-                });
-            });
-
-            document.addEventListener('click', function(e) {
-                if (!e.target.closest('.cnae-tooltip')) {
-                    document.querySelectorAll('.cnae-tooltip.open').forEach(t => t.classList.remove('open'));
-                }
-            });
-
-            setupTooltips();
         }
 
         function updateSegmentFilter() {
@@ -1891,6 +1911,9 @@ document.addEventListener('DOMContentLoaded', function() {
         })();
 
         showScreen('main');
+
+        // Carrega os ignorados do backend
+        carregarIgnorados();
 
         carregarMunicipiosDaAPI().then(municipios => {
             console.log("Municípios pré-carregados com sucesso!");
