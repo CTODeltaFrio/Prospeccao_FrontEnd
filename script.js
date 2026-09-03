@@ -62,6 +62,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const formTitle = document.getElementById('form-title');
         const segmentFormCard = document.getElementById('segment-form-card');
 
+        // ===== ELEMENTOS DA TELA DE IGNORADOS =====
+        const ignoradosSearch = document.getElementById('ignorados-search');
+
         // ===== MODAIS =====
         const detailsModal = document.getElementById('details-modal');
         const detailsClose = document.getElementById('close-details-modal');
@@ -96,6 +99,7 @@ document.addEventListener('DOMContentLoaded', function() {
         let currentItems = [];
         let ignorados = [];
         let ignoradosCarregados = false;
+        let ignoradosFiltrados = [];
 
         // Paginação (API)
         let currentPage = 1;
@@ -159,7 +163,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 segmentScreen.style.display = 'none';
                 ignoradosScreen.style.display = 'block';
                 setActiveMenuItem('menu-ignorados');
-                renderIgnoradosTable();
+                // Carrega ignorados se ainda não carregou
+                if (!ignoradosCarregados) {
+                    carregarIgnorados();
+                } else {
+                    renderIgnoradosTable();
+                }
             }
         }
 
@@ -340,7 +349,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // ===== CARREGAR SEGMENTOS E SEUS VÍNCULOS =====
         async function carregarSegmentos() {
-            // Se já tem dados em cache, apenas atualiza o filtro e renderiza
             if (segmentData.length > 0) {
                 updateSegmentFilter();
                 renderSegmentTable();
@@ -396,7 +404,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 renderSegmentTable();
             } catch (error) {
                 console.error("Erro ao carregar Segmentos:", error);
-                // Em caso de erro, mantém apenas "Todos"
                 if (filterSegmento) {
                     filterSegmento.innerHTML = '<option value="">Todos</option>';
                     refreshCustomSelect(filterSegmento);
@@ -461,7 +468,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        // ===== CARREGAR MUNICÍPIOS VIA API (COM CACHE E PRÉ-CARREGAMENTO) =====
+        // ===== CARREGAR MUNICÍPIOS VIA API =====
         async function carregarMunicipiosDaAPI() {
             if (municipiosCache) {
                 console.log("⚡ Usando cache de municípios");
@@ -707,7 +714,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                     body: JSON.stringify({ 
                         cnpjCompleto: cnpj, 
-                        status: 'X' // X = descartado (ignorado)
+                        status: 'X'
                     })
                 });
                 if (!response.ok) {
@@ -750,12 +757,37 @@ document.addEventListener('DOMContentLoaded', function() {
                     ignorados = [];
                 }
                 ignoradosCarregados = true;
+                // Aplica filtro (se houver termo de busca)
+                ignoradosFiltrados = [...ignorados];
                 renderIgnoradosTable();
             } catch (error) {
                 console.error('Erro ao carregar ignorados:', error);
                 ignorados = [];
+                ignoradosFiltrados = [];
                 renderIgnoradosTable();
             }
+        }
+
+        // ===== FILTRO DA TELA DE IGNORADOS =====
+        function filtrarIgnorados() {
+            const termo = ignoradosSearch ? ignoradosSearch.value.toLowerCase().trim() : '';
+            
+            if (!termo) {
+                ignoradosFiltrados = [...ignorados];
+            } else {
+                ignoradosFiltrados = ignorados.filter(item => {
+                    return (
+                        (item.cnpj && item.cnpj.includes(termo)) ||
+                        (item.cnpjFormatado && item.cnpjFormatado.includes(termo)) ||
+                        (item.razaoSocial && item.razaoSocial.toLowerCase().includes(termo)) ||
+                        (item.nomeFantasia && item.nomeFantasia.toLowerCase().includes(termo)) ||
+                        (item.uf && item.uf.toLowerCase().includes(termo)) ||
+                        (item.telefone1 && item.telefone1.includes(termo)) ||
+                        (item.municipio && item.municipio.toLowerCase().includes(termo))
+                    );
+                });
+            }
+            renderIgnoradosTable();
         }
 
         // ===== RENDERIZAR TABELA =====
@@ -849,7 +881,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const showingDiv = footerIgnorados.querySelector('.showing');
             if (!showingDiv) return;
 
-            if (ignorados.length === 0) {
+            const data = ignoradosFiltrados || [];
+
+            if (data.length === 0) {
                 tbodyIgnorados.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:20px;">Nenhum registro ignorado.</td></tr>`;
                 footerIgnorados.style.display = 'none';
                 return;
@@ -857,7 +891,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             footerIgnorados.style.display = 'flex';
 
-            ignorados.forEach((item) => {
+            data.forEach((item) => {
                 const row = `<tr>
                     <td>${item.cnpjFormatado}</td>
                     <td>${item.nomeFantasia || '-'}</td>
@@ -872,7 +906,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 tbodyIgnorados.innerHTML += row;
             });
 
-            showingDiv.textContent = `Total: ${ignorados.length} registros ignorados.`;
+            showingDiv.textContent = `Total: ${data.length} registros ignorados.`;
 
             tbodyIgnorados.querySelectorAll('.btn-detail').forEach(btn => {
                 btn.addEventListener('click', function() {
@@ -889,6 +923,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!item) return;
 
             ignorados.splice(index, 1);
+            ignoradosFiltrados = [...ignorados];
             removerStatusIgnorado(item.cnpj);
             renderIgnoradosTable();
             showWarning('Registro removido da lista de ignorados.', 'Restaurado');
@@ -902,6 +937,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             const item = ignorados[index];
             ignorados.splice(index, 1);
+            ignoradosFiltrados = [...ignorados];
             removerStatusIgnorado(cnpj);
             renderIgnoradosTable();
             detailsModal.style.display = 'none';
@@ -1051,6 +1087,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             if (index !== -1) registros.splice(index, 1);
                             if (!ignorados.some(item => item.cnpj === cnpj)) {
                                 ignorados.push(companyToIgnore);
+                                ignoradosFiltrados = [...ignorados];
                                 salvarStatusIgnorado(cnpj);
                             }
                             renderTable(registros);
@@ -1815,6 +1852,13 @@ document.addEventListener('DOMContentLoaded', function() {
             showScreen('ignorados');
         });
 
+        // ===== FILTRO DE IGNORADOS =====
+        if (ignoradosSearch) {
+            ignoradosSearch.addEventListener('input', function() {
+                filtrarIgnorados();
+            });
+        }
+
         // ===== LIMPAR FILTROS =====
         function clearFilters() {
             filterUf.value = '';
@@ -1901,7 +1945,6 @@ document.addEventListener('DOMContentLoaded', function() {
         carregarUFs();
         carregarDDDs();
 
-        // Carrega segmentos e CNAEs ANTES de mostrar a tela principal
         (async function carregarDadosIniciais() {
             await carregarCnaesIniciais();
             await carregarSegmentos();
@@ -1909,7 +1952,6 @@ document.addEventListener('DOMContentLoaded', function() {
             showScreen('main');
         })();
 
-        // Carrega ignorados e municípios em segundo plano
         carregarIgnorados();
 
         carregarMunicipiosDaAPI().then(municipios => {

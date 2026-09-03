@@ -258,42 +258,45 @@
             </div>
         </div>
 
-<!-- TELA DE IGNORADOS -->
-<div id="ignorados-screen" style="display: none;">
-    <header class="header">
-        <div>
-            <h1>Cadastros Ignorados</h1>
-            <div class="subtitle">Empresas e estabelecimentos que foram marcados como ignorados</div>
-        </div>
-    </header>
+        <!-- TELA DE IGNORADOS -->
+        <div id="ignorados-screen" style="display: none;">
+            <div class="ignorados-header">
+                <div class="header">
+                    <div>
+                        <h1>Cadastros Ignorados</h1>
+                        <div class="subtitle">Empresas e estabelecimentos que foram marcados como ignorados</div>
+                    </div>
+                    <input type="text" class="table-search" placeholder="Buscar ignorados..." id="ignorados-search">
+                </div>
+            </div>
 
-    <section class="results">
-        <div class="results-header">
-            <div class="results-title">Lista de Ignorados</div>
-        </div>
-        <div class="table-responsive">
-            <table>
-                <thead>
-                    <tr>
-                        <th>CNPJ ↓</th>
-                        <th>Nome Fantasia</th>
-                        <th>Razão Social</th>
-                        <th>Situação</th>
-                        <th>UF</th>
-                        <th>Telefone</th>
-                        <th>Ações</th>
-                    </tr>
-                </thead>
-                <tbody id="ignorados-table-body"></tbody>
-            </table>
-        </div>
-    </section>
+            <section class="results">
+                <div class="results-header">
+                    <div class="results-title">Lista de Ignorados</div>
+                </div>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>CNPJ ↓</th>
+                                <th>Nome Fantasia</th>
+                                <th>Razão Social</th>
+                                <th>Situação</th>
+                                <th>UF</th>
+                                <th>Telefone</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ignorados-table-body"></tbody>
+                    </table>
+                </div>
+            </section>
 
-    <!-- RODAPÉ FORA DA SECTION (IGUAL À PROSPECÇÃO) -->
-    <div class="table-footer" id="ignorados-footer">
-        <div class="showing">Nenhum registro ignorado.</div>
-    </div>
-</div>
+            <!-- RODAPÉ FORA DA SECTION (IGUAL À PROSPECÇÃO) -->
+            <div class="table-footer" id="ignorados-footer">
+                <div class="showing">Nenhum registro ignorado.</div>
+            </div>
+        </div>
 
     </main>
 

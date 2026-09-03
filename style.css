@@ -645,7 +645,7 @@ select.input {
     border-radius: 13px;
     overflow: hidden;
     box-shadow: var(--shadow-card);
-    margin-bottom: 0; /* Remove margem extra, pois o rodapé está fora */
+    margin-bottom: 0;
     transition: all 0.3s ease;
 }
 
@@ -711,15 +711,14 @@ body.dark-mode .icon-btn.active {
     border-color: #1e3a5f;
 }
 
-/* Ajuste da tabela principal */
 .table-responsive {
-    overflow-x: auto; /* Scroll horizontal se necessário */
+    overflow-x: auto;
 }
 
 .table-responsive table {
     width: 100%;
     border-collapse: collapse;
-    table-layout: fixed; /* Força larguras fixas */
+    table-layout: fixed;
 }
 
 .table-responsive thead {
@@ -769,29 +768,21 @@ body.dark-mode .icon-btn.active {
     vertical-align: middle;
 }
 
-/* Larguras das colunas - MÁXIMO ESPAÇO PARA NOMES */
 .table-responsive th:nth-child(1),
-.table-responsive td:nth-child(1) { width: 11%; } /* CNPJ */
-
+.table-responsive td:nth-child(1) { width: 11%; }
 .table-responsive th:nth-child(2),
-.table-responsive td:nth-child(2) { width: 28%; } /* Nome Fantasia */
-
+.table-responsive td:nth-child(2) { width: 28%; }
 .table-responsive th:nth-child(3),
-.table-responsive td:nth-child(3) { width: 34%; } /* Razão Social */
-
+.table-responsive td:nth-child(3) { width: 34%; }
 .table-responsive th:nth-child(4),
-.table-responsive td:nth-child(4) { width: 6%; } /* Situação */
-
+.table-responsive td:nth-child(4) { width: 6%; }
 .table-responsive th:nth-child(5),
-.table-responsive td:nth-child(5) { width: 4%; } /* UF */
-
+.table-responsive td:nth-child(5) { width: 4%; }
 .table-responsive th:nth-child(6),
-.table-responsive td:nth-child(6) { width: 9%; } /* Telefone */
-
+.table-responsive td:nth-child(6) { width: 9%; }
 .table-responsive th:nth-child(7),
-.table-responsive td:nth-child(7) { width: 8%; } /* Ações */
+.table-responsive td:nth-child(7) { width: 8%; }
 
-/* Ajuste para o status e botão detalhes */
 .status {
     display: inline-flex;
     align-items: center;
@@ -850,7 +841,6 @@ body.dark-mode .status {
     font-size: 13px;
 }
 
-/* RODAPÉ DA TABELA (FORA DA SECTION) */
 .table-footer {
     min-height: 65px;
     display: flex;
@@ -1212,7 +1202,6 @@ body.dark-mode .btn-secondary:hover {
     white-space: nowrap;
 }
 
-/* Permite que o tooltip dos CNAEs saia da célula */
 #segment-screen .table-responsive td:nth-child(2) {
     overflow: visible;
 }
@@ -1228,46 +1217,7 @@ body.dark-mode .btn-secondary:hover {
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-/* ===== TOOLTIP DE CNAEs - CORREÇÃO ===== */
-.cnae-tooltip {
-    position: relative;
-    display: inline-block;
-    cursor: help;
-    z-index: 10;
-}
-
-.tooltip-trigger {
-    font-weight: 700;
-    font-size: 16px;
-    color: #2463eb;
-    padding: 4px 10px;
-    border-radius: 6px;
-    background: #eff6ff;
-    transition: all 0.2s;
-    cursor: pointer;
-    user-select: none;
-    display: inline-block;
-    position: relative;
-    z-index: 5;
-}
-
-body.dark-mode .tooltip-trigger {
-    background: #1e3a5f;
-    color: #60a5fa;
-}
-
-.cnae-tooltip:hover .tooltip-trigger,
-.cnae-tooltip.open .tooltip-trigger {
-    background: #1e3a8a;
-    color: white;
-}
-
-/* =========================================================
-   TOOLTIP DE CNAEs
-   O conteúdo é movido para o BODY pelo JavaScript.
-   Isso faz ele ficar acima de toda a interface.
-   ========================================================= */
-
+/* ===== TOOLTIP DE CNAEs ===== */
 .cnae-tooltip {
     position: relative;
     display: inline-block;
@@ -1303,82 +1253,43 @@ body.dark-mode .tooltip-trigger {
     color: white;
 }
 
-/* =========================================================
-   TOOLTIP FLUTUANTE GLOBAL
-   ========================================================= */
-
 .cnae-tooltip-content {
     display: none;
-
     position: fixed !important;
-
     background: #1e3a8a;
     color: white;
-
     padding: 14px 18px;
-
     width: 360px;
     max-width: calc(100vw - 20px);
-
     max-height: 280px;
-
     overflow-y: auto;
-
     box-sizing: border-box;
-
     border-radius: 10px;
-
-    box-shadow:
-        0 10px 30px rgba(0, 0, 0, 0.55),
-        0 0 0 1px rgba(255, 255, 255, 0.08);
-
-    /*
-     * Acima de absolutamente todos os elementos
-     */
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.08);
     z-index: 2147483647 !important;
-
     font-size: 13px;
     line-height: 1.5;
-
     white-space: normal;
     word-break: break-word;
-
     text-align: left;
 }
 
-/*
- * Quando o JS colocar o tooltip no BODY,
- * esta classe controla sua exibição.
- */
 .cnae-tooltip-content.tooltip-visible {
     display: block !important;
 }
 
-/* =========================================================
-   SETA DO TOOLTIP
-   ========================================================= */
-
 .cnae-tooltip-content::after {
     content: '';
-
     position: absolute;
-
     top: 100%;
     left: 50%;
-
     transform: translateX(-50%);
-
     border: 7px solid transparent;
     border-top-color: #1e3a8a;
 }
 
-/* =========================================================
-   ITENS DOS CNAEs
-   ========================================================= */
-
 .tooltip-item {
     padding: 7px 0;
-
     border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 }
 
@@ -1389,10 +1300,6 @@ body.dark-mode .tooltip-trigger {
 .tooltip-item strong {
     color: #93c5fd;
 }
-
-/* =========================================================
-   SCROLLBAR
-   ========================================================= */
 
 .cnae-tooltip-content::-webkit-scrollbar {
     width: 6px;
@@ -1412,7 +1319,6 @@ body.dark-mode .tooltip-trigger {
     background: rgba(255, 255, 255, 0.6);
 }
 
-
 /* ===== BOTÕES DA TABELA DE SEGMENTOS - ANIMAÇÃO ===== */
 #segmentosTable .btn-table {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1426,7 +1332,6 @@ body.dark-mode .tooltip-trigger {
     font-size: 13px;
 }
 
-/* Botão Editar */
 #segmentosTable .btn-table[data-action="edit"] {
     background: #eff6ff;
     color: #1d4ed8;
@@ -1446,7 +1351,6 @@ body.dark-mode .tooltip-trigger {
     box-shadow: 0 3px 8px rgba(29, 78, 216, 0.2);
 }
 
-/* Botão Excluir */
 #segmentosTable .btn-delete {
     background: #fef2f2;
     color: #dc2626;
@@ -1466,7 +1370,6 @@ body.dark-mode .tooltip-trigger {
     box-shadow: 0 3px 8px rgba(220, 38, 38, 0.2);
 }
 
-/* Modo escuro */
 body.dark-mode #segmentosTable .btn-table[data-action="edit"] {
     background: #1e3a5f;
     color: #60a5fa;
@@ -1493,9 +1396,6 @@ body.dark-mode #segmentosTable .btn-delete:hover {
     box-shadow: 0 6px 16px rgba(239, 68, 68, 0.5);
 }
 
-/* ================== MODAIS ================== */
-/* ... (mantenha o restante do CSS de modais, dropdown, etc.) */
-/* O restante do CSS permanece igual ao original */
 /* ================== MODAIS ================== */
 .modal-overlay {
     position: fixed;
@@ -2345,7 +2245,6 @@ body.dark-mode * {
     scrollbar-color: #3b82f6 #1e293b;
 }
 
-/* Barra de rolagem específica para as tabelas com scroll */
 .table-responsive::-webkit-scrollbar,
 #segment-screen .table-responsive::-webkit-scrollbar {
     width: 8px;
@@ -2431,20 +2330,7 @@ body.dark-mode #segment-screen .table-responsive::-webkit-scrollbar-thumb:hover 
     transform: rotate(180deg) scale(1.2);
 }
 
-@keyframes pulse-new-btn {
-    0% {
-        box-shadow: 0 0 0 0 rgba(36, 99, 235, 0.4);
-    }
-    50% {
-        box-shadow: 0 0 0 12px rgba(36, 99, 235, 0);
-    }
-    100% {
-        box-shadow: 0 0 0 0 rgba(36, 99, 235, 0);
-    }
-}
 /* ===== ANIMAÇÕES DOS BOTÕES DA TELA DE SEGMENTOS ===== */
-
-/* Botão Salvar segmento */
 #btn-save-segment.btn-primary {
     position: relative;
     overflow: hidden;
@@ -2481,7 +2367,6 @@ body.dark-mode #segment-screen .table-responsive::-webkit-scrollbar-thumb:hover 
     box-shadow: 0 4px 12px rgba(36, 99, 235, 0.2);
 }
 
-/* Botão Cancelar */
 #btn-cancel-segment.btn-secondary {
     position: relative;
     overflow: hidden;
@@ -2520,7 +2405,6 @@ body.dark-mode #segment-screen .table-responsive::-webkit-scrollbar-thumb:hover 
     box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2);
 }
 
-/* Botão Vincular CNAE */
 .btn-vincular {
     position: relative;
     overflow: hidden;
@@ -2565,7 +2449,6 @@ body.dark-mode #segment-screen .table-responsive::-webkit-scrollbar-thumb:hover 
     transform: rotate(90deg) scale(1.1);
 }
 
-/* Botões Editar e Excluir da tabela de segmentos (melhorias) */
 #segmentosTable .btn-table {
     position: relative;
     overflow: hidden;
@@ -2585,7 +2468,6 @@ body.dark-mode #segment-screen .table-responsive::-webkit-scrollbar-thumb:hover 
     pointer-events: none;
 }
 
-/* Botão Editar */
 #segmentosTable .btn-table[data-action="edit"] {
     background: #eff6ff;
     color: #1d4ed8;
@@ -2614,7 +2496,6 @@ body.dark-mode #segment-screen .table-responsive::-webkit-scrollbar-thumb:hover 
     box-shadow: 0 4px 10px rgba(29, 78, 216, 0.2);
 }
 
-/* Botão Excluir */
 #segmentosTable .btn-delete {
     background: #fef2f2;
     color: #dc2626;
@@ -2643,7 +2524,6 @@ body.dark-mode #segment-screen .table-responsive::-webkit-scrollbar-thumb:hover 
     box-shadow: 0 4px 10px rgba(220, 38, 38, 0.2);
 }
 
-/* Modo escuro para os botões da tabela */
 body.dark-mode #segmentosTable .btn-table[data-action="edit"] {
     background: #1e3a5f;
     color: #60a5fa;
@@ -2670,11 +2550,7 @@ body.dark-mode #segmentosTable .btn-delete:hover {
     box-shadow: 0 8px 20px rgba(239, 68, 68, 0.5);
 }
 
-/* ===== ANIMAÇÃO DOS BOTÕES ===== */
-
-/* ===== BOTÕES DO MODAL DE DETALHES - ESTILO IGUAL AOS DA TELA DE SEGMENTOS ===== */
-
-/* Botão Ignorar Cadastro */
+/* ===== BOTÕES DO MODAL DE DETALHES ===== */
 #btn-ignore-cadastro.btn-secondary {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     border-radius: 8px;
@@ -2702,7 +2578,6 @@ body.dark-mode #segmentosTable .btn-delete:hover {
     box-shadow: 0 3px 8px rgba(220, 38, 38, 0.2);
 }
 
-/* Modo escuro - Ignorar Cadastro */
 body.dark-mode #btn-ignore-cadastro.btn-secondary {
     background: #1e3a5f;
     color: #f87171;
@@ -2716,7 +2591,6 @@ body.dark-mode #btn-ignore-cadastro.btn-secondary:hover {
     box-shadow: 0 6px 16px rgba(239, 68, 68, 0.5);
 }
 
-/* ===== Botão Dados com IA ===== */
 .btn-light-blue {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     border-radius: 8px;
@@ -2742,7 +2616,6 @@ body.dark-mode #btn-ignore-cadastro.btn-secondary:hover {
     box-shadow: 0 3px 8px rgba(14, 165, 233, 0.2);
 }
 
-/* Modo escuro - Dados com IA */
 body.dark-mode .btn-light-blue {
     background: #1e3a5f;
     color: #60a5fa;
@@ -2756,7 +2629,6 @@ body.dark-mode .btn-light-blue:hover {
     box-shadow: 0 6px 16px rgba(14, 165, 233, 0.5);
 }
 
-/* ===== Botão Registro CRM ===== */
 .btn-register {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     border-radius: 8px;
@@ -2781,7 +2653,6 @@ body.dark-mode .btn-light-blue:hover {
     box-shadow: 0 4px 12px rgba(36, 99, 235, 0.2);
 }
 
-/* Modo escuro - Registro CRM */
 body.dark-mode .btn-register {
     background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
     box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
@@ -2793,63 +2664,8 @@ body.dark-mode .btn-register:hover {
 }
 
 /* ===== TELA DE IGNORADOS ===== */
-#ignorados-screen .table-responsive {
-    max-height: 500px;
-    overflow-y: auto;
-    overflow-x: auto;
-}
-
-#ignorados-screen .table-responsive thead {
-    position: sticky;
-    top: 0;
-    background: var(--bg-card);
-    z-index: 1;
-}
-
-#ignorados-screen .table-responsive tbody tr:hover {
-    background: var(--bg-hover);
-}
-
-#ignorados-screen .btn-restore {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    background: #f59e0b;
-    color: #ffffff;
-    border: none;
-    border-radius: 6px;
-    padding: 6px 12px;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 6px rgba(245, 158, 11, 0.2);
-}
-
-#ignorados-screen .btn-restore:hover {
-    background: #d97706;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
-}
-
-#ignorados-screen .btn-restore:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);
-}
-
-body.dark-mode #ignorados-screen .btn-restore {
-    background: #b45309;
-    box-shadow: 0 2px 6px rgba(180, 83, 9, 0.3);
-}
-
-body.dark-mode #ignorados-screen .btn-restore:hover {
-    background: #d97706;
-    box-shadow: 0 4px 12px rgba(180, 83, 9, 0.5);
-}
-
-/* ===== AJUSTE PARA TELA DE IGNORADOS ===== */
 #ignorados-screen .results {
-    margin-bottom: 0; /* Remove margem extra, igual à prospecção */
+    margin-bottom: 0;
 }
 
 #ignorados-screen .table-footer {
@@ -2865,7 +2681,7 @@ body.dark-mode #ignorados-screen .btn-restore:hover {
     font-size: 12px;
     color: var(--text-secondary);
 }
-/* ===== REMOVE OS PONTINHOS DA TABELA DE IGNORADOS ===== */
+
 #ignorados-screen .table-responsive td {
     white-space: normal !important;
     overflow: visible !important;
@@ -2888,3 +2704,15 @@ body.dark-mode #ignorados-screen .btn-restore:hover {
 #ignorados-screen .table-responsive th:nth-child(7),
 #ignorados-screen .table-responsive td:nth-child(7) { width: 11%; }
 
+/* ===== HEADER DA TELA DE IGNORADOS COM BUSCA ===== */
+.ignorados-header .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+}
+
+.ignorados-header .table-search {
+    width: 280px;
+    flex-shrink: 0;
+}
