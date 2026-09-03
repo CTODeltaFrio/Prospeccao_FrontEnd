@@ -2716,3 +2716,180 @@ body.dark-mode .btn-register:hover {
     width: 280px;
     flex-shrink: 0;
 }
+
+/* ============================================================
+   RESPONSIVIDADE PARA NOTEBOOKS E TELAS MÉDIAS (769px a 1366px)
+   ============================================================ */
+
+@media (min-width: 769px) and (max-width: 1366px) {
+    /* ----------------------------------------------------------
+       SIDEBAR: NÃO FORÇAR COLAPSO – DEIXAR COMPORTAMENTO PADRÃO
+       O usuário pode alternar com o botão "sidebar-toggle"
+       ---------------------------------------------------------- */
+
+    /* FILTROS – 2 colunas */
+    .filter-row {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 12px !important;
+    }
+    .filter-row-bottom {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 12px !important;
+    }
+    /* Campo CNAE ocupa 2 colunas */
+    .filter-row-bottom .field:nth-child(2) {
+        grid-column: span 2 !important;
+    }
+    /* Botão Pesquisar ocupa 2 colunas */
+    .filter-row-bottom .search-btn {
+        grid-column: span 2 !important;
+        width: 100% !important;
+        min-width: unset !important;
+    }
+    /* Inputs menores */
+    .input, .custom-select-trigger {
+        height: 38px !important;
+        font-size: 13px !important;
+    }
+    .custom-select-trigger {
+        min-height: 38px !important;
+        padding: 0 10px !important;
+    }
+    .filter-box {
+        padding: 16px !important;
+    }
+
+    /* HEADER */
+    .header h1 {
+        font-size: 20px !important;
+    }
+    .competencia {
+        padding: 6px 12px !important;
+        min-width: auto !important;
+        font-size: 13px !important;
+    }
+
+    /* CARDS – 2 colunas */
+    .cards {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 14px !important;
+    }
+    .card {
+        padding: 14px !important;
+        min-height: 90px !important;
+    }
+    .card-icon {
+        width: 40px !important;
+        height: 40px !important;
+        font-size: 18px !important;
+    }
+    .card-info strong {
+        font-size: 18px !important;
+    }
+    .card-info label {
+        font-size: 11px !important;
+    }
+
+    /* TABELA PRINCIPAL – ajuste de colunas */
+    .table-responsive th,
+    .table-responsive td {
+        padding: 6px 4px !important;
+        font-size: 11px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+    .table-responsive th:nth-child(1), .table-responsive td:nth-child(1) { width: 10% !important; } /* CNPJ */
+    .table-responsive th:nth-child(2), .table-responsive td:nth-child(2) { width: 20% !important; } /* Fantasia */
+    .table-responsive th:nth-child(3), .table-responsive td:nth-child(3) { width: 22% !important; } /* Razão */
+    .table-responsive th:nth-child(4), .table-responsive td:nth-child(4) { width: 8% !important; }  /* Situação */
+    .table-responsive th:nth-child(5), .table-responsive td:nth-child(5) { width: 4% !important; }  /* UF */
+    .table-responsive th:nth-child(6), .table-responsive td:nth-child(6) { width: 16% !important; } /* Telefone */
+    .table-responsive th:nth-child(7), .table-responsive td:nth-child(7) { width: 10% !important; } /* Ações */
+
+    .btn-detail {
+        padding: 3px 8px !important;
+        font-size: 10px !important;
+        white-space: nowrap !important;
+    }
+
+    /* PAGINAÇÃO */
+    .table-footer {
+        flex-wrap: wrap !important;
+        gap: 6px !important;
+        padding: 8px 0 !important;
+    }
+    .page-indicator {
+        min-width: 60px !important;
+        font-size: 12px !important;
+        height: 30px !important;
+    }
+    .page-btn {
+        width: 30px !important;
+        height: 30px !important;
+        font-size: 12px !important;
+    }
+
+    /* TELA DE SEGMENTOS */
+    .container {
+        padding: 12px !important;
+    }
+    .card-segmento {
+        padding: 14px !important;
+    }
+    .input-with-button {
+        flex-direction: column !important;
+        align-items: stretch !important;
+    }
+    .btn-vincular {
+        width: 100% !important;
+        height: 40px !important;
+    }
+    .form-actions {
+        flex-direction: column !important;
+    }
+    .form-actions .btn-primary,
+    .form-actions .btn-secondary {
+        width: 100% !important;
+        text-align: center !important;
+    }
+    .table-header {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 8px !important;
+    }
+    .table-search {
+        width: 100% !important;
+    }
+    #segment-screen .table-responsive th:nth-child(1),
+    #segment-screen .table-responsive td:nth-child(1) { width: 35% !important; }
+    #segment-screen .table-responsive th:nth-child(2),
+    #segment-screen .table-responsive td:nth-child(2) { width: 20% !important; }
+    #segment-screen .table-responsive th:nth-child(3),
+    #segment-screen .table-responsive td:nth-child(3) { width: 45% !important; }
+
+    /* MODAIS – ocupam 90% da tela */
+    .modal-content {
+        max-width: 90% !important;
+        width: 90% !important;
+        height: 80vh !important;
+        padding: 16px !important;
+    }
+    .modal-content.large-modal {
+        max-width: 95% !important;
+        width: 95% !important;
+        height: 85vh !important;
+    }
+    .info-grid {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 10px !important;
+    }
+    .modal-footer {
+        flex-direction: row !important;
+        flex-wrap: wrap !important;
+        gap: 8px !important;
+    }
+    .footer-actions {
+        flex-wrap: wrap !important;
+    }
+}

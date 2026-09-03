@@ -1899,6 +1899,27 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
+        // Verifica se está em notebook e colapsa a sidebar
+function checkAndCollapseSidebar() {
+    const width = window.innerWidth;
+    if (width >= 769 && width <= 1366) {
+        sidebar.classList.add('collapsed');
+        // Atualiza o ícone do botão toggle se necessário
+        const toggleBtn = document.getElementById('sidebar-toggle');
+        if (toggleBtn) {
+            toggleBtn.innerHTML = '<i class="fas fa-bars"></i>'; // ou outro ícone
+        }
+    }
+}
+
+// Chama no carregamento e no resize
+checkAndCollapseSidebar();
+window.addEventListener('resize', function() {
+    // Se a largura sair da faixa, podemos remover a classe collapsed? Melhor manter a decisão do usuário.
+    // Mas para simplificar, só aplicamos se estiver na faixa e a sidebar não tiver sido expandida manualmente?
+    // Talvez seja melhor não forçar no resize para não atrapalhar.
+});
+
         // ===== EVENTOS =====
         btnSearch.addEventListener('click', function() {
             currentPage = 1;
