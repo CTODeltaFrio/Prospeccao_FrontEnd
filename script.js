@@ -340,6 +340,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // ===== CARREGAR SEGMENTOS E SEUS VÍNCULOS =====
         async function carregarSegmentos() {
+            // Se já tem dados em cache, apenas atualiza o filtro e renderiza
+            if (segmentData.length > 0) {
+                updateSegmentFilter();
+                renderSegmentTable();
+                return;
+            }
+
             try {
                 const data = await apiGet(`${API_URL}/api/segmentos`);
                 segmentData = data.map(item => ({ id: item.codigo, nome: item.descricao }));
@@ -389,6 +396,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 renderSegmentTable();
             } catch (error) {
                 console.error("Erro ao carregar Segmentos:", error);
+                // Em caso de erro, mantém apenas "Todos"
+                if (filterSegmento) {
+                    filterSegmento.innerHTML = '<option value="">Todos</option>';
+                    refreshCustomSelect(filterSegmento);
+                }
             }
         }
 
@@ -707,17 +719,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        // Nota: A API não possui endpoint DELETE para remover o status.
-        // Para "restaurar", apenas removemos localmente da lista de ignorados.
-        // O CNPJ continuará na tabela de status, mas não será exibido como ignorado.
-        // Se quiser que ele reapareça nas pesquisas, seria necessário remover o registro da tabela,
-        // mas isso não é suportado pela API atual.
         async function removerStatusIgnorado(cnpj) {
-            // Não faz nada na API (não há DELETE), apenas remove localmente.
             console.log(`Restaurando localmente o CNPJ ${cnpj} (não há API para remover status)`);
-            // Opcional: poderia chamar um POST com status 'C' para sobrescrever, mas isso não removeria a exclusão das pesquisas.
-            // Como a documentação diz que a presença do CNPJ na tabela exclui das pesquisas independente do status,
-            // a restauração não fará o CNPJ reaparecer nas pesquisas. Apenas removerá da lista visual de ignorados.
         }
 
         async function carregarIgnorados() {
@@ -732,21 +735,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 const data = await response.json();
                 
                 if (data && data.registros && Array.isArray(data.registros)) {
-                    // A API retorna os dados completos do estabelecimento + status + dataStatus
-                    ignorados = data.registros.map(item => {
-                        // Mapeia para o formato esperado pela tabela
-                        return {
-                            cnpj: item.cnpj,
-                            cnpjFormatado: item.cnpjFormatado,
-                            razaoSocial: item.razaoSocial,
-                            nomeFantasia: item.nomeFantasia,
-                            uf: item.uf,
-                            municipio: item.municipio,
-                            telefone1: item.telefone1,
-                            telefone2: item.telefone2,
-                            email: item.email
-                        };
-                    });
+                    ignorados = data.registros.map(item => ({
+                        cnpj: item.cnpj,
+                        cnpjFormatado: item.cnpjFormatado,
+                        razaoSocial: item.razaoSocial,
+                        nomeFantasia: item.nomeFantasia,
+                        uf: item.uf,
+                        municipio: item.municipio,
+                        telefone1: item.telefone1,
+                        telefone2: item.telefone2,
+                        email: item.email
+                    }));
                 } else {
                     ignorados = [];
                 }
@@ -890,9 +889,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!item) return;
 
             ignorados.splice(index, 1);
-            // Não adiciona de volta à prospecção (pois o status permanece na API e o CNPJ continuará excluído das pesquisas)
-            // Se quiser que ele reapareça, seria necessário remover da tabela de status (não suportado)
-            removerStatusIgnorado(item.cnpj); // apenas log
+            removerStatusIgnorado(item.cnpj);
             renderIgnoradosTable();
             showWarning('Registro removido da lista de ignorados.', 'Restaurado');
         }
@@ -1904,15 +1901,15 @@ document.addEventListener('DOMContentLoaded', function() {
         carregarUFs();
         carregarDDDs();
 
-        (async function carregarDadosSegmentos() {
+        // Carrega segmentos e CNAEs ANTES de mostrar a tela principal
+        (async function carregarDadosIniciais() {
             await carregarCnaesIniciais();
             await carregarSegmentos();
             updateSegmentFilter();
+            showScreen('main');
         })();
 
-        showScreen('main');
-
-        // Carrega os ignorados do backend
+        // Carrega ignorados e municípios em segundo plano
         carregarIgnorados();
 
         carregarMunicipiosDaAPI().then(municipios => {
