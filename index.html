@@ -6,6 +6,7 @@
     <title>Prospecção de Empresas e Estabelecimentos</title>
     <link rel="icon" type="image.svg" href="favicon.svg">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="style.css">
     <style>
         /* Oculta paginação e contador quando a tela de segmentos estiver ativa */
@@ -58,6 +59,12 @@
         <div class="menu-item" id="menu-ignorados">
             <div class="menu-icon"><i class="fas fa-trash-alt"></i></div>
             <div class="menu-text"><strong>Ignorados</strong></div>
+        </div>
+
+        <!-- NOVO ITEM MAPA -->
+        <div class="menu-item" id="menu-mapa">
+            <div class="menu-icon"><i class="fas fa-map"></i></div>
+            <div class="menu-text"><strong>Mapa</strong></div>
         </div>
 
         <!-- Botão modo escuro no rodapé -->
@@ -298,6 +305,17 @@
             </div>
         </div>
 
+        <!-- TELA DO MAPA -->
+        <div id="map-screen" style="display: none;">
+            <div class="header">
+                <div>
+                    <h1>Mapa Interativo</h1>
+                    <div class="subtitle">Visualização geográfica dos registros</div>
+                </div>
+            </div>
+            <div id="map" style="width: 100%; height: calc(100vh - 200px); border-radius: 12px; box-shadow: var(--shadow-card);"></div>
+        </div>
+
     </main>
 
     <!-- MODAIS -->
@@ -385,6 +403,7 @@
         </div>
     </div>
 
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

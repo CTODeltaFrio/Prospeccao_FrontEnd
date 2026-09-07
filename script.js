@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log("✅ Página carregada! O JavaScript está rodando.");
 
     // ===== CONFIGURAÇÃO DA API =====
-    const API_URL = 'http://api.deltafrio.com.br:8080';
+    const API_URL = '/api';
 
     try {
         // ===== MODO ESCURO =====
@@ -33,6 +33,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const mainScreen = document.getElementById('main-screen');
         const segmentScreen = document.getElementById('segment-screen');
         const ignoradosScreen = document.getElementById('ignorados-screen');
+        const mapScreen = document.getElementById('map-screen'); // NOVO
 
         const tbody = document.getElementById('table-body');
         const pageIndicator = document.getElementById('page-indicator');
@@ -149,11 +150,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 mainScreen.style.display = 'block';
                 segmentScreen.style.display = 'none';
                 ignoradosScreen.style.display = 'none';
+                mapScreen.style.display = 'none';
                 setActiveMenuItem('menu-dashboard');
             } else if (screen === 'segment') {
                 mainScreen.style.display = 'none';
                 segmentScreen.style.display = 'block';
                 ignoradosScreen.style.display = 'none';
+                mapScreen.style.display = 'none';
                 setActiveMenuItem('menu-segmentos');
                 resetSegmentForm();
                 renderSegmentTable();
@@ -162,12 +165,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 mainScreen.style.display = 'none';
                 segmentScreen.style.display = 'none';
                 ignoradosScreen.style.display = 'block';
+                mapScreen.style.display = 'none';
                 setActiveMenuItem('menu-ignorados');
                 // Carrega ignorados se ainda não carregou
                 if (!ignoradosCarregados) {
                     carregarIgnorados();
                 } else {
                     renderIgnoradosTable();
+                }
+            } else if (screen === 'mapa') {
+                mainScreen.style.display = 'none';
+                segmentScreen.style.display = 'none';
+                ignoradosScreen.style.display = 'none';
+                mapScreen.style.display = 'block';
+                setActiveMenuItem('menu-mapa');
+                // Inicializar mapa se ainda não foi inicializado
+                if (!window.mapInstance) {
+                    initMap();
+                } else {
+                    // Forçar redimensionamento se necessário
+                    setTimeout(() => {
+                        window.mapInstance.invalidateSize();
+                    }, 100);
                 }
             }
         }
@@ -270,7 +289,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // ===== CARREGAR DADOS AUXILIARES =====
         async function carregarUFs() {
             try {
-                const data = await apiGet(`${API_URL}/api/ufs`);
+                const data = await apiGet(`${API_URL}/ufs`);
                 ufData = data.map(item => ({ sigla: item.uf, nome: item.nome, full: item.ufNome || `${item.uf} - ${item.nome}` }));
                 filterUf.innerHTML = '<option value="">Todos</option>' + ufData.map(uf => `<option value="${uf.sigla}">${uf.sigla}</option>`).join('');
                 refreshCustomSelect(filterUf);
@@ -282,7 +301,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // ===== CARREGAR DDDs =====
         async function carregarDDDs() {
             try {
-                const data = await apiGet(`${API_URL}/api/ddds`);
+                const data = await apiGet(`${API_URL}/ddds`);
                 const selectDDD = document.getElementById('filter-ddd');
                 
                 selectDDD.innerHTML = '<option value="">Todos</option>';
@@ -320,7 +339,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             try {
                 const lista = await fetchFromAPI([
-                    `${API_URL}/api/cnaes?filtro=${encodeURIComponent(codigoNormalizado)}`
+                    `${API_URL}/cnaes?filtro=${encodeURIComponent(codigoNormalizado)}`
                 ]);
 
                 if (Array.isArray(lista)) {
@@ -356,7 +375,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             try {
-                const data = await apiGet(`${API_URL}/api/segmentos`);
+                const data = await apiGet(`${API_URL}/segmentos`);
                 segmentData = data.map(item => ({ id: item.codigo, nome: item.descricao }));
 
                 segmentoCnaeLinks = [];
@@ -364,7 +383,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 for (const seg of segmentData) {
                     try {
-                        const cnaesVinculados = await apiGet(`${API_URL}/api/segmentos/${seg.id}/cnaes`);
+                        const cnaesVinculados = await apiGet(`${API_URL}/segmentos/${seg.id}/cnaes`);
                         
                         cnaesVinculados.forEach(cnae => {
                             const exists = segmentoCnaeLinks.some(link => 
@@ -414,8 +433,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // ===== BUSCAR CNAES (CONSULTA DIRETA NA API) =====
         async function buscarCnaes(filtro) {
             const urls = [
-                `${API_URL}/api/cnaes?filtro=${encodeURIComponent(filtro)}`,
-                `http://localhost:8080/api/cnaes?filtro=${encodeURIComponent(filtro)}`
+                `${API_URL}/cnaes?filtro=${encodeURIComponent(filtro)}`,
+                `http://localhost:8080/cnaes?filtro=${encodeURIComponent(filtro)}`
             ];
             
             const data = await fetchFromAPI(urls);
@@ -451,7 +470,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // ===== CARREGAR CNAEs INICIAIS =====
         async function carregarCnaesIniciais() {
             try {
-                const data = await fetchFromAPI([`${API_URL}/api/cnaes`]);
+                const data = await fetchFromAPI([`${API_URL}/cnaes`]);
                 if (data) {
                     allCnaesCache = data.map(item => ({
                         codigo: item.codigo || item.cnae || item.id,
@@ -483,11 +502,11 @@ document.addEventListener('DOMContentLoaded', function() {
             municipiosCarregando = true;
 
             try {
-                const dddData = await apiGet(`${API_URL}/api/ddds`);
+                const dddData = await apiGet(`${API_URL}/ddds`);
 
                 const promises = dddData.map(async (ddd) => {
                     try {
-                        const municipios = await apiGet(`${API_URL}/api/ddds/${ddd.ddd}/municipios`);
+                        const municipios = await apiGet(`${API_URL}/ddds/${ddd.ddd}/municipios`);
                         return municipios.map(m => `${m.municipio} - ${ddd.ddd}`);
                     } catch (e) {
                         return [];
@@ -512,7 +531,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // ===== CARREGAR SITUAÇÕES CADASTRAIS =====
         async function carregarSituacoesCadastrais() {
             try {
-                const data = await apiGet(`${API_URL}/api/situacoes-cadastrais`);
+                const data = await apiGet(`${API_URL}/situacoes-cadastrais`);
                 return data.map(item => `${item.codigoDescricao}`);
             } catch (error) {
                 return ['ATIVA', 'BAIXADA', 'SUSPENSA'];
@@ -709,7 +728,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // ===== PERSISTÊNCIA DOS IGNORADOS (API) =====
         async function salvarStatusIgnorado(cnpj) {
             try {
-                const response = await fetch(`${API_URL}/api/prospeccao/status-estabelecimentos`, {
+                const response = await fetch(`${API_URL}/prospeccao/status-estabelecimentos`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                     body: JSON.stringify({ 
@@ -733,7 +752,7 @@ document.addEventListener('DOMContentLoaded', function() {
         async function carregarIgnorados() {
             if (ignoradosCarregados) return;
             try {
-                const response = await fetch(`${API_URL}/api/prospeccao/status-estabelecimentos?status=X`, {
+                const response = await fetch(`${API_URL}/prospeccao/status-estabelecimentos?status=X`, {
                     headers: { 'Accept': 'application/json' }
                 });
                 if (!response.ok) {
@@ -994,7 +1013,7 @@ document.addEventListener('DOMContentLoaded', function() {
             pesquisaController = new AbortController();
 
             try {
-                const response = await fetch(`${API_URL}/api/prospeccao/pesquisar`, {
+                const response = await fetch(`${API_URL}/prospeccao/pesquisar`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                     body: JSON.stringify(body),
@@ -1355,11 +1374,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 let segId = editingSegmentId;
 
                 if (editingSegmentId !== null) {
-                    await apiPut(`${API_URL}/api/segmentos/${editingSegmentId}`, { descricao: nome });
+                    await apiPut(`${API_URL}/segmentos/${editingSegmentId}`, { descricao: nome });
                     const seg = segmentData.find(s => s.id === editingSegmentId);
                     if (seg) seg.nome = nome;
                 } else {
-                    const novo = await apiPost(`${API_URL}/api/segmentos`, { descricao: nome });
+                    const novo = await apiPost(`${API_URL}/segmentos`, { descricao: nome });
                     segId = novo.codigo;
                     segmentData.push({ id: segId, nome });
                 }
@@ -1371,7 +1390,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     for (const cnae of cnaesOriginais) {
                         if (!cnaesAtuais.includes(cnae)) {
                             try {
-                                await apiDelete(`${API_URL}/api/segmentos/${segId}/cnaes/${cnae}`);
+                                await apiDelete(`${API_URL}/segmentos/${segId}/cnaes/${cnae}`);
                             } catch (e) {
                                 console.warn(`Erro ao desvincular CNAE ${cnae}:`, e);
                             }
@@ -1381,7 +1400,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     for (const cnae of currentLinkedCnaes) {
                         if (cnaesOriginais.includes(cnae.codigo)) continue;
                         try {
-                            await apiPost(`${API_URL}/api/segmentos/${segId}/cnaes`, { cnae: cnae.codigo });
+                            await apiPost(`${API_URL}/segmentos/${segId}/cnaes`, { cnae: cnae.codigo });
                         } catch (e) {
                             if (e.message !== 'HTTP 409') console.warn(`Erro ao vincular CNAE ${cnae.codigo}:`, e);
                         }
@@ -1425,7 +1444,7 @@ document.addEventListener('DOMContentLoaded', function() {
             segmentFormCard.classList.add('editing-mode');
 
             try {
-                const cnaesVinculados = await apiGet(`${API_URL}/api/segmentos/${id}/cnaes`);
+                const cnaesVinculados = await apiGet(`${API_URL}/segmentos/${id}/cnaes`);
                 
                 const cnaesCompletos = [];
                 for (const cnae of cnaesVinculados) {
@@ -1464,7 +1483,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             showConfirm('Excluir Segmento', `Tem certeza que deseja excluir o segmento "${seg.nome}"?`, async function() {
                 try {
-                    await apiDelete(`${API_URL}/api/segmentos/${id}`);
+                    await apiDelete(`${API_URL}/segmentos/${id}`);
                     segmentData = segmentData.filter(s => s.id !== id);
                     segmentoCnaeLinks = segmentoCnaeLinks.filter(link => link.segmentoId !== id);
                     renderSegmentTable(segmentSearch.value);
@@ -1852,6 +1871,11 @@ document.addEventListener('DOMContentLoaded', function() {
             showScreen('ignorados');
         });
 
+        // ===== NOVO: EVENTO DO MENU MAPA =====
+        document.getElementById('menu-mapa').addEventListener('click', function() {
+            showScreen('mapa');
+        });
+
         // ===== FILTRO DE IGNORADOS =====
         if (ignoradosSearch) {
             ignoradosSearch.addEventListener('input', function() {
@@ -1900,25 +1924,25 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // Verifica se está em notebook e colapsa a sidebar
-function checkAndCollapseSidebar() {
-    const width = window.innerWidth;
-    if (width >= 769 && width <= 1366) {
-        sidebar.classList.add('collapsed');
-        // Atualiza o ícone do botão toggle se necessário
-        const toggleBtn = document.getElementById('sidebar-toggle');
-        if (toggleBtn) {
-            toggleBtn.innerHTML = '<i class="fas fa-bars"></i>'; // ou outro ícone
+        function checkAndCollapseSidebar() {
+            const width = window.innerWidth;
+            if (width >= 769 && width <= 1366) {
+                sidebar.classList.add('collapsed');
+                // Atualiza o ícone do botão toggle se necessário
+                const toggleBtn = document.getElementById('sidebar-toggle');
+                if (toggleBtn) {
+                    toggleBtn.innerHTML = '<i class="fas fa-bars"></i>'; // ou outro ícone
+                }
+            }
         }
-    }
-}
 
-// Chama no carregamento e no resize
-checkAndCollapseSidebar();
-window.addEventListener('resize', function() {
-    // Se a largura sair da faixa, podemos remover a classe collapsed? Melhor manter a decisão do usuário.
-    // Mas para simplificar, só aplicamos se estiver na faixa e a sidebar não tiver sido expandida manualmente?
-    // Talvez seja melhor não forçar no resize para não atrapalhar.
-});
+        // Chama no carregamento e no resize
+        checkAndCollapseSidebar();
+        window.addEventListener('resize', function() {
+            // Se a largura sair da faixa, podemos remover a classe collapsed? Melhor manter a decisão do usuário.
+            // Mas para simplificar, só aplicamos se estiver na faixa e a sidebar não tiver sido expandida manualmente?
+            // Talvez seja melhor não forçar no resize para não atrapalhar.
+        });
 
         // ===== EVENTOS =====
         btnSearch.addEventListener('click', function() {
@@ -1978,6 +2002,24 @@ window.addEventListener('resize', function() {
         carregarMunicipiosDaAPI().then(municipios => {
             console.log("Municípios pré-carregados com sucesso!");
         });
+
+        // ===== INICIALIZAÇÃO DO MAPA (FUNÇÃO) =====
+        function initMap() {
+            const mapContainer = document.getElementById('map');
+            if (!mapContainer) return;
+
+            // Cria o mapa centralizado no Brasil
+            const map = L.map('map').setView([-14.2350, -51.9253], 4);
+
+            // Adiciona camada de tiles (OpenStreetMap)
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+
+            // Guardar instância para futuras manipulações
+            window.mapInstance = map;
+        }
 
     } catch (error) {
         console.error('❌ Erro durante a inicialização:', error);

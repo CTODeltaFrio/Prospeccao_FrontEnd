@@ -2893,3 +2893,24 @@ body.dark-mode .btn-register:hover {
         flex-wrap: wrap !important;
     }
 }
+
+/* ===== TELA DO MAPA ===== */
+#map-screen .header {
+    margin-bottom: 20px;
+}
+
+#map-screen #map {
+    width: 100%;
+    height: calc(100vh - 200px);
+    border-radius: 12px;
+    box-shadow: var(--shadow-card);
+    border: 1px solid var(--border-color);
+    z-index: 1; /* Garante que o mapa fique abaixo de modais */
+}
+
+/* Ajuste responsivo do mapa em telas menores */
+@media (max-width: 768px) {
+    #map-screen #map {
+        height: calc(100vh - 180px);
+    }
+}
