@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Prospecção de Empresas e Estabelecimentos</title>
+    <title>Prospec&ccedil;&atilde;o de Empresas e Estabelecimentos</title>
     <link rel="icon" type="image.svg" href="favicon.svg">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style-vendedores.css">
     <style>
-        /* Oculta paginação e contador quando a tela de segmentos estiver ativa */
         #segment-screen:not([style*="display: none"]) ~ .main .table-footer,
         #segment-screen:not([style*="display: none"]) ~ .main .pagination,
         #segment-screen:not([style*="display: none"]) ~ .main .page-indicator,
@@ -20,7 +20,6 @@
 </head>
 <body>
 
-    <!-- SIDEBAR -->
     <aside class="sidebar" id="sidebar">
         <button class="sidebar-toggle" id="sidebar-toggle">
             <i class="fas fa-bars"></i>
@@ -29,8 +28,8 @@
         <div class="menu-item active" id="menu-dashboard">
             <div class="menu-icon"><i class="fas fa-search"></i></div>
             <div class="menu-text">
-                <strong>Prospecção</strong>
-                <small>Visão geral</small>
+                <strong>Prospec&ccedil;&atilde;o</strong>
+                <small>Vis&atilde;o geral</small>
             </div>
         </div>
 
@@ -43,12 +42,12 @@
 
         <div class="menu-item" id="menu-municipios">
             <div class="menu-icon"><i class="fas fa-map-marker-alt"></i></div>
-            <div class="menu-text"><strong>Municípios</strong></div>
+            <div class="menu-text"><strong>Munic&iacute;pios</strong></div>
         </div>
 
         <div class="menu-item" id="menu-natureza">
             <div class="menu-icon"><i class="fas fa-balance-scale"></i></div>
-            <div class="menu-text"><strong>Natureza Jurídica</strong></div>
+            <div class="menu-text"><strong>Natureza Jur&iacute;dica</strong></div>
         </div>
 
         <div class="menu-item" id="menu-segmentos">
@@ -61,41 +60,49 @@
             <div class="menu-text"><strong>Ignorados</strong></div>
         </div>
 
-        <!-- NOVO ITEM MAPA -->
+        <div class="menu-title">GEST&Atilde;O</div>
+
+        <div class="menu-item" id="menu-vendedores">
+            <div class="menu-icon"><i class="fas fa-user-tie"></i></div>
+            <div class="menu-text"><strong>Vendedores</strong></div>
+        </div>
+
         <div class="menu-item" id="menu-mapa">
             <div class="menu-icon"><i class="fas fa-map"></i></div>
             <div class="menu-text"><strong>Mapa</strong></div>
         </div>
 
-        <!-- Botão modo escuro no rodapé -->
         <div class="sidebar-footer">
-            <button class="dark-mode-toggle" id="btn-dark-mode" title="Alternar tema">
-                <i class="fas fa-moon"></i>
-            </button>
+            <div class="competencia" title="Compet&ecirc;ncia">
+                <div class="competencia-left">
+                    <div class="calendar"><i class="fas fa-calendar-alt"></i></div>
+                    <div class="competencia-text">
+                        <strong>Compet&ecirc;ncia</strong>
+                        <span>08/2026</span>
+                    </div>
+                </div>
+            </div>
         </div>
     </aside>
 
-    <!-- CONTEÚDO PRINCIPAL -->
     <main class="main">
 
-        <!-- TELA PRINCIPAL (PROSPECÇÃO) -->
         <div id="main-screen">
             <header class="header">
                 <div>
-                    <h1>Prospecção de Empresas e Estabelecimentos</h1>
+                    <h1>Prospec&ccedil;&atilde;o de Empresas e Estabelecimentos</h1>
                     <div class="subtitle">
                         <span class="status-dot"></span>
-                        Base RFB CNPJ • Dados atualizados em 09/08/2026 16:34
+                        Base RFB CNPJ &bull; Dados atualizados em 09/08/2026 16:34
                     </div>
                 </div>
-                <div class="competencia">
-                    <div class="competencia-left">
-                        <div class="calendar"><i class="fas fa-calendar-alt"></i></div>
-                        <div>
-                            <strong>Competência</strong>
-                            <span>2026-08</span>
-                        </div>
-                    </div>
+                <div class="header-right">
+                    <button class="dark-mode-toggle" id="btn-dark-mode" title="Alternar tema">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                    <button class="logout-toggle" id="btn-logout" title="Sair">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
                 </div>
             </header>
 
@@ -110,7 +117,7 @@
                 </div>
                 <div class="card">
                     <div class="card-icon purple"><i class="fas fa-users"></i></div>
-                    <div class="card-info"><label>Sócios</label><strong>27.992.378</strong></div>
+                    <div class="card-info"><label>S&oacute;cios</label><strong>27.992.378</strong></div>
                 </div>
                 <div class="card">
                     <div class="card-icon orange"><i class="fas fa-sack-dollar"></i></div>
@@ -139,7 +146,7 @@
                         </select>
                     </div>
                     <div class="field" id="campo-municipio" style="display: none;">
-                        <label>Município (do DDD selecionado)</label>
+                        <label>Munic&iacute;pio (do DDD selecionado)</label>
                         <select id="filter-municipio" class="input">
                             <option value="">Todos</option>
                         </select>
@@ -154,7 +161,7 @@
                         </select>
                     </div>
                     <div class="field" style="flex: 1.5;">
-                        <label>Buscar CNAE (código ou descrição)</label>
+                        <label>Buscar CNAE (c&oacute;digo ou descri&ccedil;&atilde;o)</label>
                         <div class="search-wrapper">
                             <input id="filter-cnae" class="input" type="text" placeholder="Digite ex: 1012103 ou frutas..." autocomplete="off">
                             <span class="search-icon"><i class="fas fa-search"></i></span>
@@ -165,7 +172,7 @@
                         <label>Escopo do CNAE</label>
                         <select id="filter-tipo-cnae" class="input">
                             <option value="PRINCIPAL" selected>Somente Principal</option>
-                            <option value="PRINCIPAL_E_SECUNDARIO">Principal e Secundário</option>
+                            <option value="PRINCIPAL_E_SECUNDARIO">Principal e Secund&aacute;rio</option>
                         </select>
                     </div>
                     <button class="search-btn" id="btn-search"><i class="fas fa-search"></i> &nbsp; Pesquisar</button>
@@ -180,13 +187,13 @@
                     <table>
                         <thead>
                             <tr>
-                                <th>CNPJ ↓</th>
+                                <th>CNPJ &darr;</th>
                                 <th>Nome Fantasia</th>
-                                <th>Razão Social</th>
-                                <th>Situação</th>
+                                <th>Raz&atilde;o Social</th>
+                                <th>Situa&ccedil;&atilde;o</th>
                                 <th>UF</th>
                                 <th>Telefone</th>
-                                <th>Ações</th>
+                                <th>A&ccedil;&otilde;es</th>
                             </tr>
                         </thead>
                         <tbody id="table-body"></tbody>
@@ -194,18 +201,16 @@
                 </div>
             </section>
 
-            <!-- RODAPÉ DA TABELA - FORA DA SECTION .results -->
             <div class="table-footer">
                 <div class="showing" id="records-footer">Exibindo 0 registros</div>
                 <div class="pagination">
                     <button class="page-btn" id="btn-prev"><i class="fas fa-chevron-left"></i></button>
-                    <span class="page-indicator" id="page-indicator">Página 1</span>
+                    <span class="page-indicator" id="page-indicator">P&aacute;gina 1</span>
                     <button class="page-btn" id="btn-next"><i class="fas fa-chevron-right"></i></button>
                 </div>
             </div>
         </div>
 
-        <!-- TELA DE SEGMENTOS -->
         <div id="segment-screen" style="display: none;">
             <div class="container">
                 <div class="header">
@@ -255,7 +260,7 @@
                                 <tr>
                                     <th>Nome</th>
                                     <th>Qtd. CNAEs</th>
-                                    <th style="text-align: center;">Ações</th>
+                                    <th style="text-align: center;">A&ccedil;&otilde;es</th>
                                 </tr>
                             </thead>
                             <tbody id="segment-table-body"></tbody>
@@ -265,7 +270,6 @@
             </div>
         </div>
 
-        <!-- TELA DE IGNORADOS -->
         <div id="ignorados-screen" style="display: none;">
             <div class="ignorados-header">
                 <div class="header">
@@ -285,13 +289,13 @@
                     <table>
                         <thead>
                             <tr>
-                                <th>CNPJ ↓</th>
+                                <th>CNPJ &darr;</th>
                                 <th>Nome Fantasia</th>
-                                <th>Razão Social</th>
-                                <th>Situação</th>
+                                <th>Raz&atilde;o Social</th>
+                                <th>Situa&ccedil;&atilde;o</th>
                                 <th>UF</th>
                                 <th>Telefone</th>
-                                <th>Ações</th>
+                                <th>A&ccedil;&otilde;es</th>
                             </tr>
                         </thead>
                         <tbody id="ignorados-table-body"></tbody>
@@ -299,32 +303,68 @@
                 </div>
             </section>
 
-            <!-- RODAPÉ FORA DA SECTION (IGUAL À PROSPECÇÃO) -->
             <div class="table-footer" id="ignorados-footer">
                 <div class="showing">Nenhum registro ignorado.</div>
             </div>
         </div>
 
-        <!-- TELA DO MAPA -->
-        <div id="map-screen" style="display: none;">
-            <div class="header">
-                <div>
-                    <h1>Mapa Interativo</h1>
-                    <div class="subtitle">Visualização geográfica dos registros</div>
+        <!-- ============ TELA VENDEDORES ============ -->
+        <div id="vendedores-screen" style="display: none;">
+            <div class="container">
+                <div class="header">
+                    <div>
+                        <h1>Gerenciar vendedores</h1>
+                        <div class="subtitle">Cadastre vendedores e vincule &agrave;s empresas</div>
+                    </div>
+                    <button class="btn-primary" onclick="novoVendedor()">
+                        <i class="fas fa-plus"></i> &nbsp; Novo vendedor
+                    </button>
+                </div>
+
+                <div class="card-segmento">
+                    <div class="table-header">
+                        <h2>Vendedores cadastrados</h2>
+                        <input type="text" class="table-search" placeholder="Buscar por nome, e-mail..." id="vendedor-search">
+                    </div>
+                    <div class="table-responsive">
+                        <table id="vendedoresTable">
+                            <thead>
+                                <tr>
+                                    <th></th>
+                                    <th>Nome</th>
+                                    <th>E-mail</th>
+                                    <th>Telefone</th>
+                                    <th>Regi&atilde;o</th>
+                                    <th style="text-align:center;">Empresas</th>
+                                    <th style="text-align:center;">Status</th>
+                                    <th style="text-align:center;">A&ccedil;&otilde;es</th>
+                                </tr>
+                            </thead>
+                            <tbody id="vendedor-table-body"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
-            <div id="map" style="width: 100%; height: calc(100vh - 200px); border-radius: 12px; box-shadow: var(--shadow-card);"></div>
+        </div>
+
+        <!-- ============ TELA MAPA ============ -->
+        <div id="map-screen" style="display: none;">
+            <div class="map-wrapper">
+                <div id="map" style="width: 100%; height: 100%;"></div>
+                <div class="vendedores-stats" id="vendedores-stats">
+                    <!-- Preenchido via JS -->
+                </div>
+            </div>
         </div>
 
     </main>
 
-    <!-- MODAIS -->
     <div id="details-modal" class="modal-overlay">
         <div class="modal-content large-modal">
             <span class="close-modal" id="close-details-modal">&times;</span>
             <div class="modal-header">
                 <h2>Detalhes do Estabelecimento</h2>
-                <p>Informações cadastrais e comerciais do estabelecimento</p>
+                <p>Informa&ccedil;&otilde;es cadastrais e comerciais do estabelecimento</p>
             </div>
             <div class="modal-scroll-area">
                 <div class="principal-card">
@@ -339,24 +379,24 @@
                 <div class="info-grid">
                     <div class="info-card">
                         <h4>Dados da Empresa</h4>
-                        <div class="info-line"><span>Natureza Jurídica</span><strong id="det-natureza"></strong></div>
+                        <div class="info-line"><span>Natureza Jur&iacute;dica</span><strong id="det-natureza"></strong></div>
                         <div class="info-line"><span>Porte</span><strong id="det-porte"></strong></div>
                         <div class="info-line"><span>Capital Social</span><strong id="det-capital"></strong></div>
                     </div>
                     <div class="info-card">
                         <h4>Estabelecimento</h4>
-                        <div class="info-line"><span>Início da Atividade</span><strong id="det-inicio"></strong></div>
-                        <div class="info-line"><span>Data da Situação Cadastral</span><strong id="det-data-sit"></strong></div>
+                        <div class="info-line"><span>In&iacute;cio da Atividade</span><strong id="det-inicio"></strong></div>
+                        <div class="info-line"><span>Data da Situa&ccedil;&atilde;o Cadastral</span><strong id="det-data-sit"></strong></div>
                         <div class="info-line"><span>CNAE Principal</span><strong id="det-cnae"></strong></div>
                     </div>
                     <div class="info-card full-width">
-                        <h4>Endereço</h4>
+                        <h4>Endere&ccedil;o</h4>
                         <div class="info-line"><span>Logradouro</span><strong id="det-logradouro"></strong></div>
-                        <div class="info-line"><span>Número</span><strong id="det-numero"></strong></div>
+                        <div class="info-line"><span>N&uacute;mero</span><strong id="det-numero"></strong></div>
                         <div class="info-line"><span>Complemento</span><strong id="det-complemento"></strong></div>
                         <div class="info-line"><span>Bairro</span><strong id="det-bairro"></strong></div>
                         <div class="info-line"><span>CEP</span><strong id="det-cep"></strong></div>
-                        <div class="info-line"><span>Município / UF</span><strong id="det-municipio"></strong></div>
+                        <div class="info-line"><span>Munic&iacute;pio / UF</span><strong id="det-municipio"></strong></div>
                     </div>
                     <div class="info-card full-width">
                         <h4>Contatos</h4>
@@ -393,7 +433,7 @@
         <div class="modal-content confirm-content">
             <span class="close-modal" id="close-confirm-modal">&times;</span>
             <div class="confirm-icon"><i class="fas fa-exclamation-triangle"></i></div>
-            <h3 id="confirm-title">Confirmação</h3>
+            <h3 id="confirm-title">Confirma&ccedil;&atilde;o</h3>
             <p id="confirm-message">Tem certeza que deseja continuar?</p>
             <div class="confirm-actions">
                 <button class="btn-secondary" id="btn-confirm-cancel">Cancelar</button>
@@ -403,7 +443,87 @@
         </div>
     </div>
 
+    <!-- ============ MODAL VENDEDOR ============ -->
+    <div id="vendedor-modal" class="modal-overlay">
+        <div class="modal-content form-modal">
+            <span class="close-modal" id="close-vendedor-modal">&times;</span>
+            <div class="modal-header">
+                <h2 id="vendedor-modal-title">Cadastro de vendedor</h2>
+                <p>Preencha os dados do vendedor e vincule as cidades / DDDs atendidos</p>
+            </div>
+            <form id="vendedorForm" class="modal-scroll-area">
+                <div class="form-row">
+                    <div class="form-group" style="flex:2;">
+                        <label for="vend-nome">Nome *</label>
+                        <input type="text" id="vend-nome" placeholder="Nome completo" autocomplete="off">
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label for="vend-cor">Cor</label>
+                        <input type="color" id="vend-cor" value="#2463eb" style="height:42px;padding:4px;cursor:pointer;">
+                    </div>
+                </div>
+
+                <!-- Usuário do sistema (login) -->
+                <div class="form-group">
+                    <label for="vend-usuario-search">Usuário do sistema (login) *</label>
+                    <div class="cidade-search-wrapper" id="vend-usuario-wrapper">
+                        <input type="text" id="vend-usuario-search" class="input" placeholder="Buscar usuário por nome, e-mail ou CPF..." autocomplete="off">
+                        <span class="search-icon"><i class="fas fa-user-check"></i></span>
+                        <div id="vend-usuario-suggestions" class="autocomplete-list"></div>
+                    </div>
+                    <div id="vend-usuario-selected" class="usuario-selected-card" style="display:none;">
+                        <div class="usuario-selected-avatar" id="vend-usuario-avatar">--</div>
+                        <div class="usuario-selected-info">
+                            <strong id="vend-usuario-nome">--</strong>
+                            <small id="vend-usuario-email">--</small>
+                        </div>
+                        <button type="button" id="vend-usuario-remove" class="usuario-selected-remove" title="Remover vínculo">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- DDDs vinculados -->
+                <div class="form-group">
+                    <label>DDDs vinculados</label>
+                    <div class="cidade-search-wrapper">
+                        <input type="text" id="vend-ddd-search" class="input" placeholder="Digite o DDD (ex: 51, 54)..." autocomplete="off" maxlength="3" inputmode="numeric">
+                        <span class="search-icon"><i class="fas fa-search"></i></span>
+                        <div id="vend-ddd-suggestions" class="autocomplete-list"></div>
+                    </div>
+                    <div class="helper-text" style="margin-top:6px;font-size:12px;">
+                        <i class="fas fa-info-circle"></i> Digite o DDD e pressione <strong>Enter</strong> (ou selecione na lista).
+                    </div>
+                    <div id="vend-ddds-list" class="cidades-list">
+                        <span class="cidades-empty">Nenhum DDD vinculado ainda.</span>
+                    </div>
+                </div>
+
+                <!-- Cidades vinculadas -->
+                <div class="form-group">
+                    <label>Cidades vinculadas</label>
+                    <div class="cidade-search-wrapper">
+                        <input type="text" id="vend-cidade-search" class="input" placeholder="Digite para buscar uma cidade (ex: Porto Alegre)..." autocomplete="off">
+                        <span class="search-icon"><i class="fas fa-search"></i></span>
+                        <div id="vend-cidade-suggestions" class="autocomplete-list"></div>
+                    </div>
+                    <div class="helper-text" style="margin-top:6px;font-size:12px;">
+                        <i class="fas fa-info-circle"></i> Digite ao menos 2 letras e selecione as cidades atendidas.
+                    </div>
+                    <div id="vend-cidades-list" class="cidades-list">
+                        <span class="cidades-empty">Nenhuma cidade vinculada ainda.</span>
+                    </div>
+                </div>
+            </form>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" id="btn-cancel-vendedor">Cancelar</button>
+                <button type="submit" form="vendedorForm" class="btn-primary" id="btn-save-vendedor">Salvar vendedor</button>
+            </div>
+        </div>
+    </div>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="script.js"></script>
+    <script src="script.js" charset="UTF-8"></script>
+    <script src="vendedores.js" charset="UTF-8"></script>
 </body>
 </html>
