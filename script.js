@@ -1,27 +1,67 @@
 document.addEventListener('DOMContentLoaded', async function() {
-    console.log("P\u00e1gina carregada! O JavaScript est\u00e1 rodando.");
+    console.log("Página carregada! O JavaScript está rodando.");
 
     const API_URL = '/api';
+    const API_MAPAS = '/api/mapas';
 
     // ============================================================
-    // ===== CONFIGURA\u00c7\u00c3O DOS VENDEDORES (POR C\u00d3DIGO IBGE) =====
+    // CACHE EM localStorage (com TTL)
+    // ============================================================
+    const CACHE = {
+        UFS:       { key: 'deltafrio_ufs_v2',        ttl: 24 * 60 * 60 * 1000 },
+        DDDS:      { key: 'deltafrio_ddds_v2',       ttl: 24 * 60 * 60 * 1000 },
+        CNAES:     { key: 'deltafrio_cnaes_v4',      ttl: 12 * 60 * 60 * 1000 },
+        SEGMENTOS: { key: 'deltafrio_segmentos_v2',  ttl: 5 * 60 * 1000 },
+        IGNORADOS: { key: 'deltafrio_ignorados_v2',  ttl: 5 * 60 * 1000 },
+        MUNICIPIOS:{ key: 'deltafrio_municipios_v2', ttl: 24 * 60 * 60 * 1000 }
+    };
+
+    function cacheGet(chave) {
+        try {
+            const raw = localStorage.getItem(chave.key);
+            if (!raw) return null;
+            const { ts, dados } = JSON.parse(raw);
+            if (Date.now() - ts > chave.ttl) { localStorage.removeItem(chave.key); return null; }
+            return dados;
+        } catch (e) { return null; }
+    }
+    function cacheSet(chave, dados) {
+        try { localStorage.setItem(chave.key, JSON.stringify({ ts: Date.now(), dados })); }
+        catch (e) { /* silencioso */ }
+    }
+
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    async function executarEmLotesComPausa(itens, limite, pausaMs, fn, onProgress) {
+        let proximo = 0;
+        let concluidos = 0;
+        async function worker() {
+            while (true) {
+                const i = proximo++;
+                if (i >= itens.length) return;
+                try { await fn(itens[i], i); } catch (e) { /* silencioso */ }
+                concluidos++;
+                if (onProgress) onProgress(concluidos, itens.length);
+                await sleep(pausaMs);
+            }
+        }
+        await Promise.all(Array.from({ length: Math.min(limite, itens.length) }, worker));
+    }
+
+    // ============================================================
+    // ===== CONFIGURAÇÃO DOS VENDEDORES =====
     // ============================================================
     const VENDEDORES = [
-        { id: 'v1', nome: 'Vendedor 1', cor: '#2463eb', regiao: 'Regi\u00e3o Metropolitana',
+        { id: 'v1', nome: 'Vendedor 1', cor: '#2463eb', regiao: 'Região Metropolitana',
           cidades: ['4314902', '4304606', '4318705', '4313409', '4309209'] },
-        { id: 'v2', nome: 'Vendedor 2', cor: '#10b981', regiao: 'Serra Ga\u00facha',
+        { id: 'v2', nome: 'Vendedor 2', cor: '#10b981', regiao: 'Serra Gaúcha',
           cidades: ['4305108', '4302105', '4307906', '4308607', '4322509'] },
         { id: 'v3', nome: 'Vendedor 3', cor: '#f59e0b', regiao: 'Sul / Fronteira',
           cidades: ['4314407', '4315602', '4301602', '4316907', '4321204'] }
     ];
 
     function normalizar(str) {
-        return String(str || '')
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .replace(/\s+/g, ' ')
-            .toLowerCase()
-            .trim();
+        return String(str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').toLowerCase().trim();
     }
 
     function getVendedorDaCidade(props) {
@@ -38,17 +78,21 @@ document.addEventListener('DOMContentLoaded', async function() {
         return null;
     }
 
-    // ===== AUTENTICA\u00c7\u00c3O =====
+    // ===== AUTENTICAÇÃO =====
     try {
         const respostaSessao = await fetch(`${API_URL}/sessao`, {
             method: 'GET', credentials: 'include',
             headers: { 'Accept': 'application/json' }
         });
-        if (!respostaSessao.ok) { window.location.href = '/'; return; }
-        await respostaSessao.json();
+        if (respostaSessao.status === 401) {
+            window.location.replace('/index.html');
+            return;
+        }
+        if (respostaSessao.ok) {
+            try { await respostaSessao.json(); } catch (e) {}
+        }
     } catch (erro) {
-        console.error('Erro ao verificar sess\u00e3o:', erro);
-        window.location.href = '/'; return;
+        /* silencioso */
     }
 
     try {
@@ -156,15 +200,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         function saveActiveMenuItem() { const a = document.querySelector('.menu-item.active'); if (a) previousMenuItemId = a.id; }
         function restoreActiveMenuItem() { if (previousMenuItemId) { setActiveMenuItem(previousMenuItemId); previousMenuItemId = null; } }
 
-        // ============================================================
-        // ?? PATCH 1 � Registro de telas externas
-        // ============================================================
         const registeredScreens = {};
         function registerScreen(nome, el) { if (el) registeredScreens[nome] = el; }
 
-        // ============================================================
-        // ?? PATCH 2 � showScreen agora reconhece telas registradas
-        // ============================================================
         function showScreen(screen) {
             [mainScreen, segmentScreen, ignoradosScreen, mapScreen, ...Object.values(registeredScreens)]
                 .forEach(s => { if (s) s.style.display = 'none'; });
@@ -202,13 +240,16 @@ document.addEventListener('DOMContentLoaded', async function() {
                     const csrf = document.cookie.split('; ').find(c => c.startsWith('login_delta_csrf='));
                     const csrfValor = csrf ? decodeURIComponent(csrf.split('=')[1]) : '';
                     await fetch('/api/logout', { method: 'POST', credentials: 'include', headers: csrfValor ? { 'X-CSRF-Token': csrfValor } : {} });
-                } catch (e) { console.warn('Erro no logout:', e); }
+                } catch (e) { /* silencioso */ }
                 window.location.href = 'https://www.sistemas.deltafrio.com.br/central.html';
             });
         }
 
         function normalizarTexto(t) { return t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
 
+        // ============================================================
+        // API
+        // ============================================================
         async function apiGet(url) {
             const r = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -233,31 +274,78 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
         async function fetchFromAPI(urls) {
             for (const url of urls) {
-                try { const r = await fetch(url); if (!r.ok) throw new Error(`HTTP ${r.status}`);
-                    const d = await r.json(); return Array.isArray(d) ? d : (d.data || d.results || []);
-                } catch (e) { console.warn(`Falha em ${url}:`, e); }
+                try {
+                    const r = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
+                    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                    const d = await r.json();
+                    return Array.isArray(d) ? d : (d.data || d.results || []);
+                } catch (e) { /* silencioso */ }
             }
             return null;
         }
 
-        // ===== CARREGAMENTOS =====
+        // ============================================================
+        // CARREGAMENTOS COM CACHE
+        // ============================================================
         async function carregarUFs() {
+            const cache = cacheGet(CACHE.UFS);
+            if (cache) {
+                ufData = cache;
+                filterUf.innerHTML = '<option value="">Todos</option>' + ufData.map(u => `<option value="${u.sigla}">${u.sigla}</option>`).join('');
+                refreshCustomSelect(filterUf);
+                return;
+            }
             try {
                 const data = await apiGet(`${API_URL}/ufs`);
                 ufData = data.map(i => ({ sigla: i.uf, nome: i.nome, full: i.ufNome || `${i.uf} - ${i.nome}` }));
                 filterUf.innerHTML = '<option value="">Todos</option>' + ufData.map(u => `<option value="${u.sigla}">${u.sigla}</option>`).join('');
                 refreshCustomSelect(filterUf);
+                cacheSet(CACHE.UFS, ufData);
             } catch (e) { console.error("Erro UFs:", e); }
         }
+
         async function carregarDDDs() {
+            const cache = cacheGet(CACHE.DDDS);
+            if (cache) {
+                const selectDDD = document.getElementById('filter-ddd');
+                selectDDD.innerHTML = '<option value="">Todos</option>';
+                cache.forEach(i => { const o = document.createElement('option'); o.value = i.ddd; o.textContent = `${i.ddd} - ${i.descricao}`; selectDDD.appendChild(o); });
+                refreshCustomSelect(selectDDD);
+                return;
+            }
             try {
                 const data = await apiGet(`${API_URL}/ddds`);
                 const selectDDD = document.getElementById('filter-ddd');
                 selectDDD.innerHTML = '<option value="">Todos</option>';
                 data.forEach(i => { const o = document.createElement('option'); o.value = i.ddd; o.textContent = `${i.ddd} - ${i.descricao}`; selectDDD.appendChild(o); });
                 refreshCustomSelect(selectDDD);
+                cacheSet(CACHE.DDDS, data.map(i => ({ ddd: i.ddd, descricao: i.descricao })));
             } catch (e) { console.error("Erro DDDs:", e); }
         }
+
+        async function carregarCnaesIniciais() {
+            const cache = cacheGet(CACHE.CNAES);
+            if (cache) {
+                allCnaesCache = cache;
+                cnaeData = allCnaesCache;
+                populateLinkSelect();
+                return;
+            }
+            try {
+                const data = await fetchFromAPI([`${API_URL}/cnaes`]);
+                if (data) {
+                    allCnaesCache = data.map(i => ({
+                        codigo: i.codigo || i.cnae || i.id,
+                        descricao: i.descricao || i.nome || '',
+                        full: i.codigoDescricao || `${i.codigo} - ${i.descricao}`
+                    })).filter(c => c.codigo);
+                    cnaeData = allCnaesCache;
+                    populateLinkSelect();
+                    cacheSet(CACHE.CNAES, allCnaesCache);
+                }
+            } catch (e) { console.error("Erro CNAEs iniciais:", e); allCnaesCache = []; }
+        }
+
         async function buscarDetalhesCnae(codigo) {
             const c = String(codigo).trim();
             const cache = allCnaesCache.find(x => String(x.codigo).trim() === c);
@@ -271,33 +359,73 @@ document.addEventListener('DOMContentLoaded', async function() {
                         allCnaesCache.push(r); return r;
                     }
                 }
-            } catch (e) { console.error(`Erro CNAE ${c}:`, e); }
+            } catch (e) { /* silencioso */ }
             return null;
         }
+
+        // ============================================================
+        // SEGMENTOS
+        // ============================================================
         async function carregarSegmentos() {
             if (segmentData.length > 0) { updateSegmentFilter(); renderSegmentTable(); return; }
+
+            const cache = cacheGet(CACHE.SEGMENTOS);
+            if (cache) {
+                segmentData = cache.segmentData || [];
+                segmentoCnaeLinks = cache.segmentoCnaeLinks || [];
+                updateSegmentFilter(); renderSegmentTable(); populateLinkSelect();
+                console.log(`✅ Segmentos do cache (${segmentData.length} itens, ${segmentoCnaeLinks.length} vínculos)`);
+                return;
+            }
+
             try {
+                console.log('⏳ Carregando lista de segmentos...');
                 const data = await apiGet(`${API_URL}/segmentos`);
                 segmentData = data.map(i => ({ id: i.codigo, nome: i.descricao }));
-                segmentoCnaeLinks = []; const promises = [];
-                for (const seg of segmentData) {
+                segmentoCnaeLinks = [];
+
+                const cnaesVistos = new Set(allCnaesCache.map(x => String(x.codigo).trim()));
+
+                await executarEmLotesComPausa(segmentData, 3, 20, async (seg) => {
                     try {
                         const cnaes = await apiGet(`${API_URL}/segmentos/${seg.id}/cnaes`);
                         cnaes.forEach(c => {
-                            if (!segmentoCnaeLinks.some(l => l.segmentoId === seg.id && l.cnaeCodigo === c.codigo)) segmentoCnaeLinks.push({ segmentoId: seg.id, cnaeCodigo: c.codigo });
+                            if (!segmentoCnaeLinks.some(l => l.segmentoId === seg.id && l.cnaeCodigo === c.codigo)) {
+                                segmentoCnaeLinks.push({ segmentoId: seg.id, cnaeCodigo: c.codigo });
+                            }
                             const cv = String(c.codigo).trim();
-                            if (!allCnaesCache.some(x => String(x.codigo).trim() === cv)) {
-                                promises.push(buscarDetalhesCnae(cv).then(d => { if (d) { if (!allCnaesCache.some(x => String(x.codigo).trim() === String(d.codigo).trim())) allCnaesCache.push(d); populateLinkSelect(); } }));
+                            if (!cnaesVistos.has(cv)) {
+                                cnaesVistos.add(cv);
+                                allCnaesCache.push({
+                                    codigo: cv,
+                                    descricao: c.descricao || '',
+                                    full: c.descricao ? `${cv} - ${c.descricao}` : cv
+                                });
                             }
                         });
-                    } catch (e) { console.warn(`Erro segmento ${seg.id}:`, e); }
+                    } catch (e) { /* silencioso */ }
+                            });
+
+                updateSegmentFilter();
+                renderSegmentTable();
+                populateLinkSelect();
+
+                console.log(`✅ Segmentos carregados (${segmentData.length} itens, ${segmentoCnaeLinks.length} vínculos, ${allCnaesCache.length} CNAEs no cache)`);
+
+                cacheSet(CACHE.SEGMENTOS, { segmentData, segmentoCnaeLinks });
+                cacheSet(CACHE.CNAES, allCnaesCache);
+
+            } catch (e) {
+                console.error("Erro Segmentos:", e);
+                if (filterSegmento) {
+                    filterSegmento.innerHTML = '<option value="">Todos</option>';
+                    refreshCustomSelect(filterSegmento);
                 }
-                await Promise.all(promises); updateSegmentFilter(); renderSegmentTable();
-            } catch (e) { console.error("Erro Segmentos:", e); if (filterSegmento) { filterSegmento.innerHTML = '<option value="">Todos</option>'; refreshCustomSelect(filterSegmento); } }
+            }
         }
+
         async function buscarCnaes(filtro) {
-            const urls = [`${API_URL}/cnaes?filtro=${encodeURIComponent(filtro)}`];
-            const data = await fetchFromAPI(urls);
+            const data = await fetchFromAPI([`${API_URL}/cnaes?filtro=${encodeURIComponent(filtro)}`]);
             if (data) {
                 const r = data.map(i => ({ codigo: i.codigo || i.cnae || i.id, descricao: i.descricao || i.nome || '', full: i.codigoDescricao || `${i.codigo} - ${i.descricao}` })).filter(c => c.codigo);
                 if (filtro) { const nc = r.map(x => x.codigo); allCnaesCache = allCnaesCache.filter(c => !nc.includes(c.codigo)); allCnaesCache.push(...r); }
@@ -308,27 +436,92 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
             return [];
         }
-        async function carregarCnaesIniciais() {
-            try { const data = await fetchFromAPI([`${API_URL}/cnaes`]);
-                if (data) { allCnaesCache = data.map(i => ({ codigo: i.codigo || i.cnae || i.id, descricao: i.descricao || i.nome || '', full: i.codigoDescricao || `${i.codigo} - ${i.descricao}` })).filter(c => c.codigo); cnaeData = allCnaesCache; populateLinkSelect(); }
-            } catch (e) { console.error("Erro CNAEs iniciais:", e); allCnaesCache = []; }
-        }
+
+        // ============================================================
+        // MUNICÍPIOS
+        // ============================================================
         async function carregarMunicipiosDaAPI() {
-            if (municipiosCache) return municipiosCache;
-            if (municipiosCarregando) return null;
+            if (municipiosCache && municipiosCache.length > 0) return municipiosCache;
+
+            const cache = cacheGet(CACHE.MUNICIPIOS);
+            if (cache && cache.length > 0) {
+                municipiosCache = cache;
+                console.log(`✅ Municípios do cache (${cache.length})`);
+                return municipiosCache;
+            }
+
+            if (municipiosCarregando && municipiosPromise) return municipiosPromise;
+
             municipiosCarregando = true;
-            try {
-                const dddData = await apiGet(`${API_URL}/ddds`);
-                const promises = dddData.map(async d => { try { const m = await apiGet(`${API_URL}/ddds/${d.ddd}/municipios`); return m.map(x => `${x.municipio} - ${d.ddd}`); } catch (e) { return []; } });
-                const res = await Promise.all(promises);
-                municipiosCache = [...new Set(res.flat())].sort(); municipiosCarregando = false; return municipiosCache;
-            } catch (e) { console.error("Erro munic\u00edpios:", e); municipiosCarregando = false; return []; }
+            municipiosPromise = (async () => {
+                try {
+                    const dddData = await apiGet(`${API_URL}/ddds`);
+                    const acumulado = [];
+
+                    await executarEmLotesComPausa(dddData, 5, 20, async (d) => {
+                        try {
+                            const m = await apiGet(`${API_URL}/ddds/${d.ddd}/municipios`);
+                            m.forEach(x => acumulado.push(`${x.municipio} - ${d.ddd}`));
+                        } catch (e) { /* silencioso */ }
+                    });
+
+                    if (acumulado.length > 0) {
+                        municipiosCache = [...new Set(acumulado)].sort();
+                        cacheSet(CACHE.MUNICIPIOS, municipiosCache);
+                    }
+                    console.log(`✅ Municípios da API (${acumulado.length})`);
+                    return municipiosCache || [];
+                } catch (e) {
+                    console.error("Erro municípios:", e);
+                    return [];
+                } finally {
+                    municipiosCarregando = false;
+                    municipiosPromise = null;
+                }
+            })();
+
+            return municipiosPromise;
         }
+
         async function carregarSituacoesCadastrais() {
             try { const d = await apiGet(`${API_URL}/situacoes-cadastrais`); return d.map(i => `${i.codigoDescricao}`); }
             catch (e) { return ['ATIVA', 'BAIXADA', 'SUSPENSA']; }
         }
 
+        // ============================================================
+        // IGNORADOS
+        // ============================================================
+        async function carregarIgnorados() {
+            if (ignoradosCarregados) return;
+
+            const cache = cacheGet(CACHE.IGNORADOS);
+            if (cache) {
+                ignorados = cache;
+                ignoradosCarregados = true;
+                ignoradosFiltrados = [...ignorados];
+                renderIgnoradosTable();
+                return;
+            }
+
+            try {
+                const r = await fetch(`${API_URL}/prospeccao/status-estabelecimentos?status=X`, { headers: { 'Accept': 'application/json' } });
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                const d = await r.json();
+                ignorados = d.registros?.map(i => ({ cnpj: i.cnpj, cnpjFormatado: i.cnpjFormatado, razaoSocial: i.razaoSocial, nomeFantasia: i.nomeFantasia, uf: i.uf, municipio: i.municipio, telefone1: i.telefone1, telefone2: i.telefone2, email: i.email })) || [];
+                ignoradosCarregados = true;
+                ignoradosFiltrados = [...ignorados];
+                renderIgnoradosTable();
+                cacheSet(CACHE.IGNORADOS, ignorados);
+            } catch (e) {
+                console.error(e);
+                ignorados = []; ignoradosFiltrados = [];
+                renderIgnoradosTable();
+            }
+        }
+
+        // ============================================================
+        // CUSTOM SELECT
+        // ============================================================
         function initializeCustomSelects() {
             document.querySelectorAll('select.input').forEach(select => {
                 if (select.closest('.custom-select')) return;
@@ -385,18 +578,13 @@ document.addEventListener('DOMContentLoaded', async function() {
             return d ? `(${d}) ${n}` : n;
         }
 
-        async function salvarStatusIgnorado(cnpj) { try { await fetch(`${API_URL}/prospeccao/status-estabelecimentos`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify({ cnpjCompleto: cnpj, status: 'X' }) }); } catch (e) { console.error(e); } }
-        function removerStatusIgnorado(cnpj) { console.log(`Restaurando ${cnpj}`); }
-        async function carregarIgnorados() {
-            if (ignoradosCarregados) return;
+        async function salvarStatusIgnorado(cnpj) {
             try {
-                const r = await fetch(`${API_URL}/prospeccao/status-estabelecimentos?status=X`, { headers: { 'Accept': 'application/json' } });
-                if (!r.ok) throw new Error(`HTTP ${r.status}`);
-                const d = await r.json();
-                ignorados = d.registros?.map(i => ({ cnpj: i.cnpj, cnpjFormatado: i.cnpjFormatado, razaoSocial: i.razaoSocial, nomeFantasia: i.nomeFantasia, uf: i.uf, municipio: i.municipio, telefone1: i.telefone1, telefone2: i.telefone2, email: i.email })) || [];
-                ignoradosCarregados = true; ignoradosFiltrados = [...ignorados]; renderIgnoradosTable();
-            } catch (e) { console.error(e); ignorados = []; ignoradosFiltrados = []; renderIgnoradosTable(); }
+                await fetch(`${API_URL}/prospeccao/status-estabelecimentos`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify({ cnpjCompleto: cnpj, status: 'X' }) });
+                localStorage.removeItem(CACHE.IGNORADOS.key);
+            } catch (e) { /* silencioso */ }
         }
+        function removerStatusIgnorado(cnpj) { localStorage.removeItem(CACHE.IGNORADOS.key); }
         function filtrarIgnorados() {
             const t = ignoradosSearch ? ignoradosSearch.value.toLowerCase().trim() : '';
             ignoradosFiltrados = !t ? [...ignorados] : ignorados.filter(i => (i.cnpj && i.cnpj.includes(t)) || (i.cnpjFormatado && i.cnpjFormatado.includes(t)) || (i.razaoSocial && i.razaoSocial.toLowerCase().includes(t)) || (i.nomeFantasia && i.nomeFantasia.toLowerCase().includes(t)) || (i.uf && i.uf.toLowerCase().includes(t)) || (i.telefone1 && i.telefone1.includes(t)) || (i.municipio && i.municipio.toLowerCase().includes(t)));
@@ -404,10 +592,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
         function renderTable(data) {
             tbody.innerHTML = '';
-            if (!data.length) { tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;">Nenhum resultado encontrado.</td></tr>`; recordsFooter.textContent = 'Nenhum registro'; btnPrev.disabled = true; btnNext.disabled = true; pageIndicator.textContent = 'P\u00e1gina 1'; return; }
+            if (!data.length) { tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;">Nenhum resultado encontrado.</td></tr>`; recordsFooter.textContent = 'Nenhum registro'; btnPrev.disabled = true; btnNext.disabled = true; pageIndicator.textContent = 'Página 1'; return; }
             data.forEach(i => { tbody.innerHTML += `<tr><td>${i.cnpjFormatado}</td><td>${i.nomeFantasia || '-'}</td><td>${i.razaoSocial || '-'}</td><td><span class="status"><span class="status-dot-small"></span> ATIVA</span></td><td>${i.uf || '-'}</td><td>${formatarTelefone(i.ddd, i.telefone1)}</td><td><button class="btn-detail" data-cnpj="${i.cnpj}"><i class="fas fa-info-circle"></i> Detalhes</button></td></tr>`; });
             const lim = 50; const start = (currentPage - 1) * lim + 1; const end = start + data.length - 1;
-            recordsFooter.textContent = `Exibindo ${start} - ${end}`; pageIndicator.textContent = `P\u00e1gina ${currentPage}`;
+            recordsFooter.textContent = `Exibindo ${start} - ${end}`; pageIndicator.textContent = `Página ${currentPage}`;
             btnPrev.disabled = currentPage === 1; btnNext.disabled = !temMais;
             if (!temMais && data.length < lim) btnNext.disabled = true;
             tbody.querySelectorAll('.btn-detail').forEach(b => b.addEventListener('click', function() { openDetailsModal(this.dataset.cnpj, false); }));
@@ -432,7 +620,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             setupCellTooltips();
         }
         function restaurarIgnoradoPorCnpj(cnpj) {
-            const i = ignorados.findIndex(x => x.cnpj === cnpj); if (i === -1) { showWarning('Registro n\u00e3o encontrado.', 'Erro'); return; }
+            const i = ignorados.findIndex(x => x.cnpj === cnpj); if (i === -1) { showWarning('Registro não encontrado.', 'Erro'); return; }
             ignorados.splice(i, 1); ignoradosFiltrados = [...ignorados]; removerStatusIgnorado(cnpj); renderIgnoradosTable(); detailsModal.style.display = 'none'; showWarning('Registro removido da lista de ignorados.', 'Restaurado');
         }
 
@@ -463,7 +651,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             document.getElementById('det-municipio').innerText = c.municipio || '-'; document.getElementById('det-tel1').innerText = formatarTelefone(c.ddd, c.telefone1); document.getElementById('det-tel2').innerText = formatarTelefone(c.ddd, c.telefone2); document.getElementById('det-email').innerText = c.email || '-';
             const btn = document.getElementById('btn-ignore-cadastro');
             if (isIgn) { btn.innerText = 'Restaurar'; btn.className = 'btn-secondary'; btn.onclick = () => restaurarIgnoradoPorCnpj(cnpj); }
-            else { btn.innerText = 'Ignorar Cadastro'; btn.className = 'btn-secondary'; btn.onclick = () => { const co = registros.find(i => i.cnpj === cnpj); if (!co) { showWarning('Registro n\u00e3o encontrado.', 'Erro'); return; } showConfirm('Ignorar Cadastro', `Tem certeza que deseja ignorar "${co.razaoSocial || co.nomeFantasia || 'sem nome'}"?`, function() { const idx = registros.findIndex(i => i.cnpj === cnpj); if (idx !== -1) registros.splice(idx, 1); if (!ignorados.some(i => i.cnpj === cnpj)) { ignorados.push(co); ignoradosFiltrados = [...ignorados]; salvarStatusIgnorado(cnpj); } renderTable(registros); renderIgnoradosTable(); detailsModal.style.display = 'none'; showWarning('Cadastro ignorado!', 'Ignorado'); }); }; }
+            else { btn.innerText = 'Ignorar Cadastro'; btn.className = 'btn-secondary'; btn.onclick = () => { const co = registros.find(i => i.cnpj === cnpj); if (!co) { showWarning('Registro não encontrado.', 'Erro'); return; } showConfirm('Ignorar Cadastro', `Tem certeza que deseja ignorar "${co.razaoSocial || co.nomeFantasia || 'sem nome'}"?`, function() { const idx = registros.findIndex(i => i.cnpj === cnpj); if (idx !== -1) registros.splice(idx, 1); if (!ignorados.some(i => i.cnpj === cnpj)) { ignorados.push(co); ignoradosFiltrados = [...ignorados]; salvarStatusIgnorado(cnpj); } renderTable(registros); renderIgnoradosTable(); detailsModal.style.display = 'none'; showWarning('Cadastro ignorado!', 'Ignorado'); }); }; }
             detailsModal.style.display = 'flex';
         }
 
@@ -473,7 +661,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             segmentTableBody.innerHTML = ''; const term = st.toLowerCase().trim();
             segmentData.filter(s => s.nome.toLowerCase().includes(term)).forEach(seg => {
                 const links = segmentoCnaeLinks.filter(l => l.segmentoId === seg.id); const q = links.length;
-                let tip = ''; if (q > 0) { tip = '<div class="cnae-tooltip-content">'; links.forEach(l => { const c = allCnaesCache.find(x => String(x.codigo).trim() === String(l.cnaeCodigo).trim()); tip += `<div class="tooltip-item"><strong>${c ? c.codigo : l.cnaeCodigo}</strong> - ${c ? c.descricao : 'Descri\u00e7\u00e3o n\u00e3o dispon\u00edvel'}</div>`; }); tip += '</div>'; }
+                let tip = ''; if (q > 0) { tip = '<div class="cnae-tooltip-content">'; links.forEach(l => { const c = allCnaesCache.find(x => String(x.codigo).trim() === String(l.cnaeCodigo).trim()); tip += `<div class="tooltip-item"><strong>${c ? c.codigo : l.cnaeCodigo}</strong> - ${c ? c.descricao : 'Descrição não disponível'}</div>`; }); tip += '</div>'; }
                 const tr = document.createElement('tr'); tr.innerHTML = `<td>${seg.nome}</td><td><div class="cnae-tooltip"><span class="tooltip-trigger">${q}</span>${tip}</div></td><td><div class="cell-actions"><button class="btn-table" data-action="edit" data-id="${seg.id}">Editar</button><button class="btn-table btn-delete" data-action="delete" data-id="${seg.id}">Excluir</button></div></td>`; segmentTableBody.appendChild(tr);
             });
             segmentTableBody.querySelectorAll('button[data-action]').forEach(b => b.addEventListener('click', function() { const id = parseInt(this.dataset.id); if (this.dataset.action === 'edit') editarSegmento(id); else excluirSegmento(id); }));
@@ -502,7 +690,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
         function updateSegmentFilter() { let o = '<option value="">Todos</option>'; segmentData.forEach(s => o += `<option value="${s.id}">${s.nome}</option>`); if (filterSegmento) { filterSegmento.innerHTML = o; refreshCustomSelect(filterSegmento); } }
         function populateLinkSelect() { linkCnaeSelect.innerHTML = '<option value="">Selecione um CNAE...</option>'; allCnaesCache.forEach(c => { if (!currentLinkedCnaes.some(x => x.codigo === c.codigo)) { const opt = document.createElement('option'); opt.value = c.codigo; opt.innerText = c.full; linkCnaeSelect.appendChild(opt); } }); refreshCustomSelect(linkCnaeSelect); }
-        window.vincularCNAE = function() { const cc = String(linkCnaeSelect.value || '').trim(); if (!cc) { showWarning('Selecione um CNAE.'); return; } const c = allCnaesCache.find(x => String(x.codigo).trim() === cc); if (!c) { showWarning(`CNAE ${cc} n\u00e3o encontrado.`); return; } if (currentLinkedCnaes.some(x => String(x.codigo).trim() === cc)) { showWarning('J\u00e1 vinculado.'); return; } currentLinkedCnaes.push(c); renderLinkedCnaes(); populateLinkSelect(); linkCnaeSelect.value = ''; refreshCustomSelect(linkCnaeSelect); setDirty(true); };
+        window.vincularCNAE = function() { const cc = String(linkCnaeSelect.value || '').trim(); if (!cc) { showWarning('Selecione um CNAE.'); return; } const c = allCnaesCache.find(x => String(x.codigo).trim() === cc); if (!c) { showWarning(`CNAE ${cc} não encontrado.`); return; } if (currentLinkedCnaes.some(x => String(x.codigo).trim() === cc)) { showWarning('Já vinculado.'); return; } currentLinkedCnaes.push(c); renderLinkedCnaes(); populateLinkSelect(); linkCnaeSelect.value = ''; refreshCustomSelect(linkCnaeSelect); setDirty(true); };
         function renderLinkedCnaes() { linkedCnaeList.innerHTML = ''; if (!currentLinkedCnaes.length) { linkedCnaeList.innerHTML = 'Nenhum CNAE vinculado.'; return; } currentLinkedCnaes.forEach((c, i) => { const d = document.createElement('div'); d.classList.add('linked-item'); d.innerHTML = `<span>${c.codigo} - ${c.descricao}</span><button onclick="removerCNAE(${i})"><i class="fas fa-times"></i></button>`; linkedCnaeList.appendChild(d); }); }
         window.removerCNAE = function(i) { currentLinkedCnaes.splice(i, 1); renderLinkedCnaes(); populateLinkSelect(); setDirty(true); };
         document.getElementById('segmentoForm').addEventListener('submit', async function(e) {
@@ -516,7 +704,11 @@ document.addEventListener('DOMContentLoaded', async function() {
                     for (const c of orig) if (!atual.includes(c)) { try { await apiDelete(`${API_URL}/segmentos/${segId}/cnaes/${c}`); } catch (e) {} }
                     for (const c of currentLinkedCnaes) { if (orig.includes(c.codigo)) continue; try { await apiPost(`${API_URL}/segmentos/${segId}/cnaes`, { cnae: c.codigo }); } catch (e) {} }
                 }
-                setDirty(false); originalLinkedCnaes = [...currentLinkedCnaes]; resetSegmentForm(); await carregarSegmentos(); updateSegmentFilter(); confirmModal.style.display = 'none'; showWarning('Segmento salvo com sucesso!', 'Sucesso');
+                setDirty(false); originalLinkedCnaes = [...currentLinkedCnaes]; resetSegmentForm();
+                localStorage.removeItem(CACHE.SEGMENTOS.key);
+                segmentData = []; segmentoCnaeLinks = [];
+                await carregarSegmentos();
+                updateSegmentFilter(); confirmModal.style.display = 'none'; showWarning('Segmento salvo com sucesso!', 'Sucesso');
             } catch (e) { console.error(e); showWarning('Erro ao salvar segmento.'); }
         });
         if (btnCancelSegment) btnCancelSegment.addEventListener('click', () => resetSegmentForm());
@@ -524,14 +716,14 @@ document.addEventListener('DOMContentLoaded', async function() {
         async function editarSegmento(id) {
             const seg = segmentData.find(s => s.id === id); if (!seg) return;
             editingSegmentId = id; segmentNome.value = seg.nome; btnSaveSegment.innerText = 'Atualizar segmento'; btnSaveSegment.classList.add('editing-btn'); btnCancelSegment.style.display = 'inline-block'; formTitle.innerText = 'Editar segmento'; segmentFormCard.classList.add('editing-mode');
-            try { const cnaes = await apiGet(`${API_URL}/segmentos/${id}/cnaes`); const list = []; for (const c of cnaes) { let full = allCnaesCache.find(x => x.codigo === c.codigo); if (!full) { full = await buscarDetalhesCnae(c.codigo); if (full) allCnaesCache.push(full); else full = { codigo: c.codigo, descricao: 'CNAE n\u00e3o encontrado', full: c.codigo }; } list.push(full); } currentLinkedCnaes = list; originalLinkedCnaes = [...list]; renderLinkedCnaes(); populateLinkSelect(); }
+            try { const cnaes = await apiGet(`${API_URL}/segmentos/${id}/cnaes`); const list = []; for (const c of cnaes) { let full = allCnaesCache.find(x => x.codigo === c.codigo); if (!full) { full = await buscarDetalhesCnae(c.codigo); if (full) allCnaesCache.push(full); else full = { codigo: c.codigo, descricao: 'CNAE não encontrado', full: c.codigo }; } list.push(full); } currentLinkedCnaes = list; originalLinkedCnaes = [...list]; renderLinkedCnaes(); populateLinkSelect(); }
             catch (e) { console.error(e); currentLinkedCnaes = []; originalLinkedCnaes = []; renderLinkedCnaes(); populateLinkSelect(); }
             setDirty(true);
         }
         function excluirSegmento(id) {
-            const seg = segmentData.find(s => s.id === id); if (!seg) { showWarning('Segmento n\u00e3o encontrado.'); return; }
+            const seg = segmentData.find(s => s.id === id); if (!seg) { showWarning('Segmento não encontrado.'); return; }
             showConfirm('Excluir Segmento', `Tem certeza que deseja excluir "${seg.nome}"?`, async function() {
-                try { await apiDelete(`${API_URL}/segmentos/${id}`); segmentData = segmentData.filter(s => s.id !== id); segmentoCnaeLinks = segmentoCnaeLinks.filter(l => l.segmentoId !== id); renderSegmentTable(segmentSearch.value); updateSegmentFilter(); if (editingSegmentId === id) resetSegmentForm(); }
+                try { await apiDelete(`${API_URL}/segmentos/${id}`); segmentData = segmentData.filter(s => s.id !== id); segmentoCnaeLinks = segmentoCnaeLinks.filter(l => l.segmentoId !== id); localStorage.removeItem(CACHE.SEGMENTOS.key); renderSegmentTable(segmentSearch.value); updateSegmentFilter(); if (editingSegmentId === id) resetSegmentForm(); }
                 catch (e) { showWarning('Erro ao excluir segmento.'); }
             });
         }
@@ -546,7 +738,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (confirmModal) confirmModal.addEventListener('click', function(e) { if (e.target === this) { confirmModal.style.display = 'none'; restoreActiveMenuItem(); } });
         function showConfirm(t, m, cb) { confirmTitle.innerText = t; confirmMessage.innerText = m; btnConfirmOk.innerText = 'Confirmar'; btnConfirmCancel.innerText = 'Cancelar'; btnConfirmDiscard.style.display = 'none'; confirmCallback = cb; btnConfirmCancel.style.display = 'inline-block'; confirmModal.style.display = 'flex'; }
         function showWarning(m, t = 'Aviso') { confirmTitle.innerText = t; confirmMessage.innerText = m; btnConfirmOk.innerText = 'OK'; btnConfirmCancel.style.display = 'none'; btnConfirmDiscard.style.display = 'none'; confirmCallback = null; confirmModal.style.display = 'flex'; }
-        function showUnsavedChangesModal(m, onSave, onDiscard) { confirmTitle.innerText = 'Altera\u00e7\u00f5es n\u00e3o salvas'; confirmMessage.innerText = m; btnConfirmOk.innerText = 'Salvar'; btnConfirmCancel.innerText = 'Cancelar'; btnConfirmDiscard.style.display = 'inline-block'; confirmCallback = onSave; confirmModal.style.display = 'flex'; btnConfirmDiscard.onclick = function() { if (onDiscard) onDiscard(); confirmModal.style.display = 'none'; btnConfirmDiscard.style.display = 'none'; btnConfirmCancel.style.display = 'inline-block'; btnConfirmOk.innerText = 'Confirmar'; confirmCallback = null; restoreActiveMenuItem(); }; }
+        function showUnsavedChangesModal(m, onSave, onDiscard) { confirmTitle.innerText = 'Alterações não salvas'; confirmMessage.innerText = m; btnConfirmOk.innerText = 'Salvar'; btnConfirmCancel.innerText = 'Cancelar'; btnConfirmDiscard.style.display = 'inline-block'; confirmCallback = onSave; confirmModal.style.display = 'flex'; btnConfirmDiscard.onclick = function() { if (onDiscard) onDiscard(); confirmModal.style.display = 'none'; btnConfirmDiscard.style.display = 'none'; btnConfirmCancel.style.display = 'inline-block'; btnConfirmOk.innerText = 'Confirmar'; confirmCallback = null; restoreActiveMenuItem(); }; }
         btnConfirmOk.addEventListener('click', function() { if (confirmCallback) { const cb = confirmCallback; confirmCallback = null; cb(); } confirmModal.style.display = 'none'; btnConfirmCancel.style.display = 'inline-block'; btnConfirmOk.innerText = 'Confirmar'; btnConfirmDiscard.style.display = 'none'; restoreActiveMenuItem(); });
         btnConfirmCancel.addEventListener('click', function() { confirmModal.style.display = 'none'; confirmCallback = null; btnConfirmDiscard.style.display = 'none'; restoreActiveMenuItem(); });
 
@@ -591,13 +783,22 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         document.getElementById('menu-cnaes').addEventListener('click', async () => { const c = await buscarCnaes(''); originalItems = c; openGenericModal('Pesquisa CNAE', 'Informe o CNAE:', c, 'cnae'); });
         document.getElementById('menu-municipios').addEventListener('click', async () => {
-            if (municipiosCarregando) { openGenericModal('Pesquisa Munic\u00edpio e DDDs', 'Carregando...', [], 'municipio'); const r = await municipiosPromise; if (r) { originalItems = r; currentItems = r; renderGenericList(); genericModalSubtitle.innerText = 'Informe o munic\u00edpio ou DDD:'; } return; }
-            if (municipiosCache) { originalItems = municipiosCache; openGenericModal('Pesquisa Munic\u00edpio e DDDs', 'Informe o munic\u00edpio ou DDD:', municipiosCache, 'municipio'); return; }
-            municipiosCarregando = true; openGenericModal('Pesquisa Munic\u00edpio e DDDs', 'Carregando...', [], 'municipio');
-            municipiosPromise = carregarMunicipiosDaAPI(); const m = await municipiosPromise;
-            if (m) { originalItems = m; currentItems = m; renderGenericList(); genericModalSubtitle.innerText = 'Informe o munic\u00edpio ou DDD:'; }
+            if (municipiosCache && municipiosCache.length > 0) {
+                originalItems = municipiosCache; currentItems = municipiosCache;
+                openGenericModal('Pesquisa Município e DDDs', 'Informe o município ou DDD:', municipiosCache, 'municipio');
+                return;
+            }
+            openGenericModal('Pesquisa Município e DDDs', 'Carregando...', [], 'municipio');
+            const m = await carregarMunicipiosDaAPI();
+            if (m && m.length > 0) {
+                originalItems = m; currentItems = m; renderGenericList();
+                genericModalSubtitle.innerText = 'Informe o município ou DDD:';
+            } else {
+                genericModalBody.innerHTML = '<p style="padding:15px;text-align:center;color:#666;">Nenhum município disponível.</p>';
+                genericModalSubtitle.innerText = 'Falha ao carregar municípios.';
+            }
         });
-        document.getElementById('menu-natureza').addEventListener('click', async () => { const s = await carregarSituacoesCadastrais(); originalItems = s; openGenericModal('Pesquisa Natureza Jur\u00eddica', 'Informe a natureza:', s, 'natureza'); });
+        document.getElementById('menu-natureza').addEventListener('click', async () => { const s = await carregarSituacoesCadastrais(); originalItems = s; openGenericModal('Pesquisa Natureza Jurídica', 'Informe a natureza:', s, 'natureza'); });
         document.getElementById('menu-dashboard').addEventListener('click', function() { if (segmentScreen.style.display === 'block') { if (isDirty) { showUnsavedChangesModal('Deseja salvar antes de sair?', function() { document.getElementById('segmentoForm').requestSubmit(); showScreen('main'); }, function() { resetSegmentForm(); showScreen('main'); }); } else showScreen('main'); return; } if (mainScreen.style.display !== 'block') showScreen('main'); else { setActiveMenuItem('menu-dashboard'); closeAllModals(); } });
         document.getElementById('menu-segmentos').addEventListener('click', function() { if (segmentScreen.style.display === 'block') { setActiveMenuItem('menu-segmentos'); return; } showScreen('segment'); });
         document.getElementById('menu-ignorados').addEventListener('click', function() { if (ignoradosScreen.style.display === 'block') { setActiveMenuItem('menu-ignorados'); return; } showScreen('ignorados'); });
@@ -616,16 +817,41 @@ document.addEventListener('DOMContentLoaded', async function() {
         checkAndCollapseSidebar();
         btnSearch.addEventListener('click', function() { currentPage = 1; historicoCursors = [null]; cursorAtual = null; pesquisarProspeccao(); });
         btnClear.addEventListener('click', clearFilters);
-        btnPrev.addEventListener('click', function() { if (currentPage > 1 && historicoCursors.length > 1) { historicoCursors.pop(); currentPage--; cursorAtual = historicoCursors[historicoCursors.length - 1]; pesquisarProspeccao(this, cursorAtual); } else showWarning('Voc\u00ea j\u00e1 est\u00e1 na primeira p\u00e1gina.', 'Aviso'); });
-        btnNext.addEventListener('click', function() { if (temMais) { historicoCursors.push(cursorAtual); currentPage++; pesquisarProspeccao(this, cursorAtual); } else showWarning('Voc\u00ea j\u00e1 est\u00e1 na \u00faltima p\u00e1gina.', 'Aviso'); });
+        btnPrev.addEventListener('click', function() { if (currentPage > 1 && historicoCursors.length > 1) { historicoCursors.pop(); currentPage--; cursorAtual = historicoCursors[historicoCursors.length - 1]; pesquisarProspeccao(this, cursorAtual); } else showWarning('Você já está na primeira página.', 'Aviso'); });
+        btnNext.addEventListener('click', function() { if (temMais) { historicoCursors.push(cursorAtual); currentPage++; pesquisarProspeccao(this, cursorAtual); } else showWarning('Você já está na última página.', 'Aviso'); });
         document.getElementById('filter-ddd').addEventListener('change', function() {});
 
-        // ===== INICIALIZA\u00c7\u00c3O =====
+        // ============================================================
+        // BOOT
+        // ============================================================
         if (campoMunicipio) campoMunicipio.style.display = 'none';
-        initializeCustomSelects(); carregarUFs(); carregarDDDs();
-        (async function() { await carregarCnaesIniciais(); await carregarSegmentos(); updateSegmentFilter(); showScreen('main'); })();
-        carregarIgnorados();
-        carregarMunicipiosDaAPI().then(m => console.log("Munic\u00edpios pr\u00e9-carregados:", m ? m.length : 0));
+        initializeCustomSelects();
+        showScreen('main');
+
+        (async function boot() {
+            try {
+                console.log('⏳ [boot] Carregando UFs, DDDs e CNAEs...');
+                await Promise.all([carregarUFs(), carregarDDDs(), carregarCnaesIniciais()]);
+
+                console.log('⏳ [boot] Carregando segmentos...');
+                await carregarSegmentos();
+                updateSegmentFilter();
+
+                console.log('⏳ [boot] Carregando ignorados...');
+                await carregarIgnorados();
+
+                console.log('✅ [boot] Sistema pronto.');
+
+                // Pré-carrega municípios em background
+                console.log('⏳ [background] Pré-carregando municípios...');
+                carregarMunicipiosDaAPI()
+                    .then(m => console.log(`✅ [background] Municípios pré-carregados: ${m ? m.length : 0}`))
+                    .catch(e => { /* silencioso */ });
+
+            } catch (e) {
+                console.error('❌ Erro no boot:', e);
+            }
+        })();
 
         // ========================================================================
         // ===== MAPA =====
@@ -646,24 +872,11 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         function isDark() { return document.body.classList.contains('dark-mode'); }
 
-        function getTerraStyle() {
-            const d = isDark();
-            return { color: d ? '#64748b' : '#94a3b8', weight: 0.6, opacity: 0.9, fill: true, fillColor: d ? '#1e293b' : '#f1f5f9', fillOpacity: 1 };
-        }
-        function getStateStyle() {
-            const d = isDark();
-            return { color: d ? '#94a3b8' : '#475569', weight: 1.5, opacity: 1, fill: true, fillColor: d ? '#334155' : '#e2e8f0', fillOpacity: 1 };
-        }
-        function getMunicipalityStyle() {
-            const d = isDark();
-            return { color: d ? '#475569' : '#94a3b8', weight: 0.4, opacity: 0.6, fill: false };
-        }
-        function getVendedorStyle(vendedor) {
-            return { color: vendedor.cor, weight: 1.5, opacity: 0.95, fill: true, fillColor: vendedor.cor, fillOpacity: 0.75 };
-        }
-        function getVendedorHoverStyle(vendedor) {
-            return { color: vendedor.cor, weight: 3, opacity: 1, fill: true, fillColor: vendedor.cor, fillOpacity: 0.95 };
-        }
+        function getTerraStyle() { const d = isDark(); return { color: d ? '#64748b' : '#94a3b8', weight: 0.6, opacity: 0.9, fill: true, fillColor: d ? '#1e293b' : '#f1f5f9', fillOpacity: 1 }; }
+        function getStateStyle() { const d = isDark(); return { color: d ? '#94a3b8' : '#475569', weight: 1.5, opacity: 1, fill: true, fillColor: d ? '#334155' : '#e2e8f0', fillOpacity: 1 }; }
+        function getMunicipalityStyle() { const d = isDark(); return { color: d ? '#475569' : '#94a3b8', weight: 0.4, opacity: 0.6, fill: false }; }
+        function getVendedorStyle(vendedor) { return { color: vendedor.cor, weight: 1.5, opacity: 0.95, fill: true, fillColor: vendedor.cor, fillOpacity: 0.75 }; }
+        function getVendedorHoverStyle(vendedor) { return { color: vendedor.cor, weight: 3, opacity: 1, fill: true, fillColor: vendedor.cor, fillOpacity: 0.95 }; }
 
         async function carregarTerraGeoJSON() {
             if (terraGeojsonCache) return terraGeojsonCache;
@@ -680,7 +893,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (ufsGeojsonCache) return ufsGeojsonCache;
             try { const c = localStorage.getItem(UFS_CACHE_KEY); if (c) { ufsGeojsonCache = JSON.parse(c); return ufsGeojsonCache; } } catch (e) {}
             try {
-                const r = await fetch(`${API_URL}/mapas/ufs`, { headers: { 'Accept': 'application/json' } });
+                const r = await fetch(`${API_MAPAS}/ufs`, { headers: { 'Accept': 'application/json' } });
                 if (!r.ok) throw new Error(`HTTP ${r.status}`);
                 ufsGeojsonCache = await r.json();
                 try { localStorage.setItem(UFS_CACHE_KEY, JSON.stringify(ufsGeojsonCache)); } catch (e) {}
@@ -691,44 +904,21 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (municipiosGeojsonCache) return municipiosGeojsonCache;
             try { const c = localStorage.getItem(MUN_CACHE_KEY); if (c) { municipiosGeojsonCache = JSON.parse(c); return municipiosGeojsonCache; } } catch (e) {}
             try {
-                const r = await fetch(`${API_URL}/mapas/municipios`, { headers: { 'Accept': 'application/json' } });
+                const r = await fetch(`${API_MAPAS}/municipios`, { headers: { 'Accept': 'application/json' } });
                 if (!r.ok) throw new Error(`HTTP ${r.status}`);
                 municipiosGeojsonCache = await r.json();
-                try { localStorage.setItem(MUN_CACHE_KEY, JSON.stringify(municipiosGeojsonCache)); } catch (e) { console.warn('Cache cheio'); }
+                try { localStorage.setItem(MUN_CACHE_KEY, JSON.stringify(municipiosGeojsonCache)); } catch (e) { /* silencioso */ }
                 return municipiosGeojsonCache;
-            } catch (e) { console.error('Erro munic\u00edpios:', e); return null; }
+            } catch (e) { console.error('Erro municípios:', e); return null; }
         }
 
-        function criarCamadaTerra(geojson) {
-            if (!geojson) return null;
-            return L.geoJSON(geojson, { style: () => getTerraStyle(), interactive: false });
-        }
-        function criarCamadaEstados(geojson) {
-            if (!geojson) return null;
-            return L.geoJSON(geojson, { style: () => getStateStyle(), interactive: false });
-        }
-        function criarCamadaMunicipios(geojson) {
-            if (!geojson) return null;
-            return L.geoJSON(geojson, { style: () => getMunicipalityStyle(), interactive: false });
-        }
+        function criarCamadaTerra(geojson) { return geojson ? L.geoJSON(geojson, { style: () => getTerraStyle(), interactive: false }) : null; }
+        function criarCamadaEstados(geojson) { return geojson ? L.geoJSON(geojson, { style: () => getStateStyle(), interactive: false }) : null; }
+        function criarCamadaMunicipios(geojson) { return geojson ? L.geoJSON(geojson, { style: () => getMunicipalityStyle(), interactive: false }) : null; }
         function criarCamadaVendedor(geojson, vendedor) {
             if (!geojson || !geojson.features) return null;
-
-            const features = geojson.features.filter(f => {
-                const v = getVendedorDaCidade(f.properties || {});
-                return v && v.id === vendedor.id;
-            });
-
-            const encontradas = features.map(f => f.properties?.nome || f.properties?.codigoIbge);
-            console.log(`\u2705 ${vendedor.nome}: ${features.length}/${vendedor.cidades.length} -> ${encontradas.join(', ')}`);
-            if (features.length < vendedor.cidades.length) {
-                const codigosEncontrados = features.map(f => String(f.properties?.codigoIbge || '').trim());
-                const faltando = vendedor.cidades.filter(c => !codigosEncontrados.includes(String(c).trim()));
-                console.warn(`   \u26a0\ufe0f Faltando: ${faltando.join(', ')}`);
-            }
-
+            const features = geojson.features.filter(f => { const v = getVendedorDaCidade(f.properties || {}); return v && v.id === vendedor.id; });
             if (!features.length) return null;
-
             return L.geoJSON({ type: 'FeatureCollection', features }, {
                 style: () => getVendedorStyle(vendedor),
                 onEachFeature: (f, l) => {
@@ -751,36 +941,41 @@ document.addEventListener('DOMContentLoaded', async function() {
             map.fitBounds(stateLayer.getBounds(), { padding: [20, 20] });
         };
 
-        // ========================================================================
-        // ===== PAINEL DE ESTAT\u00cdSTICAS + TOGGLE DOS VENDEDORES =====
-        // ========================================================================
+        // ============================================================
+        // Stats dos vendedores
+        // ------------------------------------------------------------
+        // Usa POST /api/municipios/populacao/total com os códigos
+        // IBGE das cidades de cada vendedor para retornar população.
+        // ============================================================
         async function buscarStatsVendedores() {
-            const mock = {
-                'v1': { cidades: 5, pessoas: 1240 },
-                'v2': { cidades: 5, pessoas: 890 },
-                'v3': { cidades: 5, pessoas: 1560 }
-            };
-            try {
-                const r = await fetch(`${API_URL}/vendedores/stats`, {
-                    headers: { 'Accept': 'application/json' }
-                });
-                if (r.ok) {
-                    const dados = await r.json();
-                    console.log('\u2705 Stats dos vendedores carregadas do endpoint');
-                    return dados;
-                }
-            } catch (e) {
-                console.warn('\u26a0\ufe0f Endpoint /vendedores/stats indispon\u00edvel, usando mock');
+            const stats = {};
+
+            for (const v of VENDEDORES) {
+                stats[v.id] = { cidades: v.cidades.length, pessoas: 0 };
+
+                if (!v.cidades || !v.cidades.length) continue;
+
+                try {
+                    const r = await fetch(`${API_URL}/municipios/populacao/total`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                        body: JSON.stringify({ codigosIbge: v.cidades.map(String) })
+                    });
+
+                    if (r.ok) {
+                        const dados = await r.json();
+                        stats[v.id].pessoas = Number(dados?.populacaoTotal || 0);
+                    }
+                } catch (e) { /* silencioso */ }
             }
-            return mock;
+
+            return stats;
         }
 
         async function renderStatsVendedores(map) {
             const container = document.getElementById('vendedores-stats');
             if (!container || !map) return;
-
             const stats = await buscarStatsVendedores();
-
             let html = '';
             VENDEDORES.forEach(v => {
                 const s = stats[v.id] || { cidades: v.cidades.length, pessoas: 0 };
@@ -794,35 +989,21 @@ document.addEventListener('DOMContentLoaded', async function() {
                                 <span class="vendedor-stat-nome">${v.nome}</span>
                             </div>
                             <div class="vendedor-stat-numbers">
-                                <div class="vendedor-stat-num">
-                                    <strong>${s.cidades}</strong>
-                                    <small>cidades</small>
-                                </div>
-                                <div class="vendedor-stat-num">
-                                    <strong>${pessoasFmt}</strong>
-                                    <small>pessoas</small>
-                                </div>
+                                <div class="vendedor-stat-num"><strong>${s.cidades}</strong><small>cidades</small></div>
+                                <div class="vendedor-stat-num"><strong>${pessoasFmt}</strong><small>pessoas</small></div>
                             </div>
                         </div>
                     </label>
                 `;
             });
-
             container.innerHTML = html;
-
             container.querySelectorAll('.vendedor-stat-checkbox').forEach(cb => {
                 cb.addEventListener('change', function(e) {
                     e.stopPropagation();
                     const card = this.closest('.vendedor-stat');
                     const layer = vendedoresLayers[this.dataset.vendedor];
-
-                    if (this.checked) {
-                        card.classList.add('active');
-                        if (layer) layer.addTo(map);
-                    } else {
-                        card.classList.remove('active');
-                        if (layer) map.removeLayer(layer);
-                    }
+                    if (this.checked) { card.classList.add('active'); if (layer) layer.addTo(map); }
+                    else { card.classList.remove('active'); if (layer) map.removeLayer(layer); }
                 });
             });
         }
@@ -830,36 +1011,18 @@ document.addEventListener('DOMContentLoaded', async function() {
         async function initMap() {
             const container = document.getElementById('map');
             if (!container) return;
-
-            const map = L.map('map', { minZoom: 3, maxZoom: 13, zoomControl: true, attributionControl: false })
-                .setView([-14.2350, -51.9253], 4);
-
+            const map = L.map('map', { minZoom: 3, maxZoom: 13, zoomControl: true, attributionControl: false }).setView([-14.2350, -51.9253], 4);
             window.mapInstance = map;
 
             const terra = await carregarTerraGeoJSON();
-            if (terra) {
-                terraLayer = criarCamadaTerra(terra);
-                if (terraLayer) terraLayer.addTo(map);
-            }
-
+            if (terra) { terraLayer = criarCamadaTerra(terra); if (terraLayer) terraLayer.addTo(map); }
             const ufs = await carregarUfsGeoJSON();
-            if (ufs) {
-                stateLayer = criarCamadaEstados(ufs);
-                if (stateLayer) {
-                    stateLayer.addTo(map);
-                    map.fitBounds(stateLayer.getBounds(), { padding: [20, 20] });
-                }
-            }
-
+            if (ufs) { stateLayer = criarCamadaEstados(ufs); if (stateLayer) { stateLayer.addTo(map); map.fitBounds(stateLayer.getBounds(), { padding: [20, 20] }); } }
             const mun = await carregarMunicipiosGeoJSON();
             if (mun) {
                 municipiosLayer = criarCamadaMunicipios(mun);
                 if (municipiosLayer) municipiosLayer.addTo(map);
-
-                VENDEDORES.forEach(v => {
-                    const layer = criarCamadaVendedor(mun, v);
-                    if (layer) vendedoresLayers[v.id] = layer;
-                });
+                VENDEDORES.forEach(v => { const layer = criarCamadaVendedor(mun, v); if (layer) vendedoresLayers[v.id] = layer; });
             }
 
             const origFilterUf = document.getElementById('filter-uf');
@@ -883,34 +1046,22 @@ document.addEventListener('DOMContentLoaded', async function() {
                     }, 100);
                 });
             }
-
             renderStatsVendedores(map);
         }
-
         window.initMap = initMap;
 
-        // ============================================================
-        // ?? PATCH 3 � SDK para m�dulos externos
-        // ============================================================
         window.AppCore = {
-            // HTTP
             apiGet, apiPost, apiPut, apiDelete,
-
-            // UI
             showScreen, setActiveMenuItem, registerScreen,
             showWarning, showConfirm,
             refreshCustomSelect, formatarTelefone,
-
-            // Config
             API_URL,
-
-            // Mapa (para uso futuro, se necess�rio)
             getMapInstance: () => window.mapInstance,
             getVendedores: () => VENDEDORES,
         };
-        console.log('\u2705 [AppCore] SDK dispon\u00edvel para m\u00f3dulos externos.');
+        console.log('✅ [AppCore] SDK disponível para módulos externos.');
 
     } catch (error) {
-        console.error('\u274c Erro durante a inicializa\u00e7\u00e3o:', error);
+        console.error('❌ Erro durante a inicialização:', error);
     }
 });

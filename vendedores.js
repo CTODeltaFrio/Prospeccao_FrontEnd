@@ -1,6 +1,10 @@
 // ============================================================
-// VENDEDORES — módulo independente
+// VENDEDORES â€” mÃ³dulo independente
 // Depende de window.AppCore (exposto por script.js)
+//
+// âš ï¸ O endpoint /api/vendedores ainda NÃƒO existe no backend C#.
+//    Este mÃ³dulo carrega apenas os auxiliares (municÃ­pios, DDDs,
+//    usuÃ¡rios) e exibe a tela com lista vazia.
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -21,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try { Core = await esperarAppCore(); }
         catch (err) { console.error('[vendedores] AppCore nunca foi exposto:', err.message); return; }
 
-        console.log('\u2705 [vendedores] AppCore obtido, inicializando m\u00f3dulo...');
+        console.log('âœ… [vendedores] AppCore obtido, inicializando mÃ³dulo...');
 
         const { apiGet, apiPost, apiPut, apiDelete, showScreen, showWarning, showConfirm, API_URL } = Core;
 
@@ -43,7 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const vendDddSugg       = document.getElementById('vend-ddd-suggestions');
         const vendDddsList      = document.getElementById('vend-ddds-list');
 
-        // Usuário do sistema
+        // UsuÃ¡rio do sistema
         const vendUsuarioSearch = document.getElementById('vend-usuario-search');
         const vendUsuarioSugg   = document.getElementById('vend-usuario-suggestions');
         const vendUsuarioCard   = document.getElementById('vend-usuario-selected');
@@ -53,13 +57,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const vendUsuarioRemove = document.getElementById('vend-usuario-remove');
 
         if (!vendedoresScreen) {
-            console.warn('[vendedores] Tela não encontrada no DOM.');
+            console.warn('[vendedores] Tela nÃ£o encontrada no DOM.');
             return;
         }
 
         // --- Estado ---
         let vendedores = [];
-        let vendedoresCarregados = false;
+        let vendedoresCarregados = true; // endpoint ainda nÃ£o existe â€” considera vazio
         let editingVendedorId = null;
 
         let currentVendedorCidades = [];
@@ -69,10 +73,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let municipiosLista = null;
         let municipiosCarregando = false;
+        let municipiosPromise = null;
         let cidadeDebounce = null;
 
         let dddsDisponiveis = null;
         let dddsCarregando = false;
+        let dddsPromise = null;
 
         let usuariosSistema = null;
         let usuariosCarregando = false;
@@ -91,7 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const normalizar = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 
         // ============================================================
-        // LISTA DE USUÁRIOS DO SISTEMA (login)
+        // LISTA DE USUÃRIOS DO SISTEMA (login)
         // ============================================================
         async function carregarListaUsuarios() {
             if (usuariosSistema) return usuariosSistema;
@@ -112,9 +118,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     cpf: u.cpf || '',
                     situacao: u.situacao || ''
                 }));
-                console.log(`? [vendedores] ${usuariosSistema.length} usuários carregados`);
+                console.log(`âœ… [vendedores] ${usuariosSistema.length} usuÃ¡rios carregados`);
             } catch (e) {
-                console.warn('[vendedores] Endpoint de usuários indisponível:', e);
                 usuariosSistema = [];
             }
             usuariosCarregando = false;
@@ -152,15 +157,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             vendUsuarioCard.style.display = 'flex';
             if (vendUsuarioAvatar) vendUsuarioAvatar.textContent = iniciais(currentVendedorUsuario.nome);
-            if (vendUsuarioNome)   vendUsuarioNome.textContent = currentVendedorUsuario.nome || '—';
-            if (vendUsuarioEmail)  vendUsuarioEmail.textContent = currentVendedorUsuario.email || (currentVendedorUsuario.cpf ? formatarCPF(currentVendedorUsuario.cpf) : '—');
+            if (vendUsuarioNome)   vendUsuarioNome.textContent = currentVendedorUsuario.nome || 'â€”';
+            if (vendUsuarioEmail)  vendUsuarioEmail.textContent = currentVendedorUsuario.email || (currentVendedorUsuario.cpf ? formatarCPF(currentVendedorUsuario.cpf) : 'â€”');
         }
 
         function selecionarUsuario(u) {
             if (!u) return;
             const vinculado = usuarioJaVinculado(u.id);
             if (vinculado) {
-                showWarning(`Este usuário já está vinculado ao vendedor "${vinculado.nome}".`);
+                showWarning(`Este usuÃ¡rio jÃ¡ estÃ¡ vinculado ao vendedor "${vinculado.nome}".`);
                 return;
             }
             currentVendedorUsuario = { ...u };
@@ -178,13 +183,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             vendUsuarioSugg.innerHTML = lista.map((u, i) => {
                 const vinculado = usuarioJaVinculado(u.id);
-                const badge = vinculado ? `<span class="usuario-sugg-badge" title="Já vinculado a ${vinculado.nome}">Em uso</span>` : '';
+                const badge = vinculado ? `<span class="usuario-sugg-badge" title="JÃ¡ vinculado a ${vinculado.nome}">Em uso</span>` : '';
                 return `
                     <div class="autocomplete-item usuario-sugg-item ${vinculado ? 'disabled' : ''}" data-index="${i}">
                         <div class="usuario-sugg-avatar">${iniciais(u.nome)}</div>
                         <div class="usuario-sugg-info">
-                            <span class="code">${u.nome || '—'}</span>
-                            <span class="desc">${u.email || '—'}</span>
+                            <span class="code">${u.nome || 'â€”'}</span>
+                            <span class="desc">${u.email || 'â€”'}</span>
                         </div>
                         ${badge}
                     </div>
@@ -212,7 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     await carregarListaUsuarios();
                     if (!usuariosSistema || !usuariosSistema.length) {
                         if (vendUsuarioSugg) {
-                            vendUsuarioSugg.innerHTML = '<div class="usuario-sugg-empty">Nenhum usuário disponível.</div>';
+                            vendUsuarioSugg.innerHTML = '<div class="usuario-sugg-empty">Nenhum usuÃ¡rio disponÃ­vel.</div>';
                             vendUsuarioSugg.classList.add('active');
                         }
                         return;
@@ -235,59 +240,54 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // ============================================================
-        // LISTA DE MUNICÍPIOS (autocomplete de cidades)
-        // Fonte primária: /api/mapas/municipios (GeoJSON)
-        // Fallback: cache do localStorage preenchido por script.js
+        // LISTA DE MUNICÃPIOS (autocomplete de cidades)
         // ============================================================
         async function carregarListaMunicipios() {
             if (municipiosLista) return municipiosLista;
-            if (municipiosCarregando) return [];
+            if (municipiosCarregando && municipiosPromise) return municipiosPromise;
 
             municipiosCarregando = true;
-
-            // 1) Tenta a API oficial de mapas (GeoJSON)
-            try {
-                const r = await fetch(`${API_URL}/mapas/municipios`, { headers: { 'Accept': 'application/json' } });
-                if (r.ok) {
-                    const geojson = await r.json();
-                    if (geojson && Array.isArray(geojson.features) && geojson.features.length) {
-                        municipiosLista = geojson.features.map(f => ({
-                            codigoIbge: String(f.properties?.codigoIbge || f.properties?.codigo || '').trim(),
-                            nome: f.properties?.nome || f.properties?.municipio || '',
-                            uf: (f.properties?.uf || '').toUpperCase()
-                        })).filter(m => m.codigoIbge && m.nome);
-                        municipiosCarregando = false;
-                        console.log(`? [vendedores] ${municipiosLista.length} municípios carregados de /api/mapas/municipios`);
-                        return municipiosLista;
+            municipiosPromise = (async () => {
+                // 1) API oficial de mapas (GeoJSON)
+                try {
+                    const r = await fetch(`${API_URL}/mapas/municipios`, { headers: { 'Accept': 'application/json' } });
+                    if (r.ok) {
+                        const geojson = await r.json();
+                        if (geojson && Array.isArray(geojson.features) && geojson.features.length) {
+                            municipiosLista = geojson.features.map(f => ({
+                                codigoIbge: String(f.properties?.codigoIbge || f.properties?.codigo || '').trim(),
+                                nome: f.properties?.nome || f.properties?.municipio || '',
+                                uf: (f.properties?.uf || '').toUpperCase()
+                            })).filter(m => m.codigoIbge && m.nome);
+                            console.log(`âœ… [vendedores] ${municipiosLista.length} municÃ­pios carregados`);
+                            return municipiosLista;
+                        }
                     }
-                }
-            } catch (e) {
-                console.warn('[vendedores] Falha em /api/mapas/municipios:', e);
-            }
+                } catch (e) { /* segue */ }
 
-            // 2) Fallback: cache do localStorage preenchido por script.js
-            try {
-                const cached = localStorage.getItem('deltafrio_municipios_geojson_v10');
-                if (cached) {
-                    const geojson = JSON.parse(cached);
-                    if (geojson.features) {
-                        municipiosLista = geojson.features.map(f => ({
-                            codigoIbge: String(f.properties?.codigoIbge || f.properties?.codigo || '').trim(),
-                            nome: f.properties?.nome || f.properties?.municipio || '',
-                            uf: (f.properties?.uf || '').toUpperCase()
-                        })).filter(m => m.codigoIbge && m.nome);
-                        municipiosCarregando = false;
-                        console.log(`? [vendedores] ${municipiosLista.length} municípios do cache do mapa`);
-                        return municipiosLista;
+                // 2) Cache do mapa (preenchido pelo script.js)
+                try {
+                    const cached = localStorage.getItem('deltafrio_municipios_geojson_v10');
+                    if (cached) {
+                        const geojson = JSON.parse(cached);
+                        if (geojson.features) {
+                            municipiosLista = geojson.features.map(f => ({
+                                codigoIbge: String(f.properties?.codigoIbge || f.properties?.codigo || '').trim(),
+                                nome: f.properties?.nome || f.properties?.municipio || '',
+                                uf: (f.properties?.uf || '').toUpperCase()
+                            })).filter(m => m.codigoIbge && m.nome);
+                            console.log(`âœ… [vendedores] ${municipiosLista.length} municÃ­pios do cache`);
+                            return municipiosLista;
+                        }
                     }
-                }
-            } catch (e) {
-                console.warn('[vendedores] Falha ao extrair municípios do cache:', e);
-            }
+                } catch (e) { /* segue */ }
 
-            municipiosCarregando = false;
-            municipiosLista = [];
-            return municipiosLista;
+                municipiosLista = [];
+                return municipiosLista;
+            })();
+
+            try { return await municipiosPromise; }
+            finally { municipiosCarregando = false; municipiosPromise = null; }
         }
 
         function buscarMunicipios(termo) {
@@ -304,26 +304,39 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // ============================================================
-        // LISTA DE DDDs (autocomplete)
+        // LISTA DE DDDs
+        // ------------------------------------------------------------
+        // Corrigido: compartilha a mesma promise em andamento e
+        // sempre retorna a lista completa apÃ³s carregar.
         // ============================================================
         async function carregarListaDdds() {
-            if (dddsDisponiveis) return dddsDisponiveis;
-            if (dddsCarregando) return [];
+            if (dddsDisponiveis && dddsDisponiveis.length > 0) return dddsDisponiveis;
+            if (dddsCarregando && dddsPromise) return dddsPromise;
 
             dddsCarregando = true;
-            try {
-                const r = await apiGet(`${API_URL}/ddds`);
-                dddsDisponiveis = (Array.isArray(r) ? r : []).map(d => ({
-                    ddd: String(d.ddd || '').trim(),
-                    descricao: d.descricao || ''
-                })).filter(d => d.ddd);
-                console.log(`? [vendedores] ${dddsDisponiveis.length} DDDs carregados`);
-            } catch (e) {
-                console.warn('[vendedores] Erro ao carregar DDDs:', e);
-                dddsDisponiveis = [];
-            }
-            dddsCarregando = false;
-            return dddsDisponiveis;
+            dddsPromise = (async () => {
+                try {
+                    const r = await apiGet(`${API_URL}/ddds`);
+                    const lista = Array.isArray(r) ? r
+                                : (r && Array.isArray(r.data))    ? r.data
+                                : (r && Array.isArray(r.results)) ? r.results
+                                : [];
+                    dddsDisponiveis = lista.map(d => ({
+                        ddd: String(d.ddd || '').trim(),
+                        descricao: d.descricao || ''
+                    })).filter(d => d.ddd);
+                    console.log(`âœ… [vendedores] ${dddsDisponiveis.length} DDDs carregados`);
+                } catch (e) {
+                    console.warn('[vendedores] Erro ao carregar DDDs:', e);
+                    dddsDisponiveis = [];
+                } finally {
+                    dddsCarregando = false;
+                    dddsPromise = null;
+                }
+                return dddsDisponiveis;
+            })();
+
+            return dddsPromise;
         }
 
         function buscarDdds(termo) {
@@ -360,7 +373,7 @@ document.addEventListener('DOMContentLoaded', () => {
         function adicionarDdd(ddd) {
             if (!ddd) return;
             if (currentVendedorDdds.some(d => String(d.ddd) === String(ddd.ddd))) {
-                showWarning('Este DDD já está vinculado.');
+                showWarning('Este DDD jÃ¡ estÃ¡ vinculado.');
                 return;
             }
             currentVendedorDdds.push({ ddd: String(ddd.ddd), descricao: ddd.descricao || '' });
@@ -377,7 +390,7 @@ document.addEventListener('DOMContentLoaded', () => {
             vendDddSugg.innerHTML = lista.map((d, i) => `
                 <div class="autocomplete-item" data-index="${i}">
                     <span class="code">DDD ${d.ddd}</span>
-                    <span class="desc"> - ${d.descricao || '—'}</span>
+                    <span class="desc"> - ${d.descricao || 'â€”'}</span>
                 </div>
             `).join('');
             vendDddSugg.classList.add('active');
@@ -416,7 +429,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     vendDddSugg?.classList.remove('active');
                     if (vendDddSugg) vendDddSugg.innerHTML = '';
                 } else {
-                    showWarning(`DDD ${raw} não encontrado.`);
+                    showWarning(`DDD ${raw} nÃ£o encontrado.`);
                 }
             });
             vendDddSearch.addEventListener('focus', async () => { await carregarListaDdds(); });
@@ -452,7 +465,7 @@ document.addEventListener('DOMContentLoaded', () => {
         function adicionarCidade(m) {
             if (!m) return;
             if (currentVendedorCidades.some(c => c.codigoIbge === m.codigoIbge)) {
-                showWarning('Esta cidade já está vinculada.');
+                showWarning('Esta cidade jÃ¡ estÃ¡ vinculada.');
                 return;
             }
             currentVendedorCidades.push({ codigoIbge: m.codigoIbge, nome: m.nome, uf: m.uf || '' });
@@ -469,7 +482,7 @@ document.addEventListener('DOMContentLoaded', () => {
             vendCidadeSugg.innerHTML = lista.map((m, i) => `
                 <div class="autocomplete-item" data-index="${i}">
                     <span class="code">${m.nome}</span>
-                    <span class="desc"> - ${m.uf || '—'} · ${m.codigoIbge}</span>
+                    <span class="desc"> - ${m.uf || 'â€”'} Â· ${m.codigoIbge}</span>
                 </div>
             `).join('');
             vendCidadeSugg.classList.add('active');
@@ -519,44 +532,16 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // ============================================================
-        // CARREGAMENTO
+        // CARREGAMENTO DE VENDEDORES (stub â€” endpoint ainda nÃ£o existe)
         // ============================================================
-        async function carregarVendedores() {
-            try {
-                const data = await apiGet(`${API_URL}/vendedores`);
-                vendedores = (Array.isArray(data) ? data : []).map(v => ({
-                    id: v.id ?? v.codigo,
-                    nome: v.nome || '',
-                    email: v.email || '',
-                    telefone: v.telefone || '',
-                    regiao: v.regiao || '',
-                    cor: v.cor || '#2463eb',
-                    ativo: v.ativo !== false && v.ativo !== 0,
-                    usuarioId: v.usuarioId ?? v.usuario_id ?? null,
-                    empresasCount: v.empresasCount ?? v.empresas_count ?? v.qtdEmpresas ?? 0,
-                    cidades: Array.isArray(v.cidades) ? v.cidades.map(c => ({
-                        codigoIbge: String(c.codigoIbge || c.codigo || '').trim(),
-                        nome: c.nome || '',
-                        uf: (c.uf || '').toUpperCase()
-                    })) : [],
-                    ddds: Array.isArray(v.ddds) ? v.ddds.map(d => ({
-                        ddd: String(d.ddd || d || '').trim(),
-                        descricao: d.descricao || ''
-                    })).filter(d => d.ddd) : []
-                }));
-            } catch (e) { console.warn('Erro vendedores:', e); vendedores = []; }
+        function carregarVendedores() {
+            vendedores = [];
             vendedoresCarregados = true;
             renderVendedorTable();
         }
 
-        function garantirDados() {
-            const p = [];
-            if (!vendedoresCarregados) p.push(carregarVendedores());
-            return Promise.all(p);
-        }
-
         // ============================================================
-        // RENDERIZAÇÃO DA TABELA
+        // RENDERIZAÃ‡ÃƒO DA TABELA
         // ============================================================
         function renderVendedorTable(filtro = '') {
             if (!vendedorTableBody) return;
@@ -579,21 +564,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 const subPartes = [];
                 if (totalCidades) subPartes.push(`${totalCidades} cidade${totalCidades > 1 ? 's' : ''}`);
                 if (totalDdds)    subPartes.push(`${totalDdds} DDD${totalDdds > 1 ? 's' : ''}`);
-                const sub = subPartes.length ? subPartes.join(' • ') : 'Sem vínculos';
+                const sub = subPartes.length ? subPartes.join(' â€¢ ') : 'Sem vÃ­nculos';
 
                 const usuario = v.usuarioId ? (usuariosSistema || []).find(u => String(u.id) === String(v.usuarioId)) : null;
                 const usuarioHtml = usuario
                     ? `<span class="vendedor-usuario-chip" title="${usuario.email || ''}"><i class="fas fa-user-check"></i> ${usuario.nome}</span>`
                     : (v.usuarioId
                         ? `<span class="vendedor-usuario-chip pendente"><i class="fas fa-user"></i> #${v.usuarioId}</span>`
-                        : `<span class="vendedor-usuario-chip ausente" title="Sem usuário vinculado"><i class="fas fa-user-slash"></i></span>`);
+                        : `<span class="vendedor-usuario-chip ausente" title="Sem usuÃ¡rio vinculado"><i class="fas fa-user-slash"></i></span>`);
 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td><div class="avatar-mini" style="background:${v.cor};">${iniciais(v.nome)}</div></td>
                     <td><strong>${v.nome || '-'}</strong><br><small style="color:var(--text-secondary);font-size:11px;">${usuarioHtml}</small></td>
                     <td>${v.email || '-'}</td>
-                    <td>${v.telefone || '—'}</td>
+                    <td>${v.telefone || 'â€”'}</td>
                     <td>${sub}</td>
                     <td style="text-align:center;"><strong>${v.empresasCount || 0}</strong></td>
                     <td style="text-align:center;"><span class="vendedor-ativo-badge ${cls}">${txt}</span></td>
@@ -613,7 +598,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // ============================================================
-        // FORM VENDEDOR
+        // FORM VENDEDOR (stub)
         // ============================================================
         function resetVendedorForm() {
             editingVendedorId = null;
@@ -640,101 +625,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function editarVendedor(id) {
-            const v = vendedores.find(x => String(x.id) === String(id)); if (!v) return;
-            editingVendedorId = v.id;
-            document.getElementById('vend-nome').value     = v.nome || '';
-            document.getElementById('vend-email').value    = v.email || '';
-            document.getElementById('vend-telefone').value = v.telefone || '';
-            document.getElementById('vend-cor').value      = v.cor || '#2463eb';
-            document.getElementById('vendedor-modal-title').innerText = 'Editar vendedor';
-            btnSaveVendedor.innerText = 'Atualizar vendedor';
-
-            currentVendedorCidades = Array.isArray(v.cidades) ? v.cidades.map(c => ({ ...c })) : [];
-            currentVendedorDdds    = Array.isArray(v.ddds)   ? v.ddds.map(d => ({ ...d }))   : [];
-            currentVendedorRegiao  = v.regiao || '';
-
-            if (v.usuarioId) {
-                const u = (usuariosSistema || []).find(x => String(x.id) === String(v.usuarioId));
-                currentVendedorUsuario = u ? { ...u } : { id: v.usuarioId, nome: `Usuário #${v.usuarioId}`, email: '', cpf: '' };
-            } else {
-                currentVendedorUsuario = null;
-            }
-
-            if (vendCidadeSearch) vendCidadeSearch.value = '';
-            if (vendCidadeSugg) { vendCidadeSugg.classList.remove('active'); vendCidadeSugg.innerHTML = ''; }
-            if (vendDddSearch) vendDddSearch.value = '';
-            if (vendDddSugg) { vendDddSugg.classList.remove('active'); vendDddSugg.innerHTML = ''; }
-            if (vendUsuarioSearch) vendUsuarioSearch.value = '';
-            if (vendUsuarioSugg) { vendUsuarioSugg.classList.remove('active'); vendUsuarioSugg.innerHTML = ''; }
-
-            renderVendedorCidades();
-            renderVendedorDdds();
-            renderUsuarioSelecionado();
-
-            carregarListaMunicipios().catch(() => {});
-            carregarListaDdds().catch(() => {});
-            carregarListaUsuarios().then(() => renderUsuarioSelecionado()).catch(() => {});
-
-            vendedorModal.style.display = 'flex';
+            showWarning('A ediÃ§Ã£o de vendedor estarÃ¡ disponÃ­vel quando o endpoint for implementado no backend.');
         }
 
         function excluirVendedor(id) {
-            const v = vendedores.find(x => String(x.id) === String(id)); if (!v) return;
-            showConfirm('Excluir Vendedor', `Tem certeza que deseja excluir "${v.nome}"?`, async () => {
-                try {
-                    await apiDelete(`${API_URL}/vendedores/${id}`);
-                    vendedores = vendedores.filter(x => String(x.id) !== String(id));
-                    renderVendedorTable(vendedorSearch.value);
-                } catch (err) { console.error(err); showWarning('Erro ao excluir vendedor.'); }
-            });
+            showWarning('A exclusÃ£o de vendedor estarÃ¡ disponÃ­vel quando o endpoint for implementado no backend.');
         }
 
         // ============================================================
-        // SUBMIT DO FORM
+        // SUBMIT DO FORM (stub)
         // ============================================================
-        vendedorForm.addEventListener('submit', async e => {
-            e.preventDefault();
-            const nome = document.getElementById('vend-nome').value.trim();
-            if (!nome) return showWarning('Informe o nome do vendedor.');
-            if (!currentVendedorUsuario) return showWarning('Selecione um usuário do sistema para vincular ao vendedor.');
-
-            const payload = {
-                nome,
-                email:    document.getElementById('vend-email')?.value.trim() || '',
-                telefone: '',
-                regiao:   currentVendedorRegiao,
-                cor:      document.getElementById('vend-cor').value || '#2463eb',
-                ativo:    true,
-                usuarioId: currentVendedorUsuario.id,
-                cidades:  currentVendedorCidades.map(c => ({
-                    codigoIbge: c.codigoIbge,
-                    nome: c.nome,
-                    uf: c.uf || ''
-                })),
-                ddds:     currentVendedorDdds.map(d => ({
-                    ddd: d.ddd,
-                    descricao: d.descricao || ''
-                }))
-            };
-            btnSaveVendedor.disabled = true;
-            const orig = btnSaveVendedor.innerText;
-            btnSaveVendedor.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
-            try {
-                if (editingVendedorId) {
-                    const atual = await apiPut(`${API_URL}/vendedores/${editingVendedorId}`, payload);
-                    const i = vendedores.findIndex(x => String(x.id) === String(editingVendedorId));
-                    if (i !== -1) vendedores[i] = { ...vendedores[i], ...payload, ...(atual || {}) };
-                } else {
-                    const novo = await apiPost(`${API_URL}/vendedores`, payload);
-                    vendedores.push({ id: novo.id ?? novo.codigo, empresasCount: 0, ...payload });
-                }
-                vendedorModal.style.display = 'none';
-                resetVendedorForm();
-                renderVendedorTable(vendedorSearch.value);
-                showWarning('Vendedor salvo com sucesso!', 'Sucesso');
-            } catch (err) { console.error(err); showWarning('Erro ao salvar vendedor: ' + (err.message || '')); }
-            finally { btnSaveVendedor.disabled = false; btnSaveVendedor.innerText = orig; }
-        });
+        if (vendedorForm) {
+            vendedorForm.addEventListener('submit', async e => {
+                e.preventDefault();
+                showWarning('O cadastro de vendedores estarÃ¡ disponÃ­vel em breve. Aguardando implementaÃ§Ã£o no backend.');
+            });
+        }
 
         // ============================================================
         // EVENTOS DOS MODAIS
@@ -759,10 +665,10 @@ document.addEventListener('DOMContentLoaded', () => {
             Core.registerScreen('vendedores', vendedoresScreen);
         }
 
-        // Pré-carrega em background
-        garantirDados().catch(() => {});
+        // InicializaÃ§Ã£o
+        renderVendedorTable();
         carregarListaUsuarios().catch(() => {});
 
-        console.log('\u2705 [vendedores] m\u00f3dulo carregado.');
+        console.log('âœ… [vendedores] mÃ³dulo carregado.');
     })();
 });
