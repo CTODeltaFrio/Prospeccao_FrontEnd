@@ -1,0 +1,230 @@
+/* ============================================================
+   ABAS DA TELA VENDEDORES / EMPRESAS
+   ============================================================ */
+.vtabs {
+    display: flex;
+    gap: 6px;
+    border-bottom: 2px solid var(--border-color);
+    margin-bottom: 20px;
+}
+
+.vtab {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    padding: 12px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-bottom: -2px;
+    font-family: inherit;
+}
+.vtab i { font-size: 15px; }
+.vtab:hover {
+    color: #2463eb;
+    background: var(--bg-hover);
+    border-radius: 8px 8px 0 0;
+}
+.vtab.active {
+    color: #2463eb;
+    border-bottom-color: #2463eb;
+}
+body.dark-mode .vtab.active { color: #60a5fa; border-bottom-color: #60a5fa; }
+body.dark-mode .vtab:hover  { color: #60a5fa; }
+
+.vtab-panel { display: none; }
+.vtab-panel.active {
+    display: block;
+    animation: fadeInUp 0.25s ease-out;
+}
+
+/* ============================================================
+   TABELA DE EMPRESAS (dentro da aba)
+   ============================================================ */
+#vtab-panel-empresas .card-segmento {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 13px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-card);
+    transition: all 0.3s ease;
+}
+#vtab-panel-empresas .card-segmento:hover {
+    box-shadow: var(--shadow-hover);
+    border-color: #c7d2fe;
+}
+
+#vtab-panel-empresas .table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+#vtab-panel-empresas .table-header h2 {
+    font-size: 20px;
+    color: var(--text-main);
+    margin: 0;
+}
+
+#vtab-panel-empresas .table-responsive {
+    overflow-x: auto;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+}
+#vtab-panel-empresas .table-responsive table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    display: block;
+}
+#vtab-panel-empresas .table-responsive thead {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: #1e3a8a;
+}
+#vtab-panel-empresas .table-responsive thead th {
+    background: #1e3a8a;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 14px 16px;
+    text-align: left;
+    border: none;
+    white-space: nowrap;
+}
+#vtab-panel-empresas .table-responsive thead th:first-child { border-top-left-radius: 12px; }
+#vtab-panel-empresas .table-responsive thead th:last-child  { border-top-right-radius: 12px; }
+
+#vtab-panel-empresas .table-responsive tbody {
+    display: block;
+    max-height: 520px;
+    overflow-y: auto;
+    width: 100%;
+}
+#vtab-panel-empresas .table-responsive tbody tr {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+    transition: background 0.2s ease;
+}
+#vtab-panel-empresas .table-responsive tbody tr:hover { background: var(--bg-hover); }
+#vtab-panel-empresas .table-responsive tbody td {
+    padding: 12px 16px;
+    color: var(--text-main);
+    font-size: 13px;
+    border-bottom: 1px solid var(--border-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+}
+#vtab-panel-empresas .table-responsive tbody tr:last-child td { border-bottom: none; }
+
+/* Larguras das colunas */
+#vtab-panel-empresas .table-responsive th:nth-child(1),
+#vtab-panel-empresas .table-responsive td:nth-child(1) { width: 20%; font-family: 'Courier New', monospace; }
+#vtab-panel-empresas .table-responsive th:nth-child(2),
+#vtab-panel-empresas .table-responsive td:nth-child(2) { width: 30%; }
+#vtab-panel-empresas .table-responsive th:nth-child(3),
+#vtab-panel-empresas .table-responsive td:nth-child(3) { width: 26%; }
+#vtab-panel-empresas .table-responsive th:nth-child(4),
+#vtab-panel-empresas .table-responsive td:nth-child(4) { width: 8%; }
+#vtab-panel-empresas .table-responsive th:nth-child(5),
+#vtab-panel-empresas .table-responsive td:nth-child(5) { width: 8%; }
+#vtab-panel-empresas .table-responsive th:nth-child(6),
+#vtab-panel-empresas .table-responsive td:nth-child(6) { width: 8%; }
+
+/* ============================================================
+   BOTÕES DE AÇÃO NA TABELA DE EMPRESAS
+   ============================================================ */
+#empresasTable .btn-table {
+    transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1),
+                background 0.25s ease, color 0.25s ease,
+                border-color 0.25s ease, box-shadow 0.3s ease;
+    will-change: transform;
+    position: relative;
+    border-radius: 8px;
+    font-weight: 600;
+    padding: 7px 11px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    font-size: 12px;
+    margin-right: 4px;
+}
+#empresasTable .btn-table:hover  { transform: translateY(-3px); }
+#empresasTable .btn-table:active { transform: translateY(-1px) scale(0.95); transition-duration: 0.08s; }
+#empresasTable .btn-table i {
+    display: inline-block;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+#empresasTable .btn-table:hover i { animation: iconWiggle 0.5s ease-in-out; }
+
+#empresasTable .btn-edit {
+    background: #eff6ff;
+    color: #1d4ed8;
+    border-color: #bfdbfe !important;
+}
+#empresasTable .btn-edit:hover {
+    background: #1d4ed8;
+    color: #ffffff;
+    border-color: #1d4ed8 !important;
+    box-shadow: 0 6px 16px rgba(29, 78, 216, 0.3);
+}
+body.dark-mode #empresasTable .btn-edit {
+    background: #1e3a5f;
+    color: #60a5fa;
+    border-color: #1e3a5f !important;
+}
+body.dark-mode #empresasTable .btn-edit:hover {
+    background: #2563eb;
+    color: #ffffff;
+    border-color: #2563eb !important;
+}
+
+/* ============================================================
+   INPUT CNPJ
+   ============================================================ */
+#emp-cnpj {
+    text-transform: uppercase;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 1.5px;
+    font-weight: 600;
+}
+
+/* ============================================================
+   RESPONSIVO
+   ============================================================ */
+@media (max-width: 900px) {
+    .vtabs { overflow-x: auto; }
+    .vtab { padding: 10px 14px; font-size: 13px; white-space: nowrap; }
+    #vtab-panel-empresas .table-header { flex-direction: column; align-items: stretch; gap: 10px; }
+    #vtab-panel-empresas .table-search { width: 100%; }
+    #vtab-panel-empresas .table-responsive th,
+    #vtab-panel-empresas .table-responsive td { padding: 8px 10px; font-size: 12px; }
+}
+/* ============================================================
+   MODAIS DE ALERTA SEMPRE NA FRENTE DOS DEMAIS
+   ============================================================ */
+#confirm-modal,
+#generic-modal {
+    z-index: 2147483000 !important;
+}
+
+/* Reforço: garante que o conteúdo do confirm fique acima do overlay */
+#confirm-modal .modal-content,
+#generic-modal .modal-content {
+    position: relative;
+    z-index: 1;
+}

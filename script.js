@@ -248,6 +248,14 @@ document.addEventListener('DOMContentLoaded', async function() {
         function normalizarTexto(t) { return t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
 
         // ============================================================
+        // CSRF — leitura do cookie
+        // ============================================================
+        function obterCsrf() {
+            const m = document.cookie.split('; ').find(c => c.startsWith('login_delta_csrf='));
+            return m ? decodeURIComponent(m.split('=')[1]) : '';
+        }
+
+        // ============================================================
         // API
         // ============================================================
         async function apiGet(url) {
@@ -256,22 +264,53 @@ document.addEventListener('DOMContentLoaded', async function() {
             const t = await r.text(); if (!t) return {};
             try { return JSON.parse(t); } catch (e) { return {}; }
         }
+
+        // Envelope {retorno, dados, erros, traceId} → devolve só `dados`
+        async function apiGetEnvelope(url) {
+            const r = await apiGet(url);
+            if (r && typeof r === 'object' && 'dados' in r) return r.dados;
+            return r;
+        }
+
         async function apiPost(url, body) {
-            const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body) });
+            const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+            const csrf = obterCsrf();
+            if (csrf) headers['X-CSRF-Token'] = csrf;
+            const r = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
             const t = await r.text();
-            if (!r.ok) { let msg = `HTTP ${r.status}`; try { msg = JSON.parse(t).message || msg; } catch (e) {} throw new Error(msg); }
+            if (!r.ok) { let msg = `HTTP ${r.status}`; try { const j = JSON.parse(t); msg = j.message || j.mensagem || j.title || (j.erros && j.erros[0]) || msg; } catch (e) {} throw new Error(msg); }
             if (!t) return {}; try { return JSON.parse(t); } catch (e) { return {}; }
         }
+
         async function apiPut(url, body) {
-            const r = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body) });
-            const t = await r.text(); if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+            const csrf = obterCsrf();
+            if (csrf) headers['X-CSRF-Token'] = csrf;
+            const r = await fetch(url, { method: 'PUT', headers, body: JSON.stringify(body) });
+            const t = await r.text();
+            if (!r.ok) { let msg = `HTTP ${r.status}`; try { const j = JSON.parse(t); msg = j.message || j.mensagem || (j.erros && j.erros[0]) || msg; } catch (e) {} throw new Error(msg); }
             if (!t) return {}; try { return JSON.parse(t); } catch (e) { return {}; }
         }
+
+        async function apiPatch(url, body) {
+            const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+            const csrf = obterCsrf();
+            if (csrf) headers['X-CSRF-Token'] = csrf;
+            const r = await fetch(url, { method: 'PATCH', headers, body: JSON.stringify(body) });
+            const t = await r.text();
+            if (!r.ok) { let msg = `HTTP ${r.status}`; try { const j = JSON.parse(t); msg = j.message || j.mensagem || (j.erros && j.erros[0]) || msg; } catch (e) {} throw new Error(msg); }
+            if (!t) return {}; try { return JSON.parse(t); } catch (e) { return {}; }
+        }
+
         async function apiDelete(url) {
-            const r = await fetch(url, { method: 'DELETE', headers: { 'Accept': 'application/json' } });
+            const headers = { 'Accept': 'application/json' };
+            const csrf = obterCsrf();
+            if (csrf) headers['X-CSRF-Token'] = csrf;
+            const r = await fetch(url, { method: 'DELETE', headers });
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
             return r.status === 204 ? null : await r.json();
         }
+
         async function fetchFromAPI(urls) {
             for (const url of urls) {
                 try {
@@ -374,12 +413,10 @@ document.addEventListener('DOMContentLoaded', async function() {
                 segmentData = cache.segmentData || [];
                 segmentoCnaeLinks = cache.segmentoCnaeLinks || [];
                 updateSegmentFilter(); renderSegmentTable(); populateLinkSelect();
-                console.log(`✅ Segmentos do cache (${segmentData.length} itens, ${segmentoCnaeLinks.length} vínculos)`);
                 return;
             }
 
             try {
-                console.log('⏳ Carregando lista de segmentos...');
                 const data = await apiGet(`${API_URL}/segmentos`);
                 segmentData = data.map(i => ({ id: i.codigo, nome: i.descricao }));
                 segmentoCnaeLinks = [];
@@ -404,13 +441,11 @@ document.addEventListener('DOMContentLoaded', async function() {
                             }
                         });
                     } catch (e) { /* silencioso */ }
-                            });
+                });
 
                 updateSegmentFilter();
                 renderSegmentTable();
                 populateLinkSelect();
-
-                console.log(`✅ Segmentos carregados (${segmentData.length} itens, ${segmentoCnaeLinks.length} vínculos, ${allCnaesCache.length} CNAEs no cache)`);
 
                 cacheSet(CACHE.SEGMENTOS, { segmentData, segmentoCnaeLinks });
                 cacheSet(CACHE.CNAES, allCnaesCache);
@@ -446,7 +481,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             const cache = cacheGet(CACHE.MUNICIPIOS);
             if (cache && cache.length > 0) {
                 municipiosCache = cache;
-                console.log(`✅ Municípios do cache (${cache.length})`);
                 return municipiosCache;
             }
 
@@ -469,10 +503,8 @@ document.addEventListener('DOMContentLoaded', async function() {
                         municipiosCache = [...new Set(acumulado)].sort();
                         cacheSet(CACHE.MUNICIPIOS, municipiosCache);
                     }
-                    console.log(`✅ Municípios da API (${acumulado.length})`);
                     return municipiosCache || [];
                 } catch (e) {
-                    console.error("Erro municípios:", e);
                     return [];
                 } finally {
                     municipiosCarregando = false;
@@ -513,7 +545,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                 renderIgnoradosTable();
                 cacheSet(CACHE.IGNORADOS, ignorados);
             } catch (e) {
-                console.error(e);
                 ignorados = []; ignoradosFiltrados = [];
                 renderIgnoradosTable();
             }
@@ -580,7 +611,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         async function salvarStatusIgnorado(cnpj) {
             try {
-                await fetch(`${API_URL}/prospeccao/status-estabelecimentos`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify({ cnpjCompleto: cnpj, status: 'X' }) });
+                await apiPost(`${API_URL}/prospeccao/status-estabelecimentos`, { cnpjCompleto: cnpj, status: 'X' });
                 localStorage.removeItem(CACHE.IGNORADOS.key);
             } catch (e) { /* silencioso */ }
         }
@@ -830,24 +861,11 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         (async function boot() {
             try {
-                console.log('⏳ [boot] Carregando UFs, DDDs e CNAEs...');
                 await Promise.all([carregarUFs(), carregarDDDs(), carregarCnaesIniciais()]);
-
-                console.log('⏳ [boot] Carregando segmentos...');
                 await carregarSegmentos();
                 updateSegmentFilter();
-
-                console.log('⏳ [boot] Carregando ignorados...');
                 await carregarIgnorados();
-
-                console.log('✅ [boot] Sistema pronto.');
-
-                // Pré-carrega municípios em background
-                console.log('⏳ [background] Pré-carregando municípios...');
-                carregarMunicipiosDaAPI()
-                    .then(m => console.log(`✅ [background] Municípios pré-carregados: ${m ? m.length : 0}`))
-                    .catch(e => { /* silencioso */ });
-
+                carregarMunicipiosDaAPI().catch(() => {});
             } catch (e) {
                 console.error('❌ Erro no boot:', e);
             }
@@ -887,7 +905,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 terraGeojsonCache = await r.json();
                 try { localStorage.setItem(TERRA_CACHE_KEY, JSON.stringify(terraGeojsonCache)); } catch (e) {}
                 return terraGeojsonCache;
-            } catch (e) { console.error('Erro terra:', e); return null; }
+            } catch (e) { return null; }
         }
         async function carregarUfsGeoJSON() {
             if (ufsGeojsonCache) return ufsGeojsonCache;
@@ -898,7 +916,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 ufsGeojsonCache = await r.json();
                 try { localStorage.setItem(UFS_CACHE_KEY, JSON.stringify(ufsGeojsonCache)); } catch (e) {}
                 return ufsGeojsonCache;
-            } catch (e) { console.error('Erro UFs:', e); return null; }
+            } catch (e) { return null; }
         }
         async function carregarMunicipiosGeoJSON() {
             if (municipiosGeojsonCache) return municipiosGeojsonCache;
@@ -909,7 +927,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 municipiosGeojsonCache = await r.json();
                 try { localStorage.setItem(MUN_CACHE_KEY, JSON.stringify(municipiosGeojsonCache)); } catch (e) { /* silencioso */ }
                 return municipiosGeojsonCache;
-            } catch (e) { console.error('Erro municípios:', e); return null; }
+            } catch (e) { return null; }
         }
 
         function criarCamadaTerra(geojson) { return geojson ? L.geoJSON(geojson, { style: () => getTerraStyle(), interactive: false }) : null; }
@@ -941,34 +959,23 @@ document.addEventListener('DOMContentLoaded', async function() {
             map.fitBounds(stateLayer.getBounds(), { padding: [20, 20] });
         };
 
-        // ============================================================
-        // Stats dos vendedores
-        // ------------------------------------------------------------
-        // Usa POST /api/municipios/populacao/total com os códigos
-        // IBGE das cidades de cada vendedor para retornar população.
-        // ============================================================
         async function buscarStatsVendedores() {
             const stats = {};
-
             for (const v of VENDEDORES) {
                 stats[v.id] = { cidades: v.cidades.length, pessoas: 0 };
-
                 if (!v.cidades || !v.cidades.length) continue;
-
                 try {
                     const r = await fetch(`${API_URL}/municipios/populacao/total`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                         body: JSON.stringify({ codigosIbge: v.cidades.map(String) })
                     });
-
                     if (r.ok) {
                         const dados = await r.json();
                         stats[v.id].pessoas = Number(dados?.populacaoTotal || 0);
                     }
                 } catch (e) { /* silencioso */ }
             }
-
             return stats;
         }
 
@@ -1051,7 +1058,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         window.initMap = initMap;
 
         window.AppCore = {
-            apiGet, apiPost, apiPut, apiDelete,
+            apiGet, apiPost, apiPut, apiPatch, apiDelete,
+            apiGetEnvelope,
+            obterCsrf,
             showScreen, setActiveMenuItem, registerScreen,
             showWarning, showConfirm,
             refreshCustomSelect, formatarTelefone,

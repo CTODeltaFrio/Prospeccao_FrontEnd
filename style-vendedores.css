@@ -6,13 +6,64 @@
     width: 90%;
     height: auto;
     max-height: 90vh;
-    padding: 30px;
+    padding: 0;
     display: flex;
     flex-direction: column;
+    overflow-y: auto;
 }
-.form-modal .modal-scroll-area { flex: 1; overflow-y: auto; padding-right: 10px; margin-bottom: 12px; }
+
+.form-modal .modal-header {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--bg-card);
+    padding: 30px 30px 0;
+    margin-bottom: 0;
+    flex-shrink: 0;
+}
+
+.form-modal .modal-scroll-area {
+    flex: 1 1 auto;
+    overflow: visible;
+    padding: 15px 30px;
+    margin-bottom: 0;
+}
+
+.form-modal .modal-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    background: var(--bg-card);
+    padding: 15px 30px 30px;
+    margin-top: 0;
+    border-top: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+/* ---------- Dropdowns (autocomplete) ---------- */
+.form-modal .autocomplete-list {
+    border-radius: 12px;
+    border-top: 1px solid var(--border-color);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+    margin-top: 6px;
+    max-height: 240px;
+    padding: 6px;
+    overflow-y: auto;
+}
+.form-modal .autocomplete-list .autocomplete-item {
+    border-bottom: none;
+    border-radius: 8px;
+    margin-bottom: 2px;
+    padding: 10px 14px;
+}
+.form-modal .autocomplete-list .autocomplete-item:last-child {
+    margin-bottom: 0;
+}
+
+/* ---------- Linhas do form ---------- */
 .form-row { display: flex; gap: 16px; }
 .form-row .form-group { margin-bottom: 1.5rem; }
+
 .form-group textarea {
     padding: .75rem 1rem;
     border: 1px solid var(--border-input);
@@ -151,22 +202,31 @@ body.dark-mode .cidade-chip button.chip-remove:hover {
     background: rgba(239, 68, 68, 0.2);
 }
 
-/* Chip de DDD (variação do cidade-chip) */
+/* Chip de empresa */
+.empresa-chip {
+    background: #fff7ed !important;
+    border-color: #fed7aa !important;
+    color: #9a3412 !important;
+}
+.empresa-chip:hover { background: #ffedd5 !important; }
+body.dark-mode .empresa-chip {
+    background: #3a2410 !important;
+    border-color: #7c2d12 !important;
+    color: #fdba74 !important;
+}
+
+/* Chip de DDD */
 .ddd-chip {
     background: #f0fdf4 !important;
     border-color: #bbf7d0 !important;
     color: #166534 !important;
 }
 .ddd-chip:hover { background: #dcfce7 !important; }
-.ddd-chip .chip-nome {
-    font-weight: 700;
-    letter-spacing: 0.5px;
-}
+.ddd-chip .chip-nome { font-weight: 700; letter-spacing: 0.5px; }
 .ddd-chip .chip-uf {
     color: #4d7c0f !important;
     background: rgba(255,255,255,0.9) !important;
     font-weight: 600;
-    text-transform: none;
 }
 body.dark-mode .ddd-chip {
     background: #14532d !important;
@@ -178,7 +238,6 @@ body.dark-mode .ddd-chip .chip-uf {
     color: #bbf7d0 !important;
     background: rgba(0,0,0,0.25) !important;
 }
-body.dark-mode .ddd-chip button.chip-remove { color: #fca5a5 !important; }
 
 /* ============================================================
    USUÁRIO DO SISTEMA (vínculo 1:1 com vendedor)
@@ -338,6 +397,147 @@ body.dark-mode .usuario-sugg-badge {
 }
 
 /* ============================================================
+   DROPDOWN DE CORES
+   ============================================================ */
+.color-select {
+    position: relative;
+    width: 100%;
+}
+
+.color-select-trigger {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: 42px;
+    border: 1px solid var(--border-input);
+    border-radius: 6px;
+    background: var(--bg-input);
+    padding: 0 12px;
+    cursor: pointer;
+    color: var(--text-main);
+    font-size: 13px;
+    font-family: inherit;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    text-align: left;
+}
+
+.color-select-trigger:hover {
+    border-color: #2463eb;
+}
+
+.color-select.open .color-select-trigger {
+    border-color: #2463eb;
+    box-shadow: 0 0 0 3px rgba(36, 99, 235, 0.1);
+}
+
+.color-select-preview {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
+    transition: background 0.2s;
+    background: #2463eb;
+}
+
+.color-select-label {
+    flex: 1;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-secondary);
+}
+
+.color-select-trigger > i {
+    color: var(--text-secondary);
+    font-size: 12px;
+    transition: transform 0.2s;
+}
+
+.color-select.open .color-select-trigger > i {
+    transform: rotate(180deg);
+}
+
+.color-select-options {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    width: 220px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+    z-index: 9999;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+}
+
+.color-select.open .color-select-options {
+    display: grid;
+}
+
+.color-option {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 8px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+    position: relative;
+    padding: 0;
+    outline: none;
+}
+
+.color-option:hover:not(.used) {
+    transform: scale(1.1);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.color-option.selected {
+    border-color: #ffffff;
+    box-shadow: 0 0 0 2px currentColor;
+}
+
+.color-option.selected::after {
+    content: '✓';
+    position: absolute;
+    inset: 0;
+    color: #fff;
+    font-size: 18px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.color-option.used {
+    cursor: not-allowed;
+    opacity: 0.35;
+    position: relative;
+}
+
+.color-option.used::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(45deg,
+        transparent calc(50% - 1px),
+        rgba(0, 0, 0, 0.5) calc(50% - 1px),
+        rgba(0, 0, 0, 0.5) calc(50% + 1px),
+        transparent calc(50% + 1px));
+    border-radius: 6px;
+}
+
+body.dark-mode .color-option.selected {
+    border-color: #1e293b;
+}
+
+/* ============================================================
    ANIMAÇÕES PREMIUM — BOTÕES (v2)
    ============================================================ */
 @keyframes btnPulse {
@@ -478,4 +678,18 @@ body.dark-mode .btn-secondary:not(:disabled):hover {
         transform: translateY(-1px) !important;
     }
     .btn-table:hover { transform: translateY(-1px) !important; }
+}
+/* ============================================================
+   MODAIS DE ALERTA SEMPRE NA FRENTE DOS DEMAIS
+   ============================================================ */
+#confirm-modal,
+#generic-modal {
+    z-index: 2147483000 !important;
+}
+
+/* Reforço: garante que o conteúdo do confirm fique acima do overlay */
+#confirm-modal .modal-content,
+#generic-modal .modal-content {
+    position: relative;
+    z-index: 1;
 }
