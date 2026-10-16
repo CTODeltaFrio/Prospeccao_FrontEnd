@@ -49,26 +49,76 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     // ============================================================
-    // ===== CONFIGURAÇÃO DOS VENDEDORES =====
+    // ===== VENDEDORES DO MAPA — carregados do endpoint real =====
     // ============================================================
-    const VENDEDORES = [
-        { id: 'v1', nome: 'Vendedor 1', cor: '#2463eb', regiao: 'Região Metropolitana',
-          cidades: ['4314902', '4304606', '4318705', '4313409', '4309209'] },
-        { id: 'v2', nome: 'Vendedor 2', cor: '#10b981', regiao: 'Serra Gaúcha',
-          cidades: ['4305108', '4302105', '4307906', '4308607', '4322509'] },
-        { id: 'v3', nome: 'Vendedor 3', cor: '#f59e0b', regiao: 'Sul / Fronteira',
-          cidades: ['4314407', '4315602', '4301602', '4316907', '4321204'] }
+    const CORES_VENDEDORES = [
+        '#2463eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+        '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#14b8a6',
+        '#a855f7', '#0ea5e9', '#dc2626', '#22c55e', '#eab308',
+        '#64748b'
     ];
+
+    let vendedoresMapa = [];
+    let vendedoresMapaCarregados = false;
+    let vendedoresMapaPromise = null;
+
+    async function carregarVendedoresMapa() {
+        if (vendedoresMapaCarregados) return vendedoresMapa;
+        if (vendedoresMapaPromise) return vendedoresMapaPromise;
+
+        vendedoresMapaPromise = (async () => {
+            try {
+                const envelope = await apiGetEnvelope(`${API_URL}/prospeccao/vendedores`);
+                const lista = Array.isArray(envelope) ? envelope
+                            : (envelope && Array.isArray(envelope.registros))  ? envelope.registros
+                            : (envelope && Array.isArray(envelope.vendedores)) ? envelope.vendedores
+                            : (envelope && Array.isArray(envelope.itens))      ? envelope.itens
+                            : [];
+
+                vendedoresMapa = lista.map((v, i) => {
+                    const cidadesRaw = Array.isArray(v.cidades) ? v.cidades
+                                     : (Array.isArray(v.cidadesIbge) ? v.cidadesIbge : []);
+                    const cidades = cidadesRaw.map(c => {
+                        if (typeof c === 'string') return c.trim();
+                        if (typeof c === 'number') return String(c);
+                        return String(c?.codigoIbge || c?.codigo || c?.id || '').trim();
+                    }).filter(Boolean);
+
+                    return {
+                        id: String(v.id ?? v.codigo ?? `v${i}`),
+                        nome: v.nome || `Vendedor #${v.id}`,
+                        cor: v.cor || CORES_VENDEDORES[i % CORES_VENDEDORES.length],
+                        regiao: v.regiao || '',
+                        cidades
+                    };
+                }).filter(v => v.id);
+
+                vendedoresMapaCarregados = true;
+                console.log(`✅ [mapa] ${vendedoresMapa.length} vendedores carregados do endpoint`);
+                if (vendedoresMapa.some(v => !v.cidades.length)) {
+                    console.warn('[mapa] alguns vendedores vieram sem cidades — o mapa não vai colorir nada para eles');
+                }
+            } catch (e) {
+                console.warn('[mapa] erro ao carregar vendedores:', e.message);
+                vendedoresMapa = [];
+            } finally {
+                vendedoresMapaPromise = null;
+            }
+            return vendedoresMapa;
+        })();
+
+        return vendedoresMapaPromise;
+    }
 
     function normalizar(str) {
         return String(str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').toLowerCase().trim();
     }
 
     function getVendedorDaCidade(props) {
-        if (!props) return null;
+        if (!props || !vendedoresMapa.length) return null;
         const codigo = String(props.codigoIbge || props.codigo || '').trim();
         const nome = normalizar(props.nome);
-        for (const v of VENDEDORES) {
+        for (const v of vendedoresMapa) {
             for (const c of v.cidades) {
                 const cStr = String(c).trim();
                 if (codigo && codigo === cStr) return v;
@@ -961,7 +1011,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         async function buscarStatsVendedores() {
             const stats = {};
-            for (const v of VENDEDORES) {
+            for (const v of vendedoresMapa) {
                 stats[v.id] = { cidades: v.cidades.length, pessoas: 0 };
                 if (!v.cidades || !v.cidades.length) continue;
                 try {
@@ -984,7 +1034,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (!container || !map) return;
             const stats = await buscarStatsVendedores();
             let html = '';
-            VENDEDORES.forEach(v => {
+            vendedoresMapa.forEach(v => {
                 const s = stats[v.id] || { cidades: v.cidades.length, pessoas: 0 };
                 const pessoasFmt = Number(s.pessoas || 0).toLocaleString('pt-BR');
                 html += `
@@ -1018,6 +1068,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         async function initMap() {
             const container = document.getElementById('map');
             if (!container) return;
+
+            // ✅ Carrega vendedores do endpoint antes de montar o mapa
+            await carregarVendedoresMapa();
+
             const map = L.map('map', { minZoom: 3, maxZoom: 13, zoomControl: true, attributionControl: false }).setView([-14.2350, -51.9253], 4);
             window.mapInstance = map;
 
@@ -1029,7 +1083,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (mun) {
                 municipiosLayer = criarCamadaMunicipios(mun);
                 if (municipiosLayer) municipiosLayer.addTo(map);
-                VENDEDORES.forEach(v => { const layer = criarCamadaVendedor(mun, v); if (layer) vendedoresLayers[v.id] = layer; });
+                vendedoresMapa.forEach(v => { const layer = criarCamadaVendedor(mun, v); if (layer) vendedoresLayers[v.id] = layer; });
             }
 
             const origFilterUf = document.getElementById('filter-uf');
@@ -1049,7 +1103,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                         if (terraLayer) terraLayer.setStyle(() => getTerraStyle());
                         if (stateLayer) stateLayer.setStyle(() => getStateStyle());
                         if (municipiosLayer) municipiosLayer.setStyle(() => getMunicipalityStyle());
-                        VENDEDORES.forEach(v => { const l = vendedoresLayers[v.id]; if (l) l.setStyle(() => getVendedorStyle(v)); });
+                        vendedoresMapa.forEach(v => { const l = vendedoresLayers[v.id]; if (l) l.setStyle(() => getVendedorStyle(v)); });
                     }, 100);
                 });
             }
@@ -1066,7 +1120,8 @@ document.addEventListener('DOMContentLoaded', async function() {
             refreshCustomSelect, formatarTelefone,
             API_URL,
             getMapInstance: () => window.mapInstance,
-            getVendedores: () => VENDEDORES,
+            getVendedores: () => vendedoresMapa,
+            carregarVendedoresMapa,
         };
         console.log('✅ [AppCore] SDK disponível para módulos externos.');
 
