@@ -490,51 +490,8 @@
                 <p>Preencha os dados do vendedor e vincule as empresas atendidas</p>
             </div>
             <form id="vendedorForm" class="modal-scroll-area">
-                <div class="form-row">
-                    <div class="form-group" style="flex:2;">
-                        <label for="vend-nome">Nome *</label>
-                        <input type="text" id="vend-nome" placeholder="Nome completo" autocomplete="off">
-                    </div>
-                    <div class="form-group" style="flex:1;">
-                        <label>Cor</label>
-                        <div class="color-select" id="vend-cor-select">
-                            <button type="button" class="color-select-trigger" id="vend-cor-trigger">
-                                <span class="color-select-preview" id="vend-cor-preview"></span>
-                                <span class="color-select-label" id="vend-cor-label">Selecione...</span>
-                                <i class="fas fa-chevron-down"></i>
-                            </button>
-                            <div class="color-select-options" id="vend-cor-options"></div>
-                        </div>
-                        <input type="hidden" id="vend-cor" value="#2463eb">
-                    </div>
-                </div>
 
-                <div class="form-row">
-                    <div class="form-group" style="flex:1;">
-                        <label for="vend-tipo-pessoa">Tipo pessoa *</label>
-                        <select id="vend-tipo-pessoa" class="input">
-                            <option value="">Selecione...</option>
-                            <option value="PF">Física</option>
-                            <option value="PJ">Jurídica</option>
-                        </select>
-                    </div>
-                    <div class="form-group" style="flex:2;">
-                        <label for="vend-cpf-cnpj">CPF / CNPJ</label>
-                        <input type="text" id="vend-cpf-cnpj" placeholder="Só números" autocomplete="off">
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group" style="flex:1;">
-                        <label for="vend-email">E-mail</label>
-                        <input type="email" id="vend-email" placeholder="email@exemplo.com" autocomplete="off">
-                    </div>
-                    <div class="form-group" style="flex:1;">
-                        <label for="vend-fone">Fone</label>
-                        <input type="text" id="vend-fone" placeholder="(00) 00000-0000" autocomplete="off">
-                    </div>
-                </div>
-
+                <!-- 1) Usuário do sistema (login) -->
                 <div class="form-group">
                     <label for="vend-usuario-search">Usuário do sistema (login) *</label>
                     <div class="cidade-search-wrapper" id="vend-usuario-wrapper">
@@ -554,6 +511,55 @@
                     </div>
                 </div>
 
+                <!-- 2) Nome + Cor (agora abaixo do login) -->
+                <div class="form-row">
+                    <div class="form-group" style="flex:2;">
+                        <label for="vend-nome">Nome *</label>
+                        <input type="text" id="vend-nome" placeholder="Nome completo" autocomplete="off">
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label>Cor</label>
+                        <div class="color-select" id="vend-cor-select">
+                            <button type="button" class="color-select-trigger" id="vend-cor-trigger">
+                                <span class="color-select-preview" id="vend-cor-preview"></span>
+                                <span class="color-select-label" id="vend-cor-label">Selecione...</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+                            <div class="color-select-options" id="vend-cor-options"></div>
+                        </div>
+                        <input type="hidden" id="vend-cor" value="#2463eb">
+                    </div>
+                </div>
+
+                <!-- 3) Tipo pessoa + CPF/CNPJ -->
+                <div class="form-row">
+                    <div class="form-group" style="flex:1;">
+                        <label for="vend-tipo-pessoa">Tipo pessoa *</label>
+                        <select id="vend-tipo-pessoa" class="input">
+                            <option value="">Selecione...</option>
+                            <option value="PF">Física</option>
+                            <option value="PJ">Jurídica</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="flex:2;">
+                        <label for="vend-cpf-cnpj">CPF / CNPJ</label>
+                        <input type="text" id="vend-cpf-cnpj" placeholder="Só números" autocomplete="off" maxlength="14">
+                    </div>
+                </div>
+
+                <!-- 4) E-mail + Fone -->
+                <div class="form-row">
+                    <div class="form-group" style="flex:1;">
+                        <label for="vend-email">E-mail</label>
+                        <input type="email" id="vend-email" placeholder="email@exemplo.com" autocomplete="off">
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label for="vend-fone">Fone</label>
+                        <input type="text" id="vend-fone" placeholder="11999990000" autocomplete="off" maxlength="11" inputmode="numeric">
+                    </div>
+                </div>
+
+                <!-- 5) Empresas -->
                 <div class="form-group">
                     <label>Empresas vinculadas</label>
                     <div class="cidade-search-wrapper" id="vend-empresa-wrapper">
@@ -566,6 +572,7 @@
                     </div>
                 </div>
 
+                <!-- 6) DDDs -->
                 <div class="form-group">
                     <label>DDDs vinculados</label>
                     <div class="cidade-search-wrapper">
@@ -578,6 +585,7 @@
                     </div>
                 </div>
 
+                <!-- 7) Cidades -->
                 <div class="form-group">
                     <label>Cidades vinculadas (opcional — usado no mapa)</label>
                     <div class="cidade-search-wrapper">

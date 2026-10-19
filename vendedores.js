@@ -36,29 +36,29 @@ document.addEventListener('DOMContentLoaded', () => {
         function extrairMensagemErro(err) {
             if (!err) return 'Erro desconhecido';
             if (typeof err === 'string') return err;
+
+            const traceId = err?.__raw?.traceId || err?.traceId || '';
+            const sufixo = traceId ? ` (código: ${traceId})` : '';
+
             if (err instanceof Error) {
                 const m = err.message || '';
                 if (m === '[object Object]') {
                     const r = err.__raw;
-                    if (r && r.erros && Array.isArray(r.erros) && r.erros.length) {
-                        const p = r.erros[0];
-                        return p.motivo || p.message || p.title || JSON.stringify(p);
-                    }
-                    if (r && r.message) return r.message;
-                    return 'Erro ao processar requisição';
+                    const motivo = r?.erros?.[0]?.motivo || r?.message || 'Erro ao processar requisição';
+                    return motivo + sufixo;
                 }
-                return m;
+                return m + sufixo;
             }
             if (err.erros && Array.isArray(err.erros) && err.erros.length) {
                 const p = err.erros[0];
-                return p.motivo || p.message || p.title || JSON.stringify(p);
+                return (p.motivo || p.message || p.title || 'Erro') + sufixo;
             }
-            if (err.message) return err.message;
-            if (err.mensagem) return err.mensagem;
-            if (err.detail) return err.detail;
-            if (err.title) return err.title;
-            if (err.traceId) return `Erro (traceId: ${err.traceId})`;
-            return String(err);
+            if (err.message) return err.message + sufixo;
+            if (err.mensagem) return err.mensagem + sufixo;
+            if (err.detail) return err.detail + sufixo;
+            if (err.title) return err.title + sufixo;
+            if (err.traceId) return `Erro (código: ${err.traceId})`;
+            return String(err) + sufixo;
         }
 
         // --- Elementos ---
@@ -69,6 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const vendedorForm      = document.getElementById('vendedorForm');
         const btnSaveVendedor   = document.getElementById('btn-save-vendedor');
 
+        const vendNome         = document.getElementById('vend-nome');
         const vendTipoPessoa   = document.getElementById('vend-tipo-pessoa');
         const vendCpfCnpj      = document.getElementById('vend-cpf-cnpj');
         const vendEmail        = document.getElementById('vend-email');
@@ -148,6 +149,38 @@ document.addEventListener('DOMContentLoaded', () => {
         const iniciais = nome =>
             String(nome || '?').trim().split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase();
         const normalizar = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+        // ✅ Efeito visual de "auto-preenchido"
+        function flashAutoFill(el) {
+            if (!el) return;
+            el.classList.remove('auto-filled');
+            void el.offsetWidth;
+            el.classList.add('auto-filled');
+            setTimeout(() => el.classList.remove('auto-filled'), 1500);
+        }
+
+        // ✅ Limita e higieniza CPF/CNPJ conforme tipoPessoa
+        function atualizarLimitesDocumento() {
+            if (!vendCpfCnpj) return;
+            const tipo = vendTipoPessoa?.value || '';
+            const max = tipo === 'PF' ? 11 : 14;
+            vendCpfCnpj.maxLength = max;
+
+            let cleaned;
+            if (tipo === 'PF') {
+                cleaned = vendCpfCnpj.value.replace(/\D/g, '').slice(0, max);
+            } else {
+                cleaned = vendCpfCnpj.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, max);
+            }
+            if (vendCpfCnpj.value !== cleaned) vendCpfCnpj.value = cleaned;
+        }
+
+        // ✅ Higieniza o telefone (só dígitos, máximo 11)
+        function higienizarFone() {
+            if (!vendFone) return;
+            const digits = vendFone.value.replace(/\D/g, '').slice(0, 11);
+            if (vendFone.value !== digits) vendFone.value = digits;
+        }
 
         // ============================================================
         // DROPDOWN DE CORES
@@ -248,6 +281,20 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // ============================================================
+        // INPUTS — limites dinâmicos
+        // ============================================================
+        if (vendTipoPessoa) {
+            vendTipoPessoa.addEventListener('change', atualizarLimitesDocumento);
+        }
+        if (vendCpfCnpj) {
+            vendCpfCnpj.addEventListener('input', atualizarLimitesDocumento);
+        }
+        if (vendFone) {
+            vendFone.addEventListener('input', higienizarFone);
+            vendFone.addEventListener('paste', () => setTimeout(higienizarFone, 0));
+        }
+
+        // ============================================================
         // USUÁRIOS DO SISTEMA
         // ============================================================
         async function carregarListaUsuarios() {
@@ -301,12 +348,41 @@ document.addEventListener('DOMContentLoaded', () => {
             if (vendUsuarioEmail)  vendUsuarioEmail.textContent = currentVendedorUsuario.email || (currentVendedorUsuario.cpf ? formatarCPF(currentVendedorUsuario.cpf) : '—');
         }
 
+        // ✅ Ao vincular login: preenche NOME, CPF, E-MAIL e TIPO
         function selecionarUsuario(u) {
             if (!u) return;
             currentVendedorUsuario = { ...u };
             renderUsuarioSelecionado();
             if (vendUsuarioSearch) vendUsuarioSearch.value = '';
             if (vendUsuarioSugg) { vendUsuarioSugg.classList.remove('active'); vendUsuarioSugg.innerHTML = ''; }
+
+            // 1) Se tipoPessoa vazio, define PF (mas dispara atualização de maxlength)
+            if (vendTipoPessoa && !vendTipoPessoa.value && u.cpf) {
+                vendTipoPessoa.value = 'PF';
+            }
+            // sempre reaplica maxlength (programaticamente o change não dispara sozinho)
+            atualizarLimitesDocumento();
+
+            // 2) Nome
+            if (u.nome && vendNome) {
+                vendNome.value = u.nome;
+                flashAutoFill(vendNome);
+            }
+
+            // 3) CPF
+            if (u.cpf && vendCpfCnpj) {
+                const cpfDigitos = String(u.cpf).replace(/\D/g, '').slice(0, 11);
+                if (cpfDigitos) {
+                    vendCpfCnpj.value = cpfDigitos;
+                    flashAutoFill(vendCpfCnpj);
+                }
+            }
+
+            // 4) E-mail
+            if (u.email && vendEmail) {
+                vendEmail.value = u.email;
+                flashAutoFill(vendEmail);
+            }
         }
 
         function renderSugestoesUsuarios(lista) {
@@ -857,9 +933,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // ============================================================
         function resetVendedorForm() {
             editingVendedorId = null;
-            const nomeEl = document.getElementById('vend-nome'); if (nomeEl) nomeEl.value = '';
+            if (vendNome) vendNome.value = '';
             if (vendTipoPessoa) vendTipoPessoa.value = '';
-            if (vendCpfCnpj) vendCpfCnpj.value = '';
+            if (vendCpfCnpj) { vendCpfCnpj.value = ''; vendCpfCnpj.maxLength = 14; }
             if (vendEmail) vendEmail.value = '';
             if (vendFone) vendFone.value = '';
             aplicarCorSelecionada('#2463eb');
@@ -891,8 +967,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const v = vendedores.find(x => String(x.id) === String(id)); if (!v) return;
             editingVendedorId = v.id;
 
-            const nomeEl = document.getElementById('vend-nome'); if (nomeEl) nomeEl.value = v.nome || '';
+            if (vendNome) vendNome.value = v.nome || '';
             if (vendTipoPessoa) vendTipoPessoa.value = v.tipoPessoa || '';
+            // Aplica maxlength correto ANTES de preencher cpf/cnpj
+            atualizarLimitesDocumento();
             if (vendCpfCnpj) vendCpfCnpj.value = v.cpfCnpj || '';
             if (vendEmail) vendEmail.value = v.email || '';
             if (vendFone) vendFone.value = v.fone || '';
@@ -929,16 +1007,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // ============================================================
-        // SUBMIT — vendedor com tipoPessoa PF/PJ (exigido pelo backend)
+        // SUBMIT
         // ============================================================
         if (vendedorForm) {
             vendedorForm.addEventListener('submit', async e => {
                 e.preventDefault();
-                const nome = document.getElementById('vend-nome').value.trim();
+                const nome = vendNome?.value.trim() || '';
                 if (!nome) return showWarning('Informe o nome do vendedor.');
                 if (!currentVendedorUsuario) return showWarning('Selecione um usuário do sistema para vincular ao vendedor.');
 
-                // tipoPessoa é obrigatório (PF ou PJ)
                 const tipoPessoaRaw = (vendTipoPessoa?.value || '').toUpperCase().trim();
                 const tipoPessoa = tipoPessoaRaw === 'F'  ? 'PF'
                                  : tipoPessoaRaw === 'J'  ? 'PJ'
@@ -947,7 +1024,10 @@ document.addEventListener('DOMContentLoaded', () => {
                                  : '';
                 if (!tipoPessoa) return showWarning('Informe o Tipo de Pessoa (Física ou Jurídica).');
 
-                // Monta payload completo
+                // Higienização final antes do envio
+                higienizarFone();
+                atualizarLimitesDocumento();
+
                 const payloadCadastro = {
                     tipoPessoa,
                     cpfCnpj: vendCpfCnpj?.value.trim() || null,
@@ -973,7 +1053,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 try {
                     let vendedorId = editingVendedorId;
 
-                    // ---------- ETAPA 1: criar/atualizar vendedor ----------
                     if (editingVendedorId) {
                         await apiPut(`${ENDPOINT}/${editingVendedorId}`, payloadUpdate);
                         console.log(`[vendedores] PUT ok — id=${editingVendedorId}`);
@@ -985,7 +1064,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             vendedorId = dados?.id ?? dados?.codigo ?? dados?.vendedorId;
                             console.log(`[vendedores] POST ok — id=${vendedorId}`);
                         } catch (errCriacao) {
-                            // Fallback: se der 503 por causa de loginIds/empresaIds, tenta sem eles
                             const msg = extrairMensagemErro(errCriacao).toLowerCase();
                             const eh503 = String(errCriacao?.message || '').includes('503')
                                        || msg.includes('não foi possível concluir');
@@ -1007,7 +1085,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             vendedorId = dados?.id ?? dados?.codigo ?? dados?.vendedorId;
                             console.log(`[vendedores] POST fallback ok — id=${vendedorId}`);
 
-                            // vincula login e empresas separadamente
                             if (vendedorId && currentVendedorUsuario?.id) {
                                 try {
                                     await apiPost(`${ENDPOINT}/${vendedorId}/logins`, { loginId: currentVendedorUsuario.id });
@@ -1036,7 +1113,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 } catch (err) {
                     console.error('[vendedores] erro no submit:', err);
-                    showWarning('Erro ao salvar vendedor: ' + extrairMensagemErro(err));
+                    const msg = extrairMensagemErro(err);
+                    if (msg.includes('Não foi possível concluir')) {
+                        showWarning(
+                            '⚠️ O servidor está com um problema temporário.\n\n' +
+                            'Já reportamos ao time de TI. Tente novamente mais tarde.\n\n' + msg,
+                            'Serviço indisponível'
+                        );
+                    } else {
+                        showWarning('Erro ao salvar vendedor: ' + msg);
+                    }
                 } finally {
                     btnSaveVendedor.disabled = false;
                     btnSaveVendedor.innerText = orig;
@@ -1074,7 +1160,6 @@ document.addEventListener('DOMContentLoaded', () => {
             Core.registerScreen('vendedores', vendedoresScreen);
         }
 
-        // Pré-carrega
         carregarVendedores();
         carregarListaUsuarios().catch(() => {});
         carregarListaEmpresas().catch(() => {});
