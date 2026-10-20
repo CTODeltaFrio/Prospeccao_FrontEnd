@@ -30,6 +30,20 @@ document.addEventListener('DOMContentLoaded', async function() {
         catch (e) { /* silencioso */ }
     }
 
+    // ✅ Helper centralizado para limpar cache de ignorados (por empresa ou global)
+    function limparCacheIgnorados(empresaId = null) {
+        try {
+            if (empresaId) {
+                localStorage.removeItem(`${CACHE.IGNORADOS.key}_${empresaId}`);
+            } else {
+                localStorage.removeItem(CACHE.IGNORADOS.key);
+                Object.keys(localStorage)
+                    .filter(k => k.startsWith(CACHE.IGNORADOS.key + '_'))
+                    .forEach(k => localStorage.removeItem(k));
+            }
+        } catch (e) { /* silencioso */ }
+    }
+
     function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
     async function executarEmLotesComPausa(itens, limite, pausaMs, fn, onProgress) {
@@ -249,7 +263,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         function setDirty(v) { isDirty = v; }
 
         // ============================================================
-        // ✅ CONTEXTO + EMPRESA ATIVA (novo)
+        // ✅ CONTEXTO + EMPRESA ATIVA
         // ============================================================
         let contextoCache = null;
         let empresaAtivaId = null;
@@ -329,7 +343,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 atualizarSeletorEmpresa();
                 console.log('✅ [contexto]', {
                     empresas: (ctx?.empresas || []).length,
-                    capacidades: ctx?.capacidades || '—'
+                    capacidades: ctx?.capacidades || '(não retornado pelo backend)'
                 });
                 return ctx;
             } catch (e) {
@@ -342,10 +356,31 @@ document.addEventListener('DOMContentLoaded', async function() {
             companySelector.addEventListener('change', function () {
                 const id = this.value || null;
                 definirEmpresaAtivaId(id);
-                // Recarrega pesquisas/ignorados quando troca de empresa
-                if (registros.length) { currentPage = 1; historicoCursors = [null]; cursorAtual = null; registros = []; renderTable([]); }
+
+                // ✅ Limpa TODOS os caches por empresa (inclui a empresa antiga e a nova)
+                limparCacheIgnorados(); // global — remove todas as chaves `_empresaId`
+
+                // ✅ Reseta estado de ignorados
                 ignoradosCarregados = false;
-                ignorados = []; ignoradosFiltrados = [];
+                ignorados = [];
+                ignoradosFiltrados = [];
+
+                // ✅ Reseta resultados da pesquisa
+                if (registros.length) {
+                    currentPage = 1;
+                    historicoCursors = [null];
+                    cursorAtual = null;
+                    registros = [];
+                    temMais = false;
+                    renderTable([]);
+                }
+
+                // ✅ Se estiver na tela de ignorados, recarrega com a nova empresa
+                if (ignoradosScreen.style.display === 'block') {
+                    carregarIgnorados();
+                }
+
+                console.log(`🔄 Empresa ativa alterada para: ${id || '(nenhuma)'}`);
             });
         }
 
@@ -736,46 +771,113 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
 
         // ============================================================
-        // IGNORADOS (agora usa empresaId na query)
+        // IGNORADOS (com empresaId obrigatório + cache por empresa)
         // ============================================================
         async function carregarIgnorados() {
             if (ignoradosCarregados) return;
+
             const empresaId = obterEmpresaAtivaId();
 
-            const cache = cacheGet(CACHE.IGNORADOS);
-            if (cache) {
-                ignorados = cache;
+            // ✅ Se não há empresa ativa, mostra instrução clara (backend exige empresaId)
+            if (!empresaId) {
+                ignorados = [];
+                ignoradosFiltrados = [];
                 ignoradosCarregados = true;
-                ignoradosFiltrados = [...ignorados];
                 renderIgnoradosTable();
+                const tb = document.getElementById('ignorados-table-body');
+                if (tb) {
+                    tb.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-secondary);">
+                        <i class="fas fa-info-circle" style="font-size:20px;display:block;margin-bottom:8px;"></i>
+                        Selecione uma empresa ativa na barra lateral para ver os ignorados.
+                    </td></tr>`;
+                }
+                console.warn('[ignorados] nenhuma empresa ativa selecionada');
                 return;
             }
 
+            // ✅ Cache POR empresa — só usa se tiver itens (> 0)
+            const cacheKey = `${CACHE.IGNORADOS.key}_${empresaId}`;
             try {
-                const url = empresaId
-                    ? `${API_URL}/prospeccao/status-estabelecimentos?status=X&empresaId=${encodeURIComponent(empresaId)}`
-                    : `${API_URL}/prospeccao/status-estabelecimentos?status=X`;
-                const r = await fetch(url, { credentials: 'include', headers: { 'Accept': 'application/json' } });
-                if (!r.ok) {
-                    const json = await r.json().catch(() => ({}));
-                    throw extrairErroResposta(json, r.status);
+                const raw = localStorage.getItem(cacheKey);
+                if (raw) {
+                    const { ts, dados } = JSON.parse(raw);
+                    if (Date.now() - ts <= CACHE.IGNORADOS.ttl && Array.isArray(dados) && dados.length > 0) {
+                        ignorados = dados;
+                        ignoradosCarregados = true;
+                        ignoradosFiltrados = [...ignorados];
+                        renderIgnoradosTable();
+                        console.log(`✅ [ignorados] ${ignorados.length} do cache (empresa ${empresaId})`);
+                        return;
+                    }
+                    localStorage.removeItem(cacheKey);
                 }
-                const d = await r.json();
-                const lista = d.registros || d.dados?.registros || d.dados || [];
-                ignorados = (Array.isArray(lista) ? lista : []).map(i => ({
-                    cnpj: i.cnpj, cnpjFormatado: i.cnpjFormatado, razaoSocial: i.razaoSocial,
-                    nomeFantasia: i.nomeFantasia, uf: i.uf, municipio: i.municipio,
-                    telefone1: i.telefone1, telefone2: i.telefone2, email: i.email,
+            } catch (e) { /* segue */ }
+
+            // ✅ Remove chave antiga global (versões anteriores)
+            try { localStorage.removeItem(CACHE.IGNORADOS.key); } catch (e) {}
+
+            // ✅ Fetch com empresaId OBRIGATÓRIO na query
+            try {
+                const url = `${API_URL}/prospeccao/status-estabelecimentos?status=X&empresaId=${encodeURIComponent(empresaId)}`;
+                console.log(`[ignorados] GET ${url}`);
+
+                const r = await fetch(url, { credentials: 'include', headers: { 'Accept': 'application/json' } });
+                const raw = await r.text();
+                console.log(`[ignorados] → HTTP ${r.status}`);
+
+                if (!r.ok) {
+                    let json = {}; try { json = JSON.parse(raw); } catch (e) {}
+                    const erro = extrairErroResposta(json, r.status);
+                    throw new Error(erro.mensagem || `HTTP ${r.status}`);
+                }
+
+                let d = {}; try { d = raw ? JSON.parse(raw) : {}; } catch (e) { d = {}; }
+
+                // ✅ Parsing tolerante a todos os formatos
+                let lista = [];
+                if (Array.isArray(d))                        lista = d;
+                else if (Array.isArray(d.registros))         lista = d.registros;
+                else if (Array.isArray(d.dados))             lista = d.dados;
+                else if (Array.isArray(d.dados?.registros))  lista = d.dados.registros;
+                else if (Array.isArray(d.itens))             lista = d.itens;
+                else if (Array.isArray(d.content))           lista = d.content;
+
+                ignorados = lista.map(i => ({
+                    cnpj: i.cnpj,
+                    cnpjFormatado: i.cnpjFormatado,
+                    razaoSocial: i.razaoSocial,
+                    nomeFantasia: i.nomeFantasia,
+                    uf: i.uf,
+                    municipio: i.municipio,
+                    ddd: i.ddd,
+                    telefone1: i.telefone1,
+                    telefone2: i.telefone2,
+                    email: i.email,
                     status: i.status || 'X'
                 }));
+
                 ignoradosCarregados = true;
                 ignoradosFiltrados = [...ignorados];
                 renderIgnoradosTable();
-                cacheSet(CACHE.IGNORADOS, ignorados);
+                console.log(`✅ [ignorados] ${ignorados.length} itens carregados (empresa ${empresaId})`);
+
+                // ✅ SÓ salva cache se tiver itens (evita cache envenenado)
+                if (ignorados.length > 0) {
+                    try {
+                        localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), dados: ignorados }));
+                    } catch (e) {}
+                }
             } catch (e) {
-                console.warn('[ignorados] erro:', e?.mensagem || e?.message);
+                console.error('[ignorados] erro:', e?.message || e);
                 ignorados = []; ignoradosFiltrados = [];
+                ignoradosCarregados = true;
                 renderIgnoradosTable();
+                const tb = document.getElementById('ignorados-table-body');
+                if (tb) {
+                    tb.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:#dc2626;">
+                        Erro ao carregar ignorados: ${e?.message || 'erro desconhecido'}
+                    </td></tr>`;
+                }
             }
         }
 
@@ -846,10 +948,13 @@ document.addEventListener('DOMContentLoaded', async function() {
                 `${API_URL}/prospeccao/status-estabelecimentos?empresaId=${encodeURIComponent(empresaId)}`,
                 { cnpjCompleto: cnpj, status }
             );
-            localStorage.removeItem(CACHE.IGNORADOS.key);
+            limparCacheIgnorados(empresaId);
         }
 
-        function removerStatusIgnorado(cnpj) { localStorage.removeItem(CACHE.IGNORADOS.key); }
+        function removerStatusIgnorado(cnpj) {
+            const empresaId = obterEmpresaAtivaId();
+            limparCacheIgnorados(empresaId || null);
+        }
         function filtrarIgnorados() {
             const t = ignoradosSearch ? ignoradosSearch.value.toLowerCase().trim() : '';
             ignoradosFiltrados = !t ? [...ignorados] : ignorados.filter(i => (i.cnpj && i.cnpj.includes(t)) || (i.cnpjFormatado && i.cnpjFormatado.includes(t)) || (i.razaoSocial && i.razaoSocial.toLowerCase().includes(t)) || (i.nomeFantasia && i.nomeFantasia.toLowerCase().includes(t)) || (i.uf && i.uf.toLowerCase().includes(t)) || (i.telefone1 && i.telefone1.includes(t)) || (i.municipio && i.municipio.toLowerCase().includes(t)));
@@ -988,20 +1093,17 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
 
         async function classificar(cnpj, novoStatus, statusAtual) {
-            // Se já está no status desejado, apenas fecha
             if (statusAtual === novoStatus) {
                 detailsModal.style.display = 'none';
                 return;
             }
 
-            // Se já existe OUTRO status (C ou X), precisa excluir primeiro (backend retorna 409)
             if (statusAtual && statusAtual !== novoStatus) {
                 showConfirm(
                     'Trocar classificação',
                     `Este estabelecimento já está classificado como "${statusAtual}". Para mudar para "${novoStatus}", é necessário excluir a classificação atual primeiro. Deseja continuar?`,
                     async () => {
                         try {
-                            // Tenta excluir. Se backend ainda não tem endpoint, vai falhar
                             const empresaId = obterEmpresaAtivaId();
                             await apiDelete(`${API_URL}/prospeccao/status-estabelecimentos/${encodeURIComponent(cnpj)}?empresaId=${encodeURIComponent(empresaId)}`);
                             await salvarStatus(cnpj, novoStatus);
@@ -1009,8 +1111,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                             detailsModal.style.display = 'none';
                             showWarning(`Classificação alterada para "${novoStatus}".`, 'Sucesso');
                         } catch (e) {
-                            // Se for 409, o backend exige exclusão
-                            if (e.codigo === 409) {
+                            if (e.codigo === 409 || e.codigo === 'conflito') {
                                 showWarning('O servidor exige exclusão antes da troca. Avise o time de TI.', 'Atenção');
                             } else {
                                 showWarning('Erro ao trocar classificação: ' + (e.message || ''));
@@ -1021,7 +1122,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                 return;
             }
 
-            // Sem status → cria novo direto
             try {
                 await salvarStatus(cnpj, novoStatus);
                 await recarregarAposClassificacao();
@@ -1037,11 +1137,23 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
 
         async function recarregarAposClassificacao() {
-            // Recarrega ignorados (X) e limpa cache
+            // ✅ Limpa cache por empresa (não global, pois só a empresa atual mudou)
+            const empresaId = obterEmpresaAtivaId();
+            if (empresaId) {
+                limparCacheIgnorados(empresaId);
+            } else {
+                limparCacheIgnorados();
+            }
+
+            // ✅ Reseta estado em memória
             ignoradosCarregados = false;
-            ignorados = []; ignoradosFiltrados = [];
-            localStorage.removeItem(CACHE.IGNORADOS.key);
-            if (ignoradosScreen.style.display === 'block') await carregarIgnorados();
+            ignorados = [];
+            ignoradosFiltrados = [];
+
+            // ✅ Se estiver na tela de ignorados, recarrega com a empresa atual
+            if (ignoradosScreen.style.display === 'block') {
+                await carregarIgnorados();
+            }
         }
 
         window.novoSegmento = function() { if (isDirty) { showUnsavedChangesModal('Deseja salvar antes de criar um novo segmento?', function() { document.getElementById('segmentoForm').requestSubmit(); resetSegmentForm(); }, function() { resetSegmentForm(); }); } else resetSegmentForm(); };
@@ -1421,6 +1533,37 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
         window.initMap = initMap;
 
+        // ============================================================
+        // ✅ Debug helpers — úteis para o suporte
+        // ============================================================
+        window.limparCacheIgnoradosDebug = function () {
+            limparCacheIgnorados();
+            console.log('🧹 Cache de ignorados limpo (todas as empresas).');
+        };
+
+        window.recarregarIgnoradosDebug = function () {
+            limparCacheIgnorados();
+            ignoradosCarregados = false;
+            ignorados = [];
+            ignoradosFiltrados = [];
+            carregarIgnorados();
+            console.log('🔄 Ignorados recarregados (chamada manual).');
+        };
+
+        window.verCacheIgnoradosDebug = function () {
+            const chaves = Object.keys(localStorage).filter(k => k.startsWith(CACHE.IGNORADOS.key));
+            if (!chaves.length) { console.log('📦 Cache vazio'); return; }
+            chaves.forEach(k => {
+                const raw = localStorage.getItem(k);
+                try {
+                    const { ts, dados } = JSON.parse(raw);
+                    console.log(`📦 ${k}: ${dados.length} itens (salvo em ${new Date(ts).toLocaleString()})`);
+                } catch (e) {
+                    console.log(`📦 ${k}: (inválido)`);
+                }
+            });
+        };
+
         window.AppCore = {
             apiGet, apiPost, apiPut, apiPatch, apiDelete,
             apiGetEnvelope,
@@ -1438,6 +1581,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             getEmpresaAtivaId: () => obterEmpresaAtivaId(),
             setEmpresaAtivaId: (id) => definirEmpresaAtivaId(id),
             carregarContexto,
+            limparCacheIgnorados,
         };
         console.log('✅ [AppCore] SDK disponível para módulos externos.');
 
