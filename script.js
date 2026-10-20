@@ -211,13 +211,19 @@ document.addEventListener('DOMContentLoaded', async function() {
         const btnConfirmOk = document.getElementById('btn-confirm-ok');
         const btnConfirmCancel = document.getElementById('btn-confirm-cancel');
         const btnConfirmDiscard = document.getElementById('btn-confirm-discard');
-        const btnIgnoreCadastro = document.getElementById('btn-ignore-cadastro');
         let confirmCallback = null;
 
         const genericModalBody = document.getElementById('generic-modal-body');
         const genericModalTitle = document.getElementById('generic-modal-title');
         const genericModalSubtitle = document.getElementById('generic-modal-subtitle');
         const genericSearch = document.getElementById('generic-search');
+
+        // ✅ Novos elementos: seletor de empresa + botões de classificação
+        const companySelectorWrapper = document.getElementById('company-selector-wrapper');
+        const companySelector        = document.getElementById('company-selector');
+        const btnClassifyX           = document.getElementById('btn-classify-x');
+        const btnClassifyC           = document.getElementById('btn-classify-c');
+        const detClassificacao       = document.getElementById('det-classificacao');
 
         // ===== DADOS =====
         let editingSegmentId = null;
@@ -241,6 +247,145 @@ document.addEventListener('DOMContentLoaded', async function() {
         window.registros = registros;
         let isDirty = false;
         function setDirty(v) { isDirty = v; }
+
+        // ============================================================
+        // ✅ CONTEXTO + EMPRESA ATIVA (novo)
+        // ============================================================
+        let contextoCache = null;
+        let empresaAtivaId = null;
+        const STORAGE_KEY = 'deltafrio_empresa_ativa';
+
+        function obterEmpresaAtivaId() {
+            if (empresaAtivaId) return empresaAtivaId;
+            try {
+                const salvo = sessionStorage.getItem(STORAGE_KEY);
+                if (salvo) { empresaAtivaId = salvo; return salvo; }
+            } catch (e) {}
+            // Fallback: se só existe 1 empresa, usa automaticamente
+            if (contextoCache?.empresas?.length === 1) {
+                empresaAtivaId = String(contextoCache.empresas[0].id);
+                try { sessionStorage.setItem(STORAGE_KEY, empresaAtivaId); } catch (e) {}
+                return empresaAtivaId;
+            }
+            return null;
+        }
+
+        function definirEmpresaAtivaId(id) {
+            empresaAtivaId = id ? String(id) : null;
+            try {
+                if (empresaAtivaId) sessionStorage.setItem(STORAGE_KEY, empresaAtivaId);
+                else sessionStorage.removeItem(STORAGE_KEY);
+            } catch (e) {}
+            atualizarSeletorEmpresa();
+        }
+
+        function atualizarSeletorEmpresa() {
+            if (!companySelector || !companySelectorWrapper) return;
+            const empresas = contextoCache?.empresas || [];
+
+            if (!empresas.length) {
+                companySelectorWrapper.style.display = 'none';
+                return;
+            }
+
+            companySelectorWrapper.style.display = 'block';
+            const ativo = obterEmpresaAtivaId();
+            companySelector.innerHTML = '';
+            if (!ativo) {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = '— Selecione —';
+                companySelector.appendChild(opt);
+            }
+            empresas.forEach(e => {
+                const opt = document.createElement('option');
+                opt.value = String(e.id);
+                opt.textContent = e.nomeFantasia || e.razaoSocial || `#${e.id}`;
+                companySelector.appendChild(opt);
+            });
+            if (ativo) companySelector.value = ativo;
+        }
+
+        async function carregarContexto() {
+            try {
+                const r = await fetch(`${API_URL}/prospeccao/contexto`, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (!r.ok) {
+                    const json = await r.json().catch(() => ({}));
+                    const erro = extrairErroResposta(json, r.status);
+                    console.error('[contexto] falhou:', erro);
+                    return null;
+                }
+                const json = await r.json();
+                const ctx = json?.dados ?? json;
+                contextoCache = ctx;
+                // Se empresa ativa não existe mais, limpa
+                const ativo = obterEmpresaAtivaId();
+                const ids = (ctx?.empresas || []).map(e => String(e.id));
+                if (ativo && !ids.includes(String(ativo))) definirEmpresaAtivaId(null);
+                atualizarSeletorEmpresa();
+                console.log('✅ [contexto]', {
+                    empresas: (ctx?.empresas || []).length,
+                    capacidades: ctx?.capacidades || '—'
+                });
+                return ctx;
+            } catch (e) {
+                console.error('[contexto] erro:', e);
+                return null;
+            }
+        }
+
+        if (companySelector) {
+            companySelector.addEventListener('change', function () {
+                const id = this.value || null;
+                definirEmpresaAtivaId(id);
+                // Recarrega pesquisas/ignorados quando troca de empresa
+                if (registros.length) { currentPage = 1; historicoCursors = [null]; cursorAtual = null; registros = []; renderTable([]); }
+                ignoradosCarregados = false;
+                ignorados = []; ignoradosFiltrados = [];
+            });
+        }
+
+        // ============================================================
+        // ERRO UNIFICADO (novo + legado)
+        // ============================================================
+        function extrairErroResposta(json, httpStatus) {
+            if (!json) return { codigo: null, mensagem: `HTTP ${httpStatus || '?'}`, traceId: '' };
+            // Novo formato: {codigo, mensagem, traceId}
+            if (json.codigo != null || (json.mensagem && !json.erros && !json.retorno)) {
+                return {
+                    codigo: json.codigo ?? null,
+                    mensagem: json.mensagem || 'Erro',
+                    traceId: json.traceId || ''
+                };
+            }
+            // Legado: {retorno, dados, erros, traceId}
+            if (Array.isArray(json.erros) && json.erros.length) {
+                const e = json.erros[0];
+                return {
+                    codigo: e.id ?? null,
+                    mensagem: e.motivo || e.message || 'Erro',
+                    traceId: json.traceId || ''
+                };
+            }
+            // Fallback
+            return {
+                codigo: null,
+                mensagem: json.message || json.title || `HTTP ${httpStatus || '?'}`,
+                traceId: json.traceId || ''
+            };
+        }
+
+        function extrairErro(err) {
+            if (err?.codigo !== undefined || err?.mensagem !== undefined) {
+                return { codigo: err.codigo, mensagem: err.mensagem, traceId: err.traceId || '' };
+            }
+            if (err?.message) return { codigo: null, mensagem: err.message, traceId: err.traceId || '' };
+            return { codigo: null, mensagem: String(err), traceId: '' };
+        }
 
         function setActiveMenuItem(id) {
             document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
@@ -297,9 +442,6 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         function normalizarTexto(t) { return t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
 
-        // ============================================================
-        // CSRF — leitura do cookie
-        // ============================================================
         function obterCsrf() {
             const m = document.cookie.split('; ').find(c => c.startsWith('login_delta_csrf='));
             return m ? decodeURIComponent(m.split('=')[1]) : '';
@@ -309,13 +451,19 @@ document.addEventListener('DOMContentLoaded', async function() {
         // API
         // ============================================================
         async function apiGet(url) {
-            const r = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
-            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            const r = await fetch(url, { method: 'GET', credentials: 'include', headers: { 'Accept': 'application/json' } });
             const t = await r.text(); if (!t) return {};
-            try { return JSON.parse(t); } catch (e) { return {}; }
+            let json; try { json = JSON.parse(t); } catch (e) { json = {}; }
+            if (!r.ok) {
+                const e = extrairErroResposta(json, r.status);
+                const err = new Error(e.mensagem);
+                err.codigo = e.codigo;
+                err.traceId = e.traceId;
+                throw err;
+            }
+            return json;
         }
 
-        // Envelope {retorno, dados, erros, traceId} → devolve só `dados`
         async function apiGetEnvelope(url) {
             const r = await apiGet(url);
             if (r && typeof r === 'object' && 'dados' in r) return r.dados;
@@ -326,45 +474,74 @@ document.addEventListener('DOMContentLoaded', async function() {
             const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
             const csrf = obterCsrf();
             if (csrf) headers['X-CSRF-Token'] = csrf;
-            const r = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+            const r = await fetch(url, { method: 'POST', credentials: 'include', headers, body: JSON.stringify(body) });
             const t = await r.text();
-            if (!r.ok) { let msg = `HTTP ${r.status}`; try { const j = JSON.parse(t); msg = j.message || j.mensagem || j.title || (j.erros && j.erros[0]) || msg; } catch (e) {} throw new Error(msg); }
-            if (!t) return {}; try { return JSON.parse(t); } catch (e) { return {}; }
+            let json; try { json = t ? JSON.parse(t) : {}; } catch (e) { json = {}; }
+            if (!r.ok) {
+                const e = extrairErroResposta(json, r.status);
+                const err = new Error(e.mensagem);
+                err.codigo = e.codigo;
+                err.traceId = e.traceId;
+                throw err;
+            }
+            return json;
         }
 
         async function apiPut(url, body) {
             const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
             const csrf = obterCsrf();
             if (csrf) headers['X-CSRF-Token'] = csrf;
-            const r = await fetch(url, { method: 'PUT', headers, body: JSON.stringify(body) });
+            const r = await fetch(url, { method: 'PUT', credentials: 'include', headers, body: JSON.stringify(body) });
             const t = await r.text();
-            if (!r.ok) { let msg = `HTTP ${r.status}`; try { const j = JSON.parse(t); msg = j.message || j.mensagem || (j.erros && j.erros[0]) || msg; } catch (e) {} throw new Error(msg); }
-            if (!t) return {}; try { return JSON.parse(t); } catch (e) { return {}; }
+            let json; try { json = t ? JSON.parse(t) : {}; } catch (e) { json = {}; }
+            if (!r.ok) {
+                const e = extrairErroResposta(json, r.status);
+                const err = new Error(e.mensagem);
+                err.codigo = e.codigo;
+                err.traceId = e.traceId;
+                throw err;
+            }
+            return json;
         }
 
         async function apiPatch(url, body) {
             const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
             const csrf = obterCsrf();
             if (csrf) headers['X-CSRF-Token'] = csrf;
-            const r = await fetch(url, { method: 'PATCH', headers, body: JSON.stringify(body) });
+            const r = await fetch(url, { method: 'PATCH', credentials: 'include', headers, body: JSON.stringify(body) });
             const t = await r.text();
-            if (!r.ok) { let msg = `HTTP ${r.status}`; try { const j = JSON.parse(t); msg = j.message || j.mensagem || (j.erros && j.erros[0]) || msg; } catch (e) {} throw new Error(msg); }
-            if (!t) return {}; try { return JSON.parse(t); } catch (e) { return {}; }
+            let json; try { json = t ? JSON.parse(t) : {}; } catch (e) { json = {}; }
+            if (!r.ok) {
+                const e = extrairErroResposta(json, r.status);
+                const err = new Error(e.mensagem);
+                err.codigo = e.codigo;
+                err.traceId = e.traceId;
+                throw err;
+            }
+            return json;
         }
 
         async function apiDelete(url) {
             const headers = { 'Accept': 'application/json' };
             const csrf = obterCsrf();
             if (csrf) headers['X-CSRF-Token'] = csrf;
-            const r = await fetch(url, { method: 'DELETE', headers });
-            if (!r.ok) throw new Error(`HTTP ${r.status}`);
-            return r.status === 204 ? null : await r.json();
+            const r = await fetch(url, { method: 'DELETE', credentials: 'include', headers });
+            if (!r.ok) {
+                const t = await r.text();
+                let json; try { json = t ? JSON.parse(t) : {}; } catch (e) { json = {}; }
+                const e = extrairErroResposta(json, r.status);
+                const err = new Error(e.mensagem);
+                err.codigo = e.codigo;
+                err.traceId = e.traceId;
+                throw err;
+            }
+            return r.status === 204 ? null : await r.json().catch(() => null);
         }
 
         async function fetchFromAPI(urls) {
             for (const url of urls) {
                 try {
-                    const r = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
+                    const r = await fetch(url, { method: 'GET', credentials: 'include', headers: { 'Accept': 'application/json' } });
                     if (!r.ok) throw new Error(`HTTP ${r.status}`);
                     const d = await r.json();
                     return Array.isArray(d) ? d : (d.data || d.results || []);
@@ -527,13 +704,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         // ============================================================
         async function carregarMunicipiosDaAPI() {
             if (municipiosCache && municipiosCache.length > 0) return municipiosCache;
-
             const cache = cacheGet(CACHE.MUNICIPIOS);
-            if (cache && cache.length > 0) {
-                municipiosCache = cache;
-                return municipiosCache;
-            }
-
+            if (cache && cache.length > 0) { municipiosCache = cache; return municipiosCache; }
             if (municipiosCarregando && municipiosPromise) return municipiosPromise;
 
             municipiosCarregando = true;
@@ -541,27 +713,20 @@ document.addEventListener('DOMContentLoaded', async function() {
                 try {
                     const dddData = await apiGet(`${API_URL}/ddds`);
                     const acumulado = [];
-
                     await executarEmLotesComPausa(dddData, 5, 20, async (d) => {
                         try {
                             const m = await apiGet(`${API_URL}/ddds/${d.ddd}/municipios`);
                             m.forEach(x => acumulado.push(`${x.municipio} - ${d.ddd}`));
                         } catch (e) { /* silencioso */ }
                     });
-
                     if (acumulado.length > 0) {
                         municipiosCache = [...new Set(acumulado)].sort();
                         cacheSet(CACHE.MUNICIPIOS, municipiosCache);
                     }
                     return municipiosCache || [];
-                } catch (e) {
-                    return [];
-                } finally {
-                    municipiosCarregando = false;
-                    municipiosPromise = null;
-                }
+                } catch (e) { return []; }
+                finally { municipiosCarregando = false; municipiosPromise = null; }
             })();
-
             return municipiosPromise;
         }
 
@@ -571,10 +736,11 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
 
         // ============================================================
-        // IGNORADOS
+        // IGNORADOS (agora usa empresaId na query)
         // ============================================================
         async function carregarIgnorados() {
             if (ignoradosCarregados) return;
+            const empresaId = obterEmpresaAtivaId();
 
             const cache = cacheGet(CACHE.IGNORADOS);
             if (cache) {
@@ -586,15 +752,28 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
 
             try {
-                const r = await fetch(`${API_URL}/prospeccao/status-estabelecimentos?status=X`, { headers: { 'Accept': 'application/json' } });
-                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                const url = empresaId
+                    ? `${API_URL}/prospeccao/status-estabelecimentos?status=X&empresaId=${encodeURIComponent(empresaId)}`
+                    : `${API_URL}/prospeccao/status-estabelecimentos?status=X`;
+                const r = await fetch(url, { credentials: 'include', headers: { 'Accept': 'application/json' } });
+                if (!r.ok) {
+                    const json = await r.json().catch(() => ({}));
+                    throw extrairErroResposta(json, r.status);
+                }
                 const d = await r.json();
-                ignorados = d.registros?.map(i => ({ cnpj: i.cnpj, cnpjFormatado: i.cnpjFormatado, razaoSocial: i.razaoSocial, nomeFantasia: i.nomeFantasia, uf: i.uf, municipio: i.municipio, telefone1: i.telefone1, telefone2: i.telefone2, email: i.email })) || [];
+                const lista = d.registros || d.dados?.registros || d.dados || [];
+                ignorados = (Array.isArray(lista) ? lista : []).map(i => ({
+                    cnpj: i.cnpj, cnpjFormatado: i.cnpjFormatado, razaoSocial: i.razaoSocial,
+                    nomeFantasia: i.nomeFantasia, uf: i.uf, municipio: i.municipio,
+                    telefone1: i.telefone1, telefone2: i.telefone2, email: i.email,
+                    status: i.status || 'X'
+                }));
                 ignoradosCarregados = true;
                 ignoradosFiltrados = [...ignorados];
                 renderIgnoradosTable();
                 cacheSet(CACHE.IGNORADOS, ignorados);
             } catch (e) {
+                console.warn('[ignorados] erro:', e?.mensagem || e?.message);
                 ignorados = []; ignoradosFiltrados = [];
                 renderIgnoradosTable();
             }
@@ -659,12 +838,17 @@ document.addEventListener('DOMContentLoaded', async function() {
             return d ? `(${d}) ${n}` : n;
         }
 
-        async function salvarStatusIgnorado(cnpj) {
-            try {
-                await apiPost(`${API_URL}/prospeccao/status-estabelecimentos`, { cnpjCompleto: cnpj, status: 'X' });
-                localStorage.removeItem(CACHE.IGNORADOS.key);
-            } catch (e) { /* silencioso */ }
+        // ✅ Salvar status agora exige empresaId na query
+        async function salvarStatus(cnpj, status) {
+            const empresaId = obterEmpresaAtivaId();
+            if (!empresaId) throw new Error('Selecione uma empresa ativa antes de classificar.');
+            await apiPost(
+                `${API_URL}/prospeccao/status-estabelecimentos?empresaId=${encodeURIComponent(empresaId)}`,
+                { cnpjCompleto: cnpj, status }
+            );
+            localStorage.removeItem(CACHE.IGNORADOS.key);
         }
+
         function removerStatusIgnorado(cnpj) { localStorage.removeItem(CACHE.IGNORADOS.key); }
         function filtrarIgnorados() {
             const t = ignoradosSearch ? ignoradosSearch.value.toLowerCase().trim() : '';
@@ -700,10 +884,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             tb.querySelectorAll('.btn-detail').forEach(b => b.addEventListener('click', function() { openDetailsModal(this.dataset.cnpj, true); }));
             setupCellTooltips();
         }
-        function restaurarIgnoradoPorCnpj(cnpj) {
-            const i = ignorados.findIndex(x => x.cnpj === cnpj); if (i === -1) { showWarning('Registro não encontrado.', 'Erro'); return; }
-            ignorados.splice(i, 1); ignoradosFiltrados = [...ignorados]; removerStatusIgnorado(cnpj); renderIgnoradosTable(); detailsModal.style.display = 'none'; showWarning('Registro removido da lista de ignorados.', 'Restaurado');
-        }
 
         let pesquisaController = null;
         async function pesquisarProspeccao(botao = null, cursor = null) {
@@ -712,28 +892,156 @@ document.addEventListener('DOMContentLoaded', async function() {
             let cnae = selectedCnaeCode; if (!cnae && filterCnaeInput.value.trim() !== '') { filterCnaeInput.value = ''; cnae = null; }
             const esc = filterTipoCnae ? filterTipoCnae.value : 'PRINCIPAL';
             const body = { uf: uf || null, ddd: uf ? null : (ddd || null), cnae: cnae || null, segmento: cnae ? null : (seg ? parseInt(seg) : null), escopoCnae: (cnae || seg) ? esc : null, ultimoCnpj: cursorEnv, limite: 50 };
+
             if (!body.uf && !body.ddd && !body.segmento && !body.cnae) { alert("Informe pelo menos um filtro."); return; }
+
+            // ✅ empresaId vai na QUERY, não no body
+            const empresaId = obterEmpresaAtivaId();
+            if (!empresaId) { alert("Selecione uma empresa ativa antes de pesquisar."); return; }
+
             btn.disabled = true; const origB = btn.innerHTML; const origP = pageIndicator.innerHTML;
             if (btn.classList.contains('page-btn')) pageIndicator.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; else btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Carregando...';
             if (pesquisaController) pesquisaController.abort(); pesquisaController = new AbortController();
             try {
-                const r = await fetch(`${API_URL}/prospeccao/pesquisar`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body), signal: pesquisaController.signal });
-                const t = await r.text(); if (!r.ok) { let m = `HTTP ${r.status}`; try { m = JSON.parse(t).message || m; } catch (e) {} throw new Error(m); }
-                const d = t ? JSON.parse(t) : {}; registros = d.registros || []; temMais = d.temMais || false; cursorAtual = d.ultimoCnpj || null; renderTable(registros);
-            } catch (e) { if (e.name !== 'AbortError') { console.error(e); alert("Erro ao pesquisar."); } if (btn.classList.contains('page-btn')) pageIndicator.innerHTML = origP; }
-            finally { btn.disabled = false; btn.innerHTML = origB; pesquisaController = null; }
+                const r = await fetch(
+                    `${API_URL}/prospeccao/pesquisar?empresaId=${encodeURIComponent(empresaId)}`,
+                    { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body), signal: pesquisaController.signal }
+                );
+                const t = await r.text();
+                let json; try { json = t ? JSON.parse(t) : {}; } catch (e) { json = {}; }
+                if (!r.ok) {
+                    const e = extrairErroResposta(json, r.status);
+                    const err = new Error(e.mensagem);
+                    err.codigo = e.codigo; err.traceId = e.traceId;
+                    throw err;
+                }
+                const d = json?.dados ?? json;
+                registros = d.registros || [];
+                temMais = d.temMais || false;
+                cursorAtual = d.ultimoCnpj || null;
+                renderTable(registros);
+            } catch (e) {
+                if (e.name !== 'AbortError') {
+                    console.error(e);
+                    alert("Erro ao pesquisar: " + (e.message || 'tente novamente'));
+                }
+                if (btn.classList.contains('page-btn')) pageIndicator.innerHTML = origP;
+            } finally {
+                btn.disabled = false; btn.innerHTML = origB; pesquisaController = null;
+            }
         }
 
+        // ✅ Detalhes agora expõe botões C e X com tratamento 409
         function openDetailsModal(cnpj, isIgn = false) {
-            const list = isIgn ? ignorados : registros; const c = list.find(i => i.cnpj === cnpj); if (!c) return;
-            document.getElementById('det-cnpj').innerText = c.cnpjFormatado; document.getElementById('det-razao').innerText = c.razaoSocial || '-'; document.getElementById('det-fantasia').innerText = c.nomeFantasia || '-';
-            const sit = document.getElementById('det-situacao'); sit.innerText = 'ATIVA'; sit.className = 'badge badge-green'; document.getElementById('det-tipo').innerText = 'MATRIZ';
-            document.getElementById('det-natureza').innerText = '-'; document.getElementById('det-porte').innerText = '-'; document.getElementById('det-capital').innerText = '-'; document.getElementById('det-inicio').innerText = '-'; document.getElementById('det-data-sit').innerText = '-'; document.getElementById('det-cnae').innerText = '-'; document.getElementById('det-logradouro').innerText = '-'; document.getElementById('det-numero').innerText = '-'; document.getElementById('det-complemento').innerText = '-'; document.getElementById('det-bairro').innerText = '-'; document.getElementById('det-cep').innerText = '-';
-            document.getElementById('det-municipio').innerText = c.municipio || '-'; document.getElementById('det-tel1').innerText = formatarTelefone(c.ddd, c.telefone1); document.getElementById('det-tel2').innerText = formatarTelefone(c.ddd, c.telefone2); document.getElementById('det-email').innerText = c.email || '-';
-            const btn = document.getElementById('btn-ignore-cadastro');
-            if (isIgn) { btn.innerText = 'Restaurar'; btn.className = 'btn-secondary'; btn.onclick = () => restaurarIgnoradoPorCnpj(cnpj); }
-            else { btn.innerText = 'Ignorar Cadastro'; btn.className = 'btn-secondary'; btn.onclick = () => { const co = registros.find(i => i.cnpj === cnpj); if (!co) { showWarning('Registro não encontrado.', 'Erro'); return; } showConfirm('Ignorar Cadastro', `Tem certeza que deseja ignorar "${co.razaoSocial || co.nomeFantasia || 'sem nome'}"?`, function() { const idx = registros.findIndex(i => i.cnpj === cnpj); if (idx !== -1) registros.splice(idx, 1); if (!ignorados.some(i => i.cnpj === cnpj)) { ignorados.push(co); ignoradosFiltrados = [...ignorados]; salvarStatusIgnorado(cnpj); } renderTable(registros); renderIgnoradosTable(); detailsModal.style.display = 'none'; showWarning('Cadastro ignorado!', 'Ignorado'); }); }; }
+            const list = isIgn ? ignorados : registros;
+            const c = list.find(i => i.cnpj === cnpj);
+            if (!c) return;
+
+            document.getElementById('det-cnpj').innerText = c.cnpjFormatado;
+            document.getElementById('det-razao').innerText = c.razaoSocial || '-';
+            document.getElementById('det-fantasia').innerText = c.nomeFantasia || '-';
+            const sit = document.getElementById('det-situacao'); sit.innerText = 'ATIVA'; sit.className = 'badge badge-green';
+            document.getElementById('det-tipo').innerText = 'MATRIZ';
+            document.getElementById('det-natureza').innerText = '-';
+            document.getElementById('det-porte').innerText = '-';
+            document.getElementById('det-capital').innerText = '-';
+            document.getElementById('det-inicio').innerText = '-';
+            document.getElementById('det-data-sit').innerText = '-';
+            document.getElementById('det-cnae').innerText = '-';
+            document.getElementById('det-logradouro').innerText = '-';
+            document.getElementById('det-numero').innerText = '-';
+            document.getElementById('det-complemento').innerText = '-';
+            document.getElementById('det-bairro').innerText = '-';
+            document.getElementById('det-cep').innerText = '-';
+            document.getElementById('det-municipio').innerText = c.municipio || '-';
+            document.getElementById('det-tel1').innerText = formatarTelefone(c.ddd, c.telefone1);
+            document.getElementById('det-tel2').innerText = formatarTelefone(c.ddd, c.telefone2);
+            document.getElementById('det-email').innerText = c.email || '-';
+
+            // Badge de classificação atual
+            const statusAtual = c.status || (isIgn ? 'X' : null);
+            if (detClassificacao) {
+                if (statusAtual === 'C') {
+                    detClassificacao.style.display = 'inline-block';
+                    detClassificacao.innerText = 'CLASSIFICADO C';
+                    detClassificacao.className = 'badge badge-blue';
+                } else if (statusAtual === 'X') {
+                    detClassificacao.style.display = 'inline-block';
+                    detClassificacao.innerText = 'SEM INTERESSE (X)';
+                    detClassificacao.className = 'badge badge-orange';
+                } else {
+                    detClassificacao.style.display = 'none';
+                }
+            }
+
+            // Botões C e X
+            if (btnClassifyX) {
+                btnClassifyX.onclick = () => classificar(cnpj, 'X', statusAtual);
+                btnClassifyX.disabled = (statusAtual === 'X');
+            }
+            if (btnClassifyC) {
+                btnClassifyC.onclick = () => classificar(cnpj, 'C', statusAtual);
+                btnClassifyC.disabled = (statusAtual === 'C');
+            }
+
             detailsModal.style.display = 'flex';
+        }
+
+        async function classificar(cnpj, novoStatus, statusAtual) {
+            // Se já está no status desejado, apenas fecha
+            if (statusAtual === novoStatus) {
+                detailsModal.style.display = 'none';
+                return;
+            }
+
+            // Se já existe OUTRO status (C ou X), precisa excluir primeiro (backend retorna 409)
+            if (statusAtual && statusAtual !== novoStatus) {
+                showConfirm(
+                    'Trocar classificação',
+                    `Este estabelecimento já está classificado como "${statusAtual}". Para mudar para "${novoStatus}", é necessário excluir a classificação atual primeiro. Deseja continuar?`,
+                    async () => {
+                        try {
+                            // Tenta excluir. Se backend ainda não tem endpoint, vai falhar
+                            const empresaId = obterEmpresaAtivaId();
+                            await apiDelete(`${API_URL}/prospeccao/status-estabelecimentos/${encodeURIComponent(cnpj)}?empresaId=${encodeURIComponent(empresaId)}`);
+                            await salvarStatus(cnpj, novoStatus);
+                            await recarregarAposClassificacao();
+                            detailsModal.style.display = 'none';
+                            showWarning(`Classificação alterada para "${novoStatus}".`, 'Sucesso');
+                        } catch (e) {
+                            // Se for 409, o backend exige exclusão
+                            if (e.codigo === 409) {
+                                showWarning('O servidor exige exclusão antes da troca. Avise o time de TI.', 'Atenção');
+                            } else {
+                                showWarning('Erro ao trocar classificação: ' + (e.message || ''));
+                            }
+                        }
+                    }
+                );
+                return;
+            }
+
+            // Sem status → cria novo direto
+            try {
+                await salvarStatus(cnpj, novoStatus);
+                await recarregarAposClassificacao();
+                detailsModal.style.display = 'none';
+                showWarning(`Classificado como "${novoStatus}".`, 'Sucesso');
+            } catch (e) {
+                if (e.codigo === 409) {
+                    showWarning('Este estabelecimento já possui classificação. Recarregue a página para atualizar.', 'Atenção');
+                } else {
+                    showWarning('Erro ao classificar: ' + (e.message || ''));
+                }
+            }
+        }
+
+        async function recarregarAposClassificacao() {
+            // Recarrega ignorados (X) e limpa cache
+            ignoradosCarregados = false;
+            ignorados = []; ignoradosFiltrados = [];
+            localStorage.removeItem(CACHE.IGNORADOS.key);
+            if (ignoradosScreen.style.display === 'block') await carregarIgnorados();
         }
 
         window.novoSegmento = function() { if (isDirty) { showUnsavedChangesModal('Deseja salvar antes de criar um novo segmento?', function() { document.getElementById('segmentoForm').requestSubmit(); resetSegmentForm(); }, function() { resetSegmentForm(); }); } else resetSegmentForm(); };
@@ -903,7 +1211,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.getElementById('filter-ddd').addEventListener('change', function() {});
 
         // ============================================================
-        // BOOT
+        // BOOT — inclui carregamento do contexto
         // ============================================================
         if (campoMunicipio) campoMunicipio.style.display = 'none';
         initializeCustomSelects();
@@ -911,6 +1219,9 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         (async function boot() {
             try {
+                // ✅ Contexto primeiro (bloqueia até pegar empresas + capacidades)
+                await carregarContexto();
+
                 await Promise.all([carregarUFs(), carregarDDDs(), carregarCnaesIniciais()]);
                 await carregarSegmentos();
                 updateSegmentFilter();
@@ -961,7 +1272,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (ufsGeojsonCache) return ufsGeojsonCache;
             try { const c = localStorage.getItem(UFS_CACHE_KEY); if (c) { ufsGeojsonCache = JSON.parse(c); return ufsGeojsonCache; } } catch (e) {}
             try {
-                const r = await fetch(`${API_MAPAS}/ufs`, { headers: { 'Accept': 'application/json' } });
+                const r = await fetch(`${API_MAPAS}/ufs`, { credentials: 'include', headers: { 'Accept': 'application/json' } });
                 if (!r.ok) throw new Error(`HTTP ${r.status}`);
                 ufsGeojsonCache = await r.json();
                 try { localStorage.setItem(UFS_CACHE_KEY, JSON.stringify(ufsGeojsonCache)); } catch (e) {}
@@ -972,7 +1283,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (municipiosGeojsonCache) return municipiosGeojsonCache;
             try { const c = localStorage.getItem(MUN_CACHE_KEY); if (c) { municipiosGeojsonCache = JSON.parse(c); return municipiosGeojsonCache; } } catch (e) {}
             try {
-                const r = await fetch(`${API_MAPAS}/municipios`, { headers: { 'Accept': 'application/json' } });
+                const r = await fetch(`${API_MAPAS}/municipios`, { credentials: 'include', headers: { 'Accept': 'application/json' } });
                 if (!r.ok) throw new Error(`HTTP ${r.status}`);
                 municipiosGeojsonCache = await r.json();
                 try { localStorage.setItem(MUN_CACHE_KEY, JSON.stringify(municipiosGeojsonCache)); } catch (e) { /* silencioso */ }
@@ -1016,13 +1327,14 @@ document.addEventListener('DOMContentLoaded', async function() {
                 if (!v.cidades || !v.cidades.length) continue;
                 try {
                     const r = await fetch(`${API_URL}/municipios/populacao/total`, {
-                        method: 'POST',
+                        method: 'POST', credentials: 'include',
                         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                         body: JSON.stringify({ codigosIbge: v.cidades.map(String) })
                     });
                     if (r.ok) {
                         const dados = await r.json();
-                        stats[v.id].pessoas = Number(dados?.populacaoTotal || 0);
+                        const d = dados?.dados ?? dados;
+                        stats[v.id].pessoas = Number(d?.populacaoTotal || 0);
                     }
                 } catch (e) { /* silencioso */ }
             }
@@ -1068,8 +1380,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         async function initMap() {
             const container = document.getElementById('map');
             if (!container) return;
-
-            // ✅ Carrega vendedores do endpoint antes de montar o mapa
             await carregarVendedoresMapa();
 
             const map = L.map('map', { minZoom: 3, maxZoom: 13, zoomControl: true, attributionControl: false }).setView([-14.2350, -51.9253], 4);
@@ -1118,10 +1428,16 @@ document.addEventListener('DOMContentLoaded', async function() {
             showScreen, setActiveMenuItem, registerScreen,
             showWarning, showConfirm,
             refreshCustomSelect, formatarTelefone,
+            extrairErroResposta, extrairErro,
             API_URL,
             getMapInstance: () => window.mapInstance,
             getVendedores: () => vendedoresMapa,
             carregarVendedoresMapa,
+            // ✅ Contexto exposto para outros módulos
+            getContexto: () => contextoCache,
+            getEmpresaAtivaId: () => obterEmpresaAtivaId(),
+            setEmpresaAtivaId: (id) => definirEmpresaAtivaId(id),
+            carregarContexto,
         };
         console.log('✅ [AppCore] SDK disponível para módulos externos.');
 
