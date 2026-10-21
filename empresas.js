@@ -3,30 +3,45 @@
 // Endpoints:
 //   POST /api/prospeccao/empresas
 //   PUT  /api/prospeccao/empresas/:id
-//   GET  /api/prospeccao/empresas          (listagem — assumido)
+//   GET  /api/prospeccao/empresas          (listagem)
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
 
-    function esperarAppCore() {
+    // ============================================================
+    // ✅ ESPERA O APPCORE REAL (não o fallback)
+    // ============================================================
+    function esperarAppCoreReal() {
         return new Promise((resolve, reject) => {
-            if (window.AppCore) return resolve(window.AppCore);
             let tentativas = 0;
-            const MAX = 300;
+            const MAX = 600; // 30 segundos
             const timer = setInterval(() => {
-                if (window.AppCore) { clearInterval(timer); resolve(window.AppCore); }
-                else if (++tentativas >= MAX) { clearInterval(timer); reject(new Error('Timeout aguardando window.AppCore')); }
+                if (window.AppCore && !window.AppCore.__isFallback) {
+                    clearInterval(timer);
+                    console.log('✅ [empresas] AppCore REAL detectado');
+                    resolve(window.AppCore);
+                } else if (++tentativas >= MAX) {
+                    clearInterval(timer);
+                    reject(new Error('Timeout aguardando AppCore real (30s)'));
+                }
             }, 50);
         });
     }
 
     (async () => {
-        let Core;
-        try { Core = await esperarAppCore(); }
-        catch (err) { console.error('[empresas] AppCore nunca foi exposto:', err.message); return; }
+        try { await esperarAppCoreReal(); }
+        catch (err) { console.error('[empresas] AppCore real nunca ficou pronto:', err.message); return; }
 
-        console.log('✅ [empresas] AppCore obtido, inicializando módulo...');
+        console.log('✅ [empresas] módulo inicializando...');
 
-        const { apiGetEnvelope, apiPost, apiPut, showWarning, API_URL } = Core;
+        // ============================================================
+        // ✅ WRAPPERS DINÂMICOS
+        // ============================================================
+        const apiGet        = (...args) => window.AppCore.apiGet(...args);
+        const apiPost       = (...args) => window.AppCore.apiPost(...args);
+        const apiPut        = (...args) => window.AppCore.apiPut(...args);
+        const apiGetEnvelope= (...args) => window.AppCore.apiGetEnvelope(...args);
+        const showWarning   = (...args) => window.AppCore.showWarning(...args);
+        const API_URL = '/api';
 
         const ENDPOINT = `${API_URL}/prospeccao/empresas`;
 
@@ -113,6 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             : [];
                 empresas = lista;
                 empresasCarregadas = true;
+                console.log(`✅ [empresas] ${empresas.length} empresa(s) carregada(s)`);
                 renderEmpresaTable(empresaSearch ? empresaSearch.value : '');
             } catch (e) {
                 console.warn('[empresas] erro ao carregar:', e.message);
@@ -252,7 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderEmpresaTable(this.value);
         });
 
-        // Força maiúsculas no CNPJ enquanto digita
+        // Força o CNPJ a ficar em maiúsculas enquanto digita
         empCnpj?.addEventListener('input', function () {
             const pos = this.selectionStart;
             this.value = this.value.toUpperCase();
@@ -299,8 +315,12 @@ document.addEventListener('DOMContentLoaded', () => {
             b.addEventListener('click', () => ativarAba(b.dataset.tab));
         });
 
-        // Expõe globalmente para o vendedores.js chamar
         window.__ativarAbaVendedoresEmpresas = ativarAba;
+
+        // ============================================================
+        // BOOT DO MÓDULO
+        // ============================================================
+        await carregarEmpresas();
 
         console.log('✅ [empresas] módulo carregado.');
     })();

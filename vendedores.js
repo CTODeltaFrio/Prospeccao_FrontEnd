@@ -1,37 +1,54 @@
 // ============================================================
 // VENDEDORES — módulo independente
-// Endpoints:
-//   /api/prospeccao/vendedores/*       (vendedores)
-//   /api/prospeccao/empresas           (vínculo com empresas locais)
+// Endpoints: /api/prospeccao/vendedores/*
+//            /api/prospeccao/empresas
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
 
-    function esperarAppCore() {
+    // ============================================================
+    // ✅ ESPERA O APPCORE REAL (não o fallback)
+    // ============================================================
+    function esperarAppCoreReal() {
         return new Promise((resolve, reject) => {
-            if (window.AppCore) return resolve(window.AppCore);
             let tentativas = 0;
-            const MAX = 300;
+            const MAX = 600; // 30 segundos
             const timer = setInterval(() => {
-                if (window.AppCore) { clearInterval(timer); resolve(window.AppCore); }
-                else if (++tentativas >= MAX) { clearInterval(timer); reject(new Error('Timeout aguardando window.AppCore')); }
+                if (window.AppCore && !window.AppCore.__isFallback) {
+                    clearInterval(timer);
+                    console.log('✅ [vendedores] AppCore REAL detectado');
+                    resolve(window.AppCore);
+                } else if (++tentativas >= MAX) {
+                    clearInterval(timer);
+                    reject(new Error('Timeout aguardando AppCore real (30s)'));
+                }
             }, 50);
         });
     }
 
     (async () => {
-        let Core;
-        try { Core = await esperarAppCore(); }
-        catch (err) { console.error('[vendedores] AppCore nunca foi exposto:', err.message); return; }
+        try { await esperarAppCoreReal(); }
+        catch (err) { console.error('[vendedores] AppCore real nunca ficou pronto:', err.message); return; }
 
-        console.log('✅ [vendedores] AppCore obtido, inicializando módulo...');
+        console.log('✅ [vendedores] módulo inicializando...');
 
-        const { apiGet, apiPost, apiPut, apiDelete, apiGetEnvelope,
-                showScreen, showWarning, showConfirm, API_URL } = Core;
+        // ============================================================
+        // ✅ WRAPPERS DINÂMICOS — sempre pegam a versão ATUAL do AppCore
+        // ============================================================
+        const apiGet        = (...args) => window.AppCore.apiGet(...args);
+        const apiPost       = (...args) => window.AppCore.apiPost(...args);
+        const apiPut        = (...args) => window.AppCore.apiPut(...args);
+        const apiPatch      = (...args) => window.AppCore.apiPatch(...args);
+        const apiDelete     = (...args) => window.AppCore.apiDelete(...args);
+        const apiGetEnvelope= (...args) => window.AppCore.apiGetEnvelope(...args);
+        const showScreen    = (...args) => window.AppCore.showScreen(...args);
+        const showWarning   = (...args) => window.AppCore.showWarning(...args);
+        const showConfirm   = (...args) => window.AppCore.showConfirm(...args);
+        const API_URL = '/api';
 
         const ENDPOINT = `${API_URL}/prospeccao/vendedores`;
 
         // ============================================================
-        // EXTRAIR MENSAGEM DE ERRO (envelope do backend)
+        // EXTRAIR MENSAGEM DE ERRO
         // ============================================================
         function extrairMensagemErro(err) {
             if (!err) return 'Erro desconhecido';
@@ -53,11 +70,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const p = err.erros[0];
                 return (p.motivo || p.message || p.title || 'Erro') + sufixo;
             }
-            if (err.message) return err.message + sufixo;
             if (err.mensagem) return err.mensagem + sufixo;
-            if (err.detail) return err.detail + sufixo;
-            if (err.title) return err.title + sufixo;
-            if (err.traceId) return `Erro (código: ${err.traceId})`;
+            if (err.message) return err.message + sufixo;
             return String(err) + sufixo;
         }
 
@@ -81,17 +95,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const vendCorLabel     = document.getElementById('vend-cor-label');
         const vendCorOptions   = document.getElementById('vend-cor-options');
 
-        // Cidades
         const vendCidadeSearch  = document.getElementById('vend-cidade-search');
         const vendCidadeSugg    = document.getElementById('vend-cidade-suggestions');
         const vendCidadesList   = document.getElementById('vend-cidades-list');
 
-        // DDDs
         const vendDddSearch     = document.getElementById('vend-ddd-search');
         const vendDddSugg       = document.getElementById('vend-ddd-suggestions');
         const vendDddsList      = document.getElementById('vend-ddds-list');
 
-        // Usuário
         const vendUsuarioSearch = document.getElementById('vend-usuario-search');
         const vendUsuarioSugg   = document.getElementById('vend-usuario-suggestions');
         const vendUsuarioCard   = document.getElementById('vend-usuario-selected');
@@ -100,7 +111,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const vendUsuarioEmail  = document.getElementById('vend-usuario-email');
         const vendUsuarioRemove = document.getElementById('vend-usuario-remove');
 
-        // Empresas
         const vendEmpresaSearch = document.getElementById('vend-empresa-search');
         const vendEmpresaSugg   = document.getElementById('vend-empresa-suggestions');
         const vendEmpresasList  = document.getElementById('vend-empresas-list');
@@ -119,6 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let currentVendedorDdds = [];
         let currentVendedorUsuario = null;
         let currentVendedorEmpresas = [];
+        let originalVendedorEmpresas = []; // ✅ Guarda o estado original das empresas
 
         let municipiosLista = null;
         let municipiosCarregando = false;
@@ -150,7 +161,6 @@ document.addEventListener('DOMContentLoaded', () => {
             String(nome || '?').trim().split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase();
         const normalizar = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 
-        // ✅ Efeito visual de "auto-preenchido"
         function flashAutoFill(el) {
             if (!el) return;
             el.classList.remove('auto-filled');
@@ -159,7 +169,6 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => el.classList.remove('auto-filled'), 1500);
         }
 
-        // ✅ Limita e higieniza CPF/CNPJ conforme tipoPessoa
         function atualizarLimitesDocumento() {
             if (!vendCpfCnpj) return;
             const tipo = vendTipoPessoa?.value || '';
@@ -175,7 +184,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (vendCpfCnpj.value !== cleaned) vendCpfCnpj.value = cleaned;
         }
 
-        // ✅ Higieniza o telefone (só dígitos, máximo 11)
         function higienizarFone() {
             if (!vendFone) return;
             const digits = vendFone.value.replace(/\D/g, '').slice(0, 11);
@@ -186,22 +194,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // DROPDOWN DE CORES
         // ============================================================
         const CORES_DISPONIVEIS = [
-            { hex: '#2463eb', nome: 'Azul' },
-            { hex: '#0ea5e9', nome: 'Céu' },
-            { hex: '#06b6d4', nome: 'Ciano' },
-            { hex: '#14b8a6', nome: 'Teal' },
-            { hex: '#10b981', nome: 'Esmeralda' },
-            { hex: '#22c55e', nome: 'Verde' },
-            { hex: '#84cc16', nome: 'Lima' },
-            { hex: '#eab308', nome: 'Amarelo' },
-            { hex: '#f59e0b', nome: 'Âmbar' },
-            { hex: '#f97316', nome: 'Laranja' },
-            { hex: '#ef4444', nome: 'Vermelho' },
-            { hex: '#dc2626', nome: 'Carmim' },
-            { hex: '#ec4899', nome: 'Rosa' },
-            { hex: '#a855f7', nome: 'Violeta' },
-            { hex: '#8b5cf6', nome: 'Roxo' },
-            { hex: '#64748b', nome: 'Cinza' }
+            { hex: '#2463eb', nome: 'Azul' }, { hex: '#0ea5e9', nome: 'Céu' },
+            { hex: '#06b6d4', nome: 'Ciano' }, { hex: '#14b8a6', nome: 'Teal' },
+            { hex: '#10b981', nome: 'Esmeralda' }, { hex: '#22c55e', nome: 'Verde' },
+            { hex: '#84cc16', nome: 'Lima' }, { hex: '#eab308', nome: 'Amarelo' },
+            { hex: '#f59e0b', nome: 'Âmbar' }, { hex: '#f97316', nome: 'Laranja' },
+            { hex: '#ef4444', nome: 'Vermelho' }, { hex: '#dc2626', nome: 'Carmim' },
+            { hex: '#ec4899', nome: 'Rosa' }, { hex: '#a855f7', nome: 'Violeta' },
+            { hex: '#8b5cf6', nome: 'Roxo' }, { hex: '#64748b', nome: 'Cinza' }
         ];
 
         function coresEmUso() {
@@ -226,13 +226,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (isSelected) classes.push('selected');
                 if (isUsed) classes.push('used');
                 const title = isUsed ? `${c.nome} (em uso por outro vendedor)` : c.nome;
-                return `<button type="button"
-                            class="${classes.join(' ')}"
-                            data-color="${c.hex}"
-                            data-nome="${c.nome}"
-                            title="${title}"
-                            style="background:${c.hex}; color:${c.hex};"
-                            ${isUsed ? 'disabled' : ''}></button>`;
+                return `<button type="button" class="${classes.join(' ')}" data-color="${c.hex}" data-nome="${c.nome}" title="${title}" style="background:${c.hex}; color:${c.hex};" ${isUsed ? 'disabled' : ''}></button>`;
             }).join('');
 
             vendCorOptions.querySelectorAll('.color-option:not(.used)').forEach(btn => {
@@ -257,14 +251,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        function abrirColorSelect() {
-            if (!vendCorSelect) return;
-            renderColorOptions();
-            vendCorSelect.classList.add('open');
-        }
-        function fecharColorSelect() {
-            if (vendCorSelect) vendCorSelect.classList.remove('open');
-        }
+        function abrirColorSelect() { if (!vendCorSelect) return; renderColorOptions(); vendCorSelect.classList.add('open'); }
+        function fecharColorSelect() { if (vendCorSelect) vendCorSelect.classList.remove('open'); }
 
         if (vendCorTrigger) {
             vendCorTrigger.addEventListener('click', function (e) {
@@ -275,20 +263,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         document.addEventListener('click', function (e) {
-            if (vendCorSelect && !e.target.closest('#vend-cor-select')) {
-                fecharColorSelect();
-            }
+            if (vendCorSelect && !e.target.closest('#vend-cor-select')) fecharColorSelect();
         });
 
-        // ============================================================
-        // INPUTS — limites dinâmicos
-        // ============================================================
-        if (vendTipoPessoa) {
-            vendTipoPessoa.addEventListener('change', atualizarLimitesDocumento);
-        }
-        if (vendCpfCnpj) {
-            vendCpfCnpj.addEventListener('input', atualizarLimitesDocumento);
-        }
+        if (vendTipoPessoa) vendTipoPessoa.addEventListener('change', atualizarLimitesDocumento);
+        if (vendCpfCnpj) vendCpfCnpj.addEventListener('input', atualizarLimitesDocumento);
         if (vendFone) {
             vendFone.addEventListener('input', higienizarFone);
             vendFone.addEventListener('paste', () => setTimeout(higienizarFone, 0));
@@ -348,7 +327,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (vendUsuarioEmail)  vendUsuarioEmail.textContent = currentVendedorUsuario.email || (currentVendedorUsuario.cpf ? formatarCPF(currentVendedorUsuario.cpf) : '—');
         }
 
-        // ✅ Ao vincular login: preenche NOME, CPF, E-MAIL e TIPO
         function selecionarUsuario(u) {
             if (!u) return;
             currentVendedorUsuario = { ...u };
@@ -356,20 +334,15 @@ document.addEventListener('DOMContentLoaded', () => {
             if (vendUsuarioSearch) vendUsuarioSearch.value = '';
             if (vendUsuarioSugg) { vendUsuarioSugg.classList.remove('active'); vendUsuarioSugg.innerHTML = ''; }
 
-            // 1) Se tipoPessoa vazio, define PF (mas dispara atualização de maxlength)
             if (vendTipoPessoa && !vendTipoPessoa.value && u.cpf) {
                 vendTipoPessoa.value = 'PF';
             }
-            // sempre reaplica maxlength (programaticamente o change não dispara sozinho)
             atualizarLimitesDocumento();
 
-            // 2) Nome
             if (u.nome && vendNome) {
                 vendNome.value = u.nome;
                 flashAutoFill(vendNome);
             }
-
-            // 3) CPF
             if (u.cpf && vendCpfCnpj) {
                 const cpfDigitos = String(u.cpf).replace(/\D/g, '').slice(0, 11);
                 if (cpfDigitos) {
@@ -377,8 +350,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     flashAutoFill(vendCpfCnpj);
                 }
             }
-
-            // 4) E-mail
             if (u.email && vendEmail) {
                 vendEmail.value = u.email;
                 flashAutoFill(vendEmail);
@@ -441,47 +412,69 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // ============================================================
-        // EMPRESAS — lista local do PROSPECT (/api/prospeccao/empresas)
+        // EMPRESAS
         // ============================================================
-        async function carregarListaEmpresas() {
-            if (empresasLista) return empresasLista;
+        async function carregarListaEmpresas(forceRefresh = false) {
+            if (!forceRefresh && empresasLista && empresasLista.length > 0) return empresasLista;
             if (empresasCarregando && empresasPromise) return empresasPromise;
 
             empresasCarregando = true;
             empresasPromise = (async () => {
+                let lista = [];
+                let fonte = 'nenhuma';
+
                 try {
-                    const dados = await apiGetEnvelope(`${API_URL}/prospeccao/empresas`);
+                    const ctx = window.AppCore.getContexto?.();
+                    const empresasCtx = ctx?.empresas || [];
+                    if (Array.isArray(empresasCtx) && empresasCtx.length > 0) {
+                        lista = empresasCtx.map(e => ({
+                            id: e.id ?? e.codigo,
+                            nome: e.nome || e.nomeFantasia || e.razaoSocial || `#${e.id}`,
+                            cnpj: e.cnpj || ''
+                        })).filter(e => e.id);
+                        fonte = 'contexto';
+                    }
+                } catch (e) {}
 
-                    const lista = Array.isArray(dados) ? dados
-                                : (dados && Array.isArray(dados.registros))  ? dados.registros
-                                : (dados && Array.isArray(dados.itens))      ? dados.itens
-                                : (dados && Array.isArray(dados.empresas))   ? dados.empresas
-                                : (dados && Array.isArray(dados.content))    ? dados.content
-                                : [];
+                if (lista.length === 0) {
+                    try {
+                        const dados = await apiGetEnvelope(`${API_URL}/prospeccao/empresas`);
+                        const arr = Array.isArray(dados) ? dados
+                                  : (dados && Array.isArray(dados.registros))  ? dados.registros
+                                  : (dados && Array.isArray(dados.itens))      ? dados.itens
+                                  : (dados && Array.isArray(dados.empresas))   ? dados.empresas
+                                  : (dados && Array.isArray(dados.content))    ? dados.content
+                                  : [];
 
-                    empresasLista = lista.map(e => ({
-                        id: e.id ?? e.codigo,
-                        nome: e.nomeFantasia || e.razaoSocial || `#${e.id}`,
-                        cnpj: e.cnpj || ''
-                    })).filter(e => e.id);
-
-                    console.log(`✅ [vendedores] ${empresasLista.length} empresas carregadas de /prospeccao/empresas`);
-                } catch (e) {
-                    console.warn('[vendedores] erro ao carregar empresas:', e.message);
-                    empresasLista = [];
-                } finally {
-                    empresasCarregando = false;
-                    empresasPromise = null;
+                        lista = arr.map(e => ({
+                            id: e.id ?? e.codigo,
+                            nome: e.nome || e.nomeFantasia || e.razaoSocial || `#${e.id}`,
+                            cnpj: e.cnpj || ''
+                        })).filter(e => e.id);
+                        fonte = 'endpoint';
+                    } catch (e) {
+                        console.warn('[vendedores] erro em GET /prospeccao/empresas:', e.message);
+                    }
                 }
+
+                empresasLista = lista;
+                console.log(`✅ [vendedores] ${empresasLista.length} empresa(s) carregada(s) (fonte: ${fonte})`);
+                empresasCarregando = false;
+                empresasPromise = null;
                 return empresasLista;
             })();
 
             return empresasPromise;
         }
 
+        window.__recarregarEmpresasVendedor = function () {
+            empresasLista = null;
+            return carregarListaEmpresas(true);
+        };
+
         function buscarEmpresas(termo) {
             if (!empresasLista || !empresasLista.length) return [];
-            if (!termo) return [];
+            if (!termo) return empresasLista.slice(0, 20);
             const t = normalizar(termo);
             const tNumeros = String(termo).replace(/\D/g, '');
             return empresasLista.filter(e => {
@@ -526,6 +519,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function renderSugestoesEmpresas(lista) {
             if (!vendEmpresaSugg) return;
+
+            if (!empresasLista || empresasLista.length === 0) {
+                vendEmpresaSugg.innerHTML = '<div class="usuario-sugg-empty">Nenhuma empresa disponível.</div>';
+                vendEmpresaSugg.classList.add('active');
+                return;
+            }
+
             if (!lista.length) {
                 vendEmpresaSugg.innerHTML = '<div class="usuario-sugg-empty">Nenhuma empresa encontrada.</div>';
                 vendEmpresaSugg.classList.add('active');
@@ -553,6 +553,12 @@ document.addEventListener('DOMContentLoaded', () => {
             vendEmpresaSearch.addEventListener('input', function () {
                 clearTimeout(empresaDebounce);
                 const t = this.value.trim();
+
+                if (t.length === 0 && empresasLista && empresasLista.length > 0) {
+                    renderSugestoesEmpresas(empresasLista.slice(0, 20));
+                    return;
+                }
+
                 if (t.length < 2) {
                     vendEmpresaSugg?.classList.remove('active');
                     if (vendEmpresaSugg) vendEmpresaSugg.innerHTML = '';
@@ -564,8 +570,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 }, 200);
             });
             vendEmpresaSearch.addEventListener('focus', async () => {
-                if (vendEmpresaSearch.value.trim().length >= 2) return;
-                if (!empresasLista) await carregarListaEmpresas();
+                await carregarListaEmpresas();
+                if (!empresasLista || empresasLista.length === 0) {
+                    renderSugestoesEmpresas([]);
+                    return;
+                }
+                const t = vendEmpresaSearch.value.trim();
+                if (t.length === 0) renderSugestoesEmpresas(empresasLista.slice(0, 20));
+                else if (t.length >= 2) renderSugestoesEmpresas(buscarEmpresas(t));
             });
         }
 
@@ -588,9 +600,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         ddd: String(d.ddd || '').trim(),
                         descricao: d.descricao || ''
                     })).filter(d => d.ddd);
-                    console.log(`✅ [vendedores] ${dddsDisponiveis.length} DDDs carregados`);
                 } catch (e) {
-                    console.warn('[vendedores] erro ao carregar DDDs:', e.message);
                     dddsDisponiveis = [];
                 } finally {
                     dddsCarregando = false;
@@ -700,7 +710,7 @@ document.addEventListener('DOMContentLoaded', () => {
             municipiosCarregando = true;
             municipiosPromise = (async () => {
                 try {
-                    const r = await fetch(`${API_URL}/mapas/municipios`, { headers: { 'Accept': 'application/json' } });
+                    const r = await fetch(`${API_URL}/mapas/municipios`, { credentials: 'include', headers: { 'Accept': 'application/json' } });
                     if (r.ok) {
                         const geojson = await r.json();
                         if (geojson && Array.isArray(geojson.features) && geojson.features.length) {
@@ -709,11 +719,10 @@ document.addEventListener('DOMContentLoaded', () => {
                                 nome: f.properties?.nome || f.properties?.municipio || '',
                                 uf: (f.properties?.uf || '').toUpperCase()
                             })).filter(m => m.codigoIbge && m.nome);
-                            console.log(`✅ [vendedores] ${municipiosLista.length} municípios carregados`);
                             return municipiosLista;
                         }
                     }
-                } catch (e) { /* segue */ }
+                } catch (e) {}
 
                 try {
                     const cached = localStorage.getItem('deltafrio_municipios_geojson_v10');
@@ -725,11 +734,10 @@ document.addEventListener('DOMContentLoaded', () => {
                                 nome: f.properties?.nome || f.properties?.municipio || '',
                                 uf: (f.properties?.uf || '').toUpperCase()
                             })).filter(m => m.codigoIbge && m.nome);
-                            console.log(`✅ [vendedores] ${municipiosLista.length} municípios do cache`);
                             return municipiosLista;
                         }
                     }
-                } catch (e) { /* segue */ }
+                } catch (e) {}
 
                 municipiosLista = [];
                 return municipiosLista;
@@ -840,6 +848,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             : [];
                 vendedores = lista.map(normalizarVendedor);
                 vendedoresCarregados = true;
+                console.log(`✅ [vendedores] ${vendedores.length} vendedor(es) carregado(s)`);
                 renderVendedorTable();
             } catch (e) {
                 console.warn('[vendedores] erro ao carregar:', e.message);
@@ -890,13 +899,10 @@ document.addEventListener('DOMContentLoaded', () => {
             lista.forEach(v => {
                 const cls = v.ativo ? 'on' : 'off';
                 const txt = v.ativo ? 'Ativo' : 'Inativo';
-                const totalCidades = (v.cidades || []).length;
-                const totalDdds = (v.ddds || []).length;
-                const totalEmpresas = (v.empresaIds || []).length;
                 const subPartes = [];
-                if (totalEmpresas) subPartes.push(`${totalEmpresas} empresa${totalEmpresas > 1 ? 's' : ''}`);
-                if (totalDdds)    subPartes.push(`${totalDdds} DDD${totalDdds > 1 ? 's' : ''}`);
-                if (totalCidades) subPartes.push(`${totalCidades} cidade${totalCidades > 1 ? 's' : ''}`);
+                if (v.empresaIds?.length) subPartes.push(`${v.empresaIds.length} empresa${v.empresaIds.length > 1 ? 's' : ''}`);
+                if (v.ddds?.length) subPartes.push(`${v.ddds.length} DDD${v.ddds.length > 1 ? 's' : ''}`);
+                if (v.cidades?.length) subPartes.push(`${v.cidades.length} cidade${v.cidades.length > 1 ? 's' : ''}`);
                 const sub = subPartes.length ? subPartes.join(' • ') : 'Sem vínculos';
 
                 const usuario = v.usuarioId ? (usuariosSistema || []).find(u => String(u.id) === String(v.usuarioId)) : null;
@@ -947,6 +953,7 @@ document.addEventListener('DOMContentLoaded', () => {
             currentVendedorDdds = [];
             currentVendedorUsuario = null;
             currentVendedorEmpresas = [];
+            originalVendedorEmpresas = [];
 
             if (vendCidadeSearch) vendCidadeSearch.value = '';
             if (vendCidadeSugg) { vendCidadeSugg.classList.remove('active'); vendCidadeSugg.innerHTML = ''; }
@@ -969,7 +976,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (vendNome) vendNome.value = v.nome || '';
             if (vendTipoPessoa) vendTipoPessoa.value = v.tipoPessoa || '';
-            // Aplica maxlength correto ANTES de preencher cpf/cnpj
             atualizarLimitesDocumento();
             if (vendCpfCnpj) vendCpfCnpj.value = v.cpfCnpj || '';
             if (vendEmail) vendEmail.value = v.email || '';
@@ -982,8 +988,9 @@ document.addEventListener('DOMContentLoaded', () => {
             currentVendedorCidades = Array.isArray(v.cidades) ? v.cidades.map(c => ({ ...c })) : [];
             currentVendedorDdds = Array.isArray(v.ddds) ? v.ddds.map(d => ({ ...d })) : [];
             currentVendedorEmpresas = Array.isArray(v.empresas)
-                ? v.empresas.map(e => ({ id: e.id, nome: e.nomeFantasia || e.razaoSocial || e.nome || `#${e.id}` }))
+                ? v.empresas.map(e => ({ id: e.id || e.empresaId, nome: e.nomeFantasia || e.razaoSocial || e.nome || `#${e.id}` }))
                 : [];
+            originalVendedorEmpresas = currentVendedorEmpresas.map(e => ({ ...e })); // ✅ Salva cópia
 
             await carregarListaUsuarios();
             if (v.usuarioId) {
@@ -1007,7 +1014,70 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // ============================================================
-        // SUBMIT
+        // SINCRONIZAÇÃO DE CONCESSÕES
+        // ============================================================
+        async function sincronizarConcessoes(usuarioId, empresasIds) {
+            if (!usuarioId) return { ok: false, motivo: 'usuarioId ausente' };
+            if (!Array.isArray(empresasIds) || empresasIds.length === 0) {
+                return { ok: false, motivo: 'nenhuma empresa vinculada' };
+            }
+            const novasEmpresas = [...new Set(empresasIds.map(id => Number(id)).filter(n => !isNaN(n) && n > 0))];
+            if (novasEmpresas.length === 0) return { ok: false, motivo: 'IDs inválidos' };
+
+            const fetchAcessos = async () => {
+                try {
+                    const resp = await apiGet(`${API_URL}/prospeccao/admin/usuarios/${usuarioId}/acessos`);
+                    const dados = resp?.dados ?? resp;
+                    return {
+                        versao: dados?.versao ?? 0,
+                        empresas: Array.isArray(dados?.empresas)
+                            ? dados.empresas.map(e => Number(e.id ?? e.empresaId)).filter(n => !isNaN(n))
+                            : [],
+                        municipios: dados?.municipios || { modalidade: 'TODOS', ufs: [], ddds: [], codigosIbge: [] },
+                        cnaes: dados?.cnaes || { modalidade: 'TODOS', codigos: [] }
+                    };
+                } catch (e) {
+                    return {
+                        versao: 0, empresas: [],
+                        municipios: { modalidade: 'TODOS', ufs: [], ddds: [], codigosIbge: [] },
+                        cnaes: { modalidade: 'TODOS', codigos: [] }
+                    };
+                }
+            };
+
+            const tentarSalvar = async (tentativa = 1) => {
+                const atual = await fetchAcessos();
+                const empresasFinal = [...new Set([...atual.empresas, ...novasEmpresas])];
+                const payload = {
+                    versao: atual.versao,
+                    empresas: empresasFinal,
+                    municipios: atual.municipios,
+                    cnaes: atual.cnaes
+                };
+                try {
+                    await apiPut(`${API_URL}/prospeccao/admin/usuarios/${usuarioId}/acessos`, payload);
+                    console.log(`✅ [vendedores] Concessão sincronizada (user ${usuarioId}, ${empresasFinal.length} empresa(s))`);
+                    return { ok: true, empresas: empresasFinal };
+                } catch (err) {
+                    const codigo = err?.codigo || '';
+                    const ehConflito = codigo === 'versao_desatualizada' || codigo === 409;
+                    if (ehConflito && tentativa < 2) return await tentarSalvar(tentativa + 1);
+                    throw err;
+                }
+            };
+
+            try {
+                return await tentarSalvar(1);
+            } catch (err) {
+                console.warn('[vendedores] erro ao sincronizar concessão:', err?.message || err);
+                return { ok: false, motivo: extrairMensagemErro(err), err };
+            }
+        }
+
+        window.__sincronizarConcessoesVendedor = sincronizarConcessoes;
+
+        // ============================================================
+        // SUBMIT — com a lógica correta de PUT + POST/PATCH de empresas
         // ============================================================
         if (vendedorForm) {
             vendedorForm.addEventListener('submit', async e => {
@@ -1024,7 +1094,6 @@ document.addEventListener('DOMContentLoaded', () => {
                                  : '';
                 if (!tipoPessoa) return showWarning('Informe o Tipo de Pessoa (Física ou Jurídica).');
 
-                // Higienização final antes do envio
                 higienizarFone();
                 atualizarLimitesDocumento();
 
@@ -1050,14 +1119,39 @@ document.addEventListener('DOMContentLoaded', () => {
                 const orig = btnSaveVendedor.innerText;
                 btnSaveVendedor.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
 
+                let resultadoConcessao = null;
+
                 try {
                     let vendedorId = editingVendedorId;
 
                     if (editingVendedorId) {
+                        // 1. Atualiza dados básicos (PUT)
                         await apiPut(`${ENDPOINT}/${editingVendedorId}`, payloadUpdate);
                         console.log(`[vendedores] PUT ok — id=${editingVendedorId}`);
+
+                        // 2. Sincroniza Empresas (Adicionar / Remover)
+                        const origIds = originalVendedorEmpresas.map(e => String(e.id));
+                        const currIds = currentVendedorEmpresas.map(e => String(e.id));
+
+                        const toAdd = currentVendedorEmpresas.filter(e => !origIds.includes(String(e.id)));
+                        const toRemove = originalVendedorEmpresas.filter(e => !currIds.includes(String(e.id)));
+
+                        for (const e of toAdd) {
+                            try { 
+                                await apiPost(`${ENDPOINT}/${editingVendedorId}/empresas`, { empresaId: e.id }); 
+                                console.log(`[vendedores] Empresa ${e.id} adicionada.`);
+                            } catch (err) { console.warn('Falha ao adicionar empresa:', err); }
+                        }
+
+                        for (const e of toRemove) {
+                            try { 
+                                await apiPatch(`${ENDPOINT}/${editingVendedorId}/empresas/${e.id}`, { ativo: 'N' }); 
+                                console.log(`[vendedores] Empresa ${e.id} removida.`);
+                            } catch (err) { console.warn('Falha ao remover empresa:', err); }
+                        }
+
                     } else {
-                        console.log('[vendedores] POST payload =', JSON.stringify(payloadCadastro, null, 2));
+                        // 3. Cria novo vendedor (POST)
                         try {
                             const resp = await apiPost(ENDPOINT, payloadCadastro);
                             const dados = resp?.dados ?? resp;
@@ -1069,60 +1163,51 @@ document.addEventListener('DOMContentLoaded', () => {
                                        || msg.includes('não foi possível concluir');
                             if (!eh503) throw errCriacao;
 
-                            console.warn('[vendedores] POST falhou com 503 — tentando sem loginIds/empresaIds...');
                             const payloadMinimo = {
-                                tipoPessoa,
-                                cpfCnpj: payloadCadastro.cpfCnpj,
-                                nome,
-                                email: payloadCadastro.email,
-                                fone:  payloadCadastro.fone,
-                                loginIds: [],
-                                empresaIds: []
+                                tipoPessoa, cpfCnpj: payloadCadastro.cpfCnpj, nome,
+                                email: payloadCadastro.email, fone: payloadCadastro.fone,
+                                loginIds: [], empresaIds: []
                             };
-                            console.log('[vendedores] POST fallback payload =', JSON.stringify(payloadMinimo, null, 2));
                             const resp = await apiPost(ENDPOINT, payloadMinimo);
                             const dados = resp?.dados ?? resp;
                             vendedorId = dados?.id ?? dados?.codigo ?? dados?.vendedorId;
                             console.log(`[vendedores] POST fallback ok — id=${vendedorId}`);
 
                             if (vendedorId && currentVendedorUsuario?.id) {
-                                try {
-                                    await apiPost(`${ENDPOINT}/${vendedorId}/logins`, { loginId: currentVendedorUsuario.id });
-                                    console.log(`[vendedores] login vinculado`);
-                                } catch (errL) {
-                                    console.warn('[vendedores] falha ao vincular login:', errL);
-                                }
+                                try { await apiPost(`${ENDPOINT}/${vendedorId}/logins`, { loginId: currentVendedorUsuario.id }); } catch (e) {}
                             }
                             if (vendedorId && currentVendedorEmpresas.length) {
                                 for (const emp of currentVendedorEmpresas) {
-                                    try {
-                                        await apiPost(`${ENDPOINT}/${vendedorId}/empresas`, { empresaId: emp.id });
-                                        console.log(`[vendedores] empresa ${emp.id} vinculada`);
-                                    } catch (errE) {
-                                        console.warn(`[vendedores] falha ao vincular empresa ${emp.id}:`, errE);
-                                    }
+                                    try { await apiPost(`${ENDPOINT}/${vendedorId}/empresas`, { empresaId: emp.id }); } catch (e) {}
                                 }
                             }
                         }
                     }
 
+                    // 4. Sincroniza Concessões
+                    if (currentVendedorUsuario?.id && currentVendedorEmpresas.length > 0) {
+                        resultadoConcessao = await sincronizarConcessoes(
+                            currentVendedorUsuario.id,
+                            currentVendedorEmpresas.map(e => e.id)
+                        );
+                    }
+
                     vendedorModal.style.display = 'none';
                     resetVendedorForm();
                     await carregarVendedores();
-                    showWarning('Vendedor salvo com sucesso!', 'Sucesso');
+
+                    if (resultadoConcessao && resultadoConcessao.ok) {
+                        showWarning('Vendedor salvo e acesso concedido com sucesso!', 'Sucesso');
+                    } else if (resultadoConcessao && !resultadoConcessao.ok) {
+                        showWarning('Vendedor salvo, mas não foi possível conceder acesso: ' + (resultadoConcessao.motivo || 'erro'), 'Aviso');
+                    } else {
+                        showWarning('Vendedor salvo com sucesso!', 'Sucesso');
+                    }
 
                 } catch (err) {
                     console.error('[vendedores] erro no submit:', err);
                     const msg = extrairMensagemErro(err);
-                    if (msg.includes('Não foi possível concluir')) {
-                        showWarning(
-                            '⚠️ O servidor está com um problema temporário.\n\n' +
-                            'Já reportamos ao time de TI. Tente novamente mais tarde.\n\n' + msg,
-                            'Serviço indisponível'
-                        );
-                    } else {
-                        showWarning('Erro ao salvar vendedor: ' + msg);
-                    }
+                    showWarning('Erro ao salvar vendedor: ' + msg);
                 } finally {
                     btnSaveVendedor.disabled = false;
                     btnSaveVendedor.innerText = orig;
@@ -1149,20 +1234,19 @@ document.addEventListener('DOMContentLoaded', () => {
         window.novoVendedor = function () {
             resetVendedorForm();
             renderColorOptions();
+            carregarListaEmpresas(true).catch(() => {});
             carregarListaMunicipios().catch(() => {});
             carregarListaDdds().catch(() => {});
-            carregarListaEmpresas().catch(() => {});
             carregarListaUsuarios().catch(() => {});
             vendedorModal.style.display = 'flex';
         };
 
-        if (Core.registerScreen && vendedoresScreen) {
-            Core.registerScreen('vendedores', vendedoresScreen);
-        }
-
-        carregarVendedores();
-        carregarListaUsuarios().catch(() => {});
-        carregarListaEmpresas().catch(() => {});
+        // ============================================================
+        // BOOT DO MÓDULO
+        // ============================================================
+        await carregarVendedores();
+        await carregarListaUsuarios().catch(() => {});
+        await carregarListaEmpresas().catch(() => {});
 
         console.log('✅ [vendedores] módulo carregado.');
     })();

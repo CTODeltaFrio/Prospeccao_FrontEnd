@@ -5,162 +5,209 @@ document.addEventListener('DOMContentLoaded', async function() {
     const API_MAPAS = '/api/mapas';
 
     // ============================================================
-    // CACHE EM localStorage (com TTL)
+    // ✅ APPCORE FALLBACK — exposto ANTES de tudo
     // ============================================================
-    const CACHE = {
-        UFS:       { key: 'deltafrio_ufs_v2',        ttl: 24 * 60 * 60 * 1000 },
-        DDDS:      { key: 'deltafrio_ddds_v2',       ttl: 24 * 60 * 60 * 1000 },
-        CNAES:     { key: 'deltafrio_cnaes_v4',      ttl: 12 * 60 * 60 * 1000 },
-        SEGMENTOS: { key: 'deltafrio_segmentos_v2',  ttl: 5 * 60 * 1000 },
-        IGNORADOS: { key: 'deltafrio_ignorados_v2',  ttl: 5 * 60 * 1000 },
-        MUNICIPIOS:{ key: 'deltafrio_municipios_v2', ttl: 24 * 60 * 60 * 1000 }
-    };
+    const criarAppCoreFallback = () => ({
+        apiGet: async () => { throw new Error('AppCore não inicializado'); },
+        apiPost: async () => { throw new Error('AppCore não inicializado'); },
+        apiPut: async () => { throw new Error('AppCore não inicializado'); },
+        apiPatch: async () => { throw new Error('AppCore não inicializado'); },
+        apiDelete: async () => { throw new Error('AppCore não inicializado'); },
+        apiGetEnvelope: async () => null,
+        obterCsrf: () => {
+            const m = document.cookie.split('; ').find(c => c.startsWith('login_delta_csrf='));
+            return m ? decodeURIComponent(m.split('=')[1]) : '';
+        },
+        showScreen: () => {},
+        setActiveMenuItem: () => {},
+        registerScreen: () => {},
+        showWarning: (msg, t) => alert((t ? t + ': ' : '') + msg),
+        showConfirm: (t, m, cb) => { if (confirm(m)) cb(); },
+        refreshCustomSelect: () => {},
+        formatarTelefone: (ddd, num) => num || '-',
+        extrairErroResposta: (json, http) => ({
+            codigo: json?.codigo ?? null,
+            mensagem: json?.mensagem || json?.message || `HTTP ${http || '?'}`,
+            traceId: json?.traceId || ''
+        }),
+        extrairErro: (err) => ({ codigo: null, mensagem: String(err), traceId: '' }),
+        API_URL: '/api',
+        getMapInstance: () => null,
+        getVendedores: () => [],
+        carregarVendedoresMapa: async () => [],
+        getContexto: () => null,
+        getEmpresaAtivaId: () => null,
+        setEmpresaAtivaId: () => {},
+        carregarContexto: async () => null,
+        limparCacheIgnorados: () => {},
+        isAdminGlobal: () => false,
+        temFuncionalidade: () => false,
+        aplicarGuardrailsAdmin: () => {},
+    });
+    window.AppCore = criarAppCoreFallback();
+    window.AppCore.__isFallback = true;
+    console.log('✅ [AppCore] Fallback exposto — vendedores.js e empresas.js podem inicializar');
 
-    function cacheGet(chave) {
-        try {
-            const raw = localStorage.getItem(chave.key);
-            if (!raw) return null;
-            const { ts, dados } = JSON.parse(raw);
-            if (Date.now() - ts > chave.ttl) { localStorage.removeItem(chave.key); return null; }
-            return dados;
-        } catch (e) { return null; }
-    }
-    function cacheSet(chave, dados) {
-        try { localStorage.setItem(chave.key, JSON.stringify({ ts: Date.now(), dados })); }
-        catch (e) { /* silencioso */ }
-    }
+    try {
+        // ============================================================
+        // CACHE
+        // ============================================================
+        const CACHE = {
+            UFS:       { key: 'deltafrio_ufs_v2',        ttl: 24 * 60 * 60 * 1000 },
+            DDDS:      { key: 'deltafrio_ddds_v2',       ttl: 24 * 60 * 60 * 1000 },
+            CNAES:     { key: 'deltafrio_cnaes_v4',      ttl: 12 * 60 * 60 * 1000 },
+            SEGMENTOS: { key: 'deltafrio_segmentos_v2',  ttl: 5 * 60 * 1000 },
+            IGNORADOS: { key: 'deltafrio_ignorados_v2',  ttl: 5 * 60 * 1000 },
+            MUNICIPIOS:{ key: 'deltafrio_municipios_v2', ttl: 24 * 60 * 60 * 1000 }
+        };
 
-    // ✅ Helper centralizado para limpar cache de ignorados (por empresa ou global)
-    function limparCacheIgnorados(empresaId = null) {
-        try {
-            if (empresaId) {
-                localStorage.removeItem(`${CACHE.IGNORADOS.key}_${empresaId}`);
-            } else {
-                localStorage.removeItem(CACHE.IGNORADOS.key);
-                Object.keys(localStorage)
-                    .filter(k => k.startsWith(CACHE.IGNORADOS.key + '_'))
-                    .forEach(k => localStorage.removeItem(k));
-            }
-        } catch (e) { /* silencioso */ }
-    }
-
-    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-    async function executarEmLotesComPausa(itens, limite, pausaMs, fn, onProgress) {
-        let proximo = 0;
-        let concluidos = 0;
-        async function worker() {
-            while (true) {
-                const i = proximo++;
-                if (i >= itens.length) return;
-                try { await fn(itens[i], i); } catch (e) { /* silencioso */ }
-                concluidos++;
-                if (onProgress) onProgress(concluidos, itens.length);
-                await sleep(pausaMs);
-            }
-        }
-        await Promise.all(Array.from({ length: Math.min(limite, itens.length) }, worker));
-    }
-
-    // ============================================================
-    // ===== VENDEDORES DO MAPA — carregados do endpoint real =====
-    // ============================================================
-    const CORES_VENDEDORES = [
-        '#2463eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
-        '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#14b8a6',
-        '#a855f7', '#0ea5e9', '#dc2626', '#22c55e', '#eab308',
-        '#64748b'
-    ];
-
-    let vendedoresMapa = [];
-    let vendedoresMapaCarregados = false;
-    let vendedoresMapaPromise = null;
-
-    async function carregarVendedoresMapa() {
-        if (vendedoresMapaCarregados) return vendedoresMapa;
-        if (vendedoresMapaPromise) return vendedoresMapaPromise;
-
-        vendedoresMapaPromise = (async () => {
+        function cacheGet(chave) {
             try {
-                const envelope = await apiGetEnvelope(`${API_URL}/prospeccao/vendedores`);
-                const lista = Array.isArray(envelope) ? envelope
-                            : (envelope && Array.isArray(envelope.registros))  ? envelope.registros
-                            : (envelope && Array.isArray(envelope.vendedores)) ? envelope.vendedores
-                            : (envelope && Array.isArray(envelope.itens))      ? envelope.itens
-                            : [];
+                const raw = localStorage.getItem(chave.key);
+                if (!raw) return null;
+                const { ts, dados } = JSON.parse(raw);
+                if (Date.now() - ts > chave.ttl) { localStorage.removeItem(chave.key); return null; }
+                return dados;
+            } catch (e) { return null; }
+        }
+        function cacheSet(chave, dados) {
+            try { localStorage.setItem(chave.key, JSON.stringify({ ts: Date.now(), dados })); }
+            catch (e) { /* silencioso */ }
+        }
 
-                vendedoresMapa = lista.map((v, i) => {
-                    const cidadesRaw = Array.isArray(v.cidades) ? v.cidades
-                                     : (Array.isArray(v.cidadesIbge) ? v.cidadesIbge : []);
-                    const cidades = cidadesRaw.map(c => {
-                        if (typeof c === 'string') return c.trim();
-                        if (typeof c === 'number') return String(c);
-                        return String(c?.codigoIbge || c?.codigo || c?.id || '').trim();
-                    }).filter(Boolean);
-
-                    return {
-                        id: String(v.id ?? v.codigo ?? `v${i}`),
-                        nome: v.nome || `Vendedor #${v.id}`,
-                        cor: v.cor || CORES_VENDEDORES[i % CORES_VENDEDORES.length],
-                        regiao: v.regiao || '',
-                        cidades
-                    };
-                }).filter(v => v.id);
-
-                vendedoresMapaCarregados = true;
-                console.log(`✅ [mapa] ${vendedoresMapa.length} vendedores carregados do endpoint`);
-                if (vendedoresMapa.some(v => !v.cidades.length)) {
-                    console.warn('[mapa] alguns vendedores vieram sem cidades — o mapa não vai colorir nada para eles');
+        function limparCacheIgnorados(empresaId = null) {
+            try {
+                if (empresaId) {
+                    localStorage.removeItem(`${CACHE.IGNORADOS.key}_${empresaId}`);
+                } else {
+                    localStorage.removeItem(CACHE.IGNORADOS.key);
+                    Object.keys(localStorage)
+                        .filter(k => k.startsWith(CACHE.IGNORADOS.key + '_'))
+                        .forEach(k => localStorage.removeItem(k));
                 }
-            } catch (e) {
-                console.warn('[mapa] erro ao carregar vendedores:', e.message);
-                vendedoresMapa = [];
-            } finally {
-                vendedoresMapaPromise = null;
+            } catch (e) { /* silencioso */ }
+        }
+
+        function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+        async function executarEmLotesComPausa(itens, limite, pausaMs, fn, onProgress) {
+            let proximo = 0;
+            let concluidos = 0;
+            async function worker() {
+                while (true) {
+                    const i = proximo++;
+                    if (i >= itens.length) return;
+                    try { await fn(itens[i], i); } catch (e) { /* silencioso */ }
+                    concluidos++;
+                    if (onProgress) onProgress(concluidos, itens.length);
+                    await sleep(pausaMs);
+                }
             }
-            return vendedoresMapa;
-        })();
+            await Promise.all(Array.from({ length: Math.min(limite, itens.length) }, worker));
+        }
 
-        return vendedoresMapaPromise;
-    }
+        // ============================================================
+        // VENDEDORES DO MAPA
+        // ============================================================
+        const CORES_VENDEDORES = [
+            '#2463eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+            '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#14b8a6',
+            '#a855f7', '#0ea5e9', '#dc2626', '#22c55e', '#eab308',
+            '#64748b'
+        ];
 
-    function normalizar(str) {
-        return String(str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').toLowerCase().trim();
-    }
+        let vendedoresMapa = [];
+        let vendedoresMapaCarregados = false;
+        let vendedoresMapaPromise = null;
 
-    function getVendedorDaCidade(props) {
-        if (!props || !vendedoresMapa.length) return null;
-        const codigo = String(props.codigoIbge || props.codigo || '').trim();
-        const nome = normalizar(props.nome);
-        for (const v of vendedoresMapa) {
-            for (const c of v.cidades) {
-                const cStr = String(c).trim();
-                if (codigo && codigo === cStr) return v;
-                if (!/^\d+$/.test(cStr) && nome === normalizar(cStr)) return v;
+        async function carregarVendedoresMapa() {
+            if (vendedoresMapaCarregados) return vendedoresMapa;
+            if (vendedoresMapaPromise) return vendedoresMapaPromise;
+
+            vendedoresMapaPromise = (async () => {
+                try {
+                    const envelope = await apiGetEnvelope(`${API_URL}/prospeccao/vendedores`);
+                    const lista = Array.isArray(envelope) ? envelope
+                                : (envelope && Array.isArray(envelope.registros))  ? envelope.registros
+                                : (envelope && Array.isArray(envelope.vendedores)) ? envelope.vendedores
+                                : (envelope && Array.isArray(envelope.itens))      ? envelope.itens
+                                : [];
+
+                    vendedoresMapa = lista.map((v, i) => {
+                        const cidadesRaw = Array.isArray(v.cidades) ? v.cidades
+                                         : (Array.isArray(v.cidadesIbge) ? v.cidadesIbge : []);
+                        const cidades = cidadesRaw.map(c => {
+                            if (typeof c === 'string') return c.trim();
+                            if (typeof c === 'number') return String(c);
+                            return String(c?.codigoIbge || c?.codigo || c?.id || '').trim();
+                        }).filter(Boolean);
+
+                        return {
+                            id: String(v.id ?? v.codigo ?? `v${i}`),
+                            nome: v.nome || `Vendedor #${v.id}`,
+                            cor: v.cor || CORES_VENDEDORES[i % CORES_VENDEDORES.length],
+                            regiao: v.regiao || '',
+                            cidades
+                        };
+                    }).filter(v => v.id);
+
+                    vendedoresMapaCarregados = true;
+                    console.log(`✅ [mapa] ${vendedoresMapa.length} vendedores carregados`);
+                } catch (e) {
+                    console.warn('[mapa] erro ao carregar vendedores:', e.message);
+                    vendedoresMapa = [];
+                } finally {
+                    vendedoresMapaPromise = null;
+                }
+                return vendedoresMapa;
+            })();
+
+            return vendedoresMapaPromise;
+        }
+
+        function normalizar(str) {
+            return String(str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').toLowerCase().trim();
+        }
+
+        function getVendedorDaCidade(props) {
+            if (!props || !vendedoresMapa.length) return null;
+            const codigo = String(props.codigoIbge || props.codigo || '').trim();
+            const nome = normalizar(props.nome);
+            for (const v of vendedoresMapa) {
+                for (const c of v.cidades) {
+                    const cStr = String(c).trim();
+                    if (codigo && codigo === cStr) return v;
+                    if (!/^\d+$/.test(cStr) && nome === normalizar(cStr)) return v;
+                }
             }
+            return null;
         }
-        return null;
-    }
 
-    // ===== AUTENTICAÇÃO =====
-    try {
-        const respostaSessao = await fetch(`${API_URL}/sessao`, {
-            method: 'GET', credentials: 'include',
-            headers: { 'Accept': 'application/json' }
-        });
-        if (respostaSessao.status === 401) {
-            window.location.replace('/index.html');
-            return;
-        }
-        if (respostaSessao.ok) {
-            try { await respostaSessao.json(); } catch (e) {}
-        }
-    } catch (erro) {
-        /* silencioso */
-    }
+        // ============================================================
+        // AUTENTICAÇÃO
+        // ============================================================
+        let sessaoCache = null;
+        try {
+            const respostaSessao = await fetch(`${API_URL}/sessao`, {
+                method: 'GET', credentials: 'include',
+                headers: { 'Accept': 'application/json' }
+            });
+            if (respostaSessao.status === 401) {
+                window.location.replace('/index.html');
+                return;
+            }
+            if (respostaSessao.ok) {
+                try {
+                    const json = await respostaSessao.json();
+                    sessaoCache = json?.dados ?? json;
+                    console.log('✅ [sessao] carregada:', sessaoCache?.usuario?.nome || sessaoCache?.usuario?.email || '—');
+                } catch (e) {}
+            }
+        } catch (erro) { /* silencioso */ }
 
-    try {
-        // ===== MODO ESCURO =====
+        // ============================================================
+        // MODO ESCURO
+        // ============================================================
         const btnDarkMode = document.getElementById('btn-dark-mode');
         if (localStorage.getItem('darkMode') === 'true') {
             document.body.classList.add('dark-mode');
@@ -175,16 +222,21 @@ document.addEventListener('DOMContentLoaded', async function() {
             });
         }
 
-        // ===== SIDEBAR =====
+        // ============================================================
+        // SIDEBAR
+        // ============================================================
         const sidebar = document.getElementById('sidebar');
         const sidebarToggle = document.getElementById('sidebar-toggle');
         if (sidebarToggle) sidebarToggle.addEventListener('click', () => sidebar.classList.toggle('collapsed'));
 
-        // ===== ELEMENTOS =====
+        // ============================================================
+        // ELEMENTOS
+        // ============================================================
         const mainScreen = document.getElementById('main-screen');
         const segmentScreen = document.getElementById('segment-screen');
         const ignoradosScreen = document.getElementById('ignorados-screen');
         const mapScreen = document.getElementById('map-screen');
+        const vendedoresScreen = document.getElementById('vendedores-screen');
 
         const tbody = document.getElementById('table-body');
         const pageIndicator = document.getElementById('page-indicator');
@@ -232,14 +284,15 @@ document.addEventListener('DOMContentLoaded', async function() {
         const genericModalSubtitle = document.getElementById('generic-modal-subtitle');
         const genericSearch = document.getElementById('generic-search');
 
-        // ✅ Novos elementos: seletor de empresa + botões de classificação
         const companySelectorWrapper = document.getElementById('company-selector-wrapper');
         const companySelector        = document.getElementById('company-selector');
+        const companySelectorLabel   = document.getElementById('company-selector-label');
         const btnClassifyX           = document.getElementById('btn-classify-x');
-        const btnClassifyC           = document.getElementById('btn-classify-c');
         const detClassificacao       = document.getElementById('det-classificacao');
 
-        // ===== DADOS =====
+        // ============================================================
+        // DADOS
+        // ============================================================
         let editingSegmentId = null;
         let currentLinkedCnaes = [];
         let originalLinkedCnaes = [];
@@ -263,7 +316,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         function setDirty(v) { isDirty = v; }
 
         // ============================================================
-        // ✅ CONTEXTO + EMPRESA ATIVA
+        // CONTEXTO + EMPRESA ATIVA
         // ============================================================
         let contextoCache = null;
         let empresaAtivaId = null;
@@ -275,7 +328,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                 const salvo = sessionStorage.getItem(STORAGE_KEY);
                 if (salvo) { empresaAtivaId = salvo; return salvo; }
             } catch (e) {}
-            // Fallback: se só existe 1 empresa, usa automaticamente
             if (contextoCache?.empresas?.length === 1) {
                 empresaAtivaId = String(contextoCache.empresas[0].id);
                 try { sessionStorage.setItem(STORAGE_KEY, empresaAtivaId); } catch (e) {}
@@ -314,10 +366,16 @@ document.addEventListener('DOMContentLoaded', async function() {
             empresas.forEach(e => {
                 const opt = document.createElement('option');
                 opt.value = String(e.id);
-                opt.textContent = e.nomeFantasia || e.razaoSocial || `#${e.id}`;
+                opt.textContent = e.nome || e.nomeFantasia || e.razaoSocial || `#${e.id}`;
                 companySelector.appendChild(opt);
             });
             if (ativo) companySelector.value = ativo;
+
+            if (companySelectorLabel) {
+                const empresaAtual = empresas.find(e => String(e.id) === String(ativo));
+                const nomeEmpresa = empresaAtual ? (empresaAtual.nome || empresaAtual.nomeFantasia || `#${empresaAtual.id}`) : null;
+                companySelectorLabel.title = nomeEmpresa ? `Empresa ativa: ${nomeEmpresa}` : 'Selecione uma empresa ativa';
+            }
         }
 
         async function carregarContexto() {
@@ -327,23 +385,43 @@ document.addEventListener('DOMContentLoaded', async function() {
                     credentials: 'include',
                     headers: { 'Accept': 'application/json' }
                 });
+
+                if (r.status === 403) {
+                    let json = {}; try { json = await r.json(); } catch (e) {}
+                    console.warn('[contexto] 403 acesso_negado — usuário sem empresas concedidas', json);
+                    contextoCache = {
+                        administradorGlobal: false,
+                        empresas: [],
+                        funcionalidades: [],
+                        municipios: { modalidade: 'SELECAO' },
+                        cnaes: { modalidade: 'SELECAO' },
+                        versaoConcessoes: 0,
+                        semAcesso: true,
+                        motivoAcesso: json?.mensagem || 'Acesso não permitido'
+                    };
+                    atualizarSeletorEmpresa();
+                    return contextoCache;
+                }
+
                 if (!r.ok) {
-                    const json = await r.json().catch(() => ({}));
+                    let json = {}; try { json = await r.json(); } catch (e) {}
                     const erro = extrairErroResposta(json, r.status);
                     console.error('[contexto] falhou:', erro);
                     return null;
                 }
+
                 const json = await r.json();
                 const ctx = json?.dados ?? json;
                 contextoCache = ctx;
-                // Se empresa ativa não existe mais, limpa
                 const ativo = obterEmpresaAtivaId();
                 const ids = (ctx?.empresas || []).map(e => String(e.id));
                 if (ativo && !ids.includes(String(ativo))) definirEmpresaAtivaId(null);
                 atualizarSeletorEmpresa();
                 console.log('✅ [contexto]', {
+                    usuarioId: ctx?.usuarioId,
+                    administradorGlobal: ctx?.administradorGlobal,
                     empresas: (ctx?.empresas || []).length,
-                    capacidades: ctx?.capacidades || '(não retornado pelo backend)'
+                    funcionalidades: (ctx?.funcionalidades || []).length,
                 });
                 return ctx;
             } catch (e) {
@@ -356,70 +434,134 @@ document.addEventListener('DOMContentLoaded', async function() {
             companySelector.addEventListener('change', function () {
                 const id = this.value || null;
                 definirEmpresaAtivaId(id);
-
-                // ✅ Limpa TODOS os caches por empresa (inclui a empresa antiga e a nova)
-                limparCacheIgnorados(); // global — remove todas as chaves `_empresaId`
-
-                // ✅ Reseta estado de ignorados
+                limparCacheIgnorados();
                 ignoradosCarregados = false;
                 ignorados = [];
                 ignoradosFiltrados = [];
-
-                // ✅ Reseta resultados da pesquisa
                 if (registros.length) {
-                    currentPage = 1;
-                    historicoCursors = [null];
-                    cursorAtual = null;
-                    registros = [];
-                    temMais = false;
-                    renderTable([]);
+                    currentPage = 1; historicoCursors = [null]; cursorAtual = null;
+                    registros = []; temMais = false; renderTable([]);
                 }
-
-                // ✅ Se estiver na tela de ignorados, recarrega com a nova empresa
-                if (ignoradosScreen.style.display === 'block') {
-                    carregarIgnorados();
-                }
-
+                if (ignoradosScreen.style.display === 'block') carregarIgnorados();
                 console.log(`🔄 Empresa ativa alterada para: ${id || '(nenhuma)'}`);
             });
         }
 
+        if (companySelectorLabel) {
+            companySelectorLabel.addEventListener('click', (e) => {
+                if (sidebar.classList.contains('collapsed')) {
+                    e.preventDefault();
+                    sidebar.classList.remove('collapsed');
+                    setTimeout(() => {
+                        if (companySelector) {
+                            companySelector.focus();
+                            try { companySelector.showPicker?.(); } catch (err) {}
+                        }
+                    }, 400);
+                }
+            });
+        }
+
         // ============================================================
-        // ERRO UNIFICADO (novo + legado)
+        // GUARDRAILS DE ADMIN
+        // ============================================================
+        const FUNC_MENUS = {
+            'ADMINISTRAR_VENDEDORES': ['menu-vendedores'],
+            'ADMINISTRAR_SEGMENTOS':  ['menu-segmentos'],
+            'CONSULTAR_MAPAS':        ['menu-mapa'],
+        };
+        const ADMIN_MENU_IDS = ['gestao-menu-title', 'menu-segmentos', 'menu-vendedores', 'menu-mapa'];
+
+        function isAdminGlobal() {
+            try {
+                const forcar = sessionStorage.getItem('deltafrio_force_admin');
+                if (forcar) {
+                    const expiraEm = Number(forcar);
+                    if (!isNaN(expiraEm) && Date.now() < expiraEm) return true;
+                    if (forcar === 'true') return true;
+                    sessionStorage.removeItem('deltafrio_force_admin');
+                }
+            } catch (e) {}
+
+            if (!contextoCache) return false;
+            if (contextoCache.administradorGlobal === true) return true;
+            if (contextoCache.administradorGlobal === false) return false;
+
+            const funcs = contextoCache.funcionalidades;
+            if (Array.isArray(funcs)) {
+                return funcs.some(f => {
+                    const s = String(f).toUpperCase();
+                    return s.startsWith('ADMINISTRAR_') || s === 'CONSULTAR_MAPAS';
+                });
+            }
+            return false;
+        }
+
+        function temFuncionalidade(nomeFunc) {
+            try {
+                const forcar = sessionStorage.getItem('deltafrio_force_admin');
+                if (forcar) {
+                    const expiraEm = Number(forcar);
+                    if (!isNaN(expiraEm) && Date.now() < expiraEm) return true;
+                    if (forcar === 'true') return true;
+                }
+            } catch (e) {}
+
+            if (!contextoCache) return false;
+            if (contextoCache.administradorGlobal === true) return true;
+            const funcs = contextoCache.funcionalidades;
+            if (Array.isArray(funcs)) {
+                const alvo = String(nomeFunc).toUpperCase();
+                return funcs.some(f => String(f).toUpperCase() === alvo);
+            }
+            return false;
+        }
+
+        function aplicarGuardrailsAdmin() {
+            let algumMenuAdminVisivel = false;
+            for (const [func, ids] of Object.entries(FUNC_MENUS)) {
+                const permitido = temFuncionalidade(func);
+                if (permitido) algumMenuAdminVisivel = true;
+                ids.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.style.display = permitido ? '' : 'none';
+                });
+            }
+            const titulo = document.getElementById('gestao-menu-title');
+            if (titulo) titulo.style.display = algumMenuAdminVisivel ? '' : 'none';
+
+            const emTelaAdmin =
+                (segmentScreen.style.display === 'block' && !temFuncionalidade('ADMINISTRAR_SEGMENTOS')) ||
+                (vendedoresScreen?.style.display === 'block' && !temFuncionalidade('ADMINISTRAR_VENDEDORES')) ||
+                (mapScreen.style.display === 'block' && !temFuncionalidade('CONSULTAR_MAPAS'));
+
+            if (emTelaAdmin) showScreen('main');
+
+            console.log('[guard] Diagnóstico:', {
+                administradorGlobal: contextoCache?.administradorGlobal,
+                semAcesso: contextoCache?.semAcesso || false,
+                funcionalidades: contextoCache?.funcionalidades || [],
+                menusVisiveis: {
+                    vendedores: temFuncionalidade('ADMINISTRAR_VENDEDORES'),
+                    segmentos:  temFuncionalidade('ADMINISTRAR_SEGMENTOS'),
+                    mapa:       temFuncionalidade('CONSULTAR_MAPAS'),
+                }
+            });
+        }
+
+        // ============================================================
+        // ERRO UNIFICADO
         // ============================================================
         function extrairErroResposta(json, httpStatus) {
             if (!json) return { codigo: null, mensagem: `HTTP ${httpStatus || '?'}`, traceId: '' };
-            // Novo formato: {codigo, mensagem, traceId}
             if (json.codigo != null || (json.mensagem && !json.erros && !json.retorno)) {
-                return {
-                    codigo: json.codigo ?? null,
-                    mensagem: json.mensagem || 'Erro',
-                    traceId: json.traceId || ''
-                };
+                return { codigo: json.codigo ?? null, mensagem: json.mensagem || 'Erro', traceId: json.traceId || '' };
             }
-            // Legado: {retorno, dados, erros, traceId}
             if (Array.isArray(json.erros) && json.erros.length) {
                 const e = json.erros[0];
-                return {
-                    codigo: e.id ?? null,
-                    mensagem: e.motivo || e.message || 'Erro',
-                    traceId: json.traceId || ''
-                };
+                return { codigo: e.id ?? null, mensagem: e.motivo || e.message || 'Erro', traceId: json.traceId || '' };
             }
-            // Fallback
-            return {
-                codigo: null,
-                mensagem: json.message || json.title || `HTTP ${httpStatus || '?'}`,
-                traceId: json.traceId || ''
-            };
-        }
-
-        function extrairErro(err) {
-            if (err?.codigo !== undefined || err?.mensagem !== undefined) {
-                return { codigo: err.codigo, mensagem: err.mensagem, traceId: err.traceId || '' };
-            }
-            if (err?.message) return { codigo: null, mensagem: err.message, traceId: err.traceId || '' };
-            return { codigo: null, mensagem: String(err), traceId: '' };
+            return { codigo: null, mensagem: json.message || json.title || `HTTP ${httpStatus || '?'}`, traceId: json.traceId || '' };
         }
 
         function setActiveMenuItem(id) {
@@ -434,7 +576,17 @@ document.addEventListener('DOMContentLoaded', async function() {
         function registerScreen(nome, el) { if (el) registeredScreens[nome] = el; }
 
         function showScreen(screen) {
-            [mainScreen, segmentScreen, ignoradosScreen, mapScreen, ...Object.values(registeredScreens)]
+            if (screen === 'segment'    && !temFuncionalidade('ADMINISTRAR_SEGMENTOS')) {
+                showWarning('Você não tem permissão para acessar esta área.', 'Acesso negado'); return;
+            }
+            if (screen === 'vendedores' && !temFuncionalidade('ADMINISTRAR_VENDEDORES')) {
+                showWarning('Você não tem permissão para acessar esta área.', 'Acesso negado'); return;
+            }
+            if (screen === 'mapa'       && !temFuncionalidade('CONSULTAR_MAPAS')) {
+                showWarning('Você não tem permissão para acessar esta área.', 'Acesso negado'); return;
+            }
+
+            [mainScreen, segmentScreen, ignoradosScreen, mapScreen, vendedoresScreen, ...Object.values(registeredScreens)]
                 .forEach(s => { if (s) s.style.display = 'none'; });
 
             if (screen === 'main') {
@@ -453,11 +605,22 @@ document.addEventListener('DOMContentLoaded', async function() {
                 setActiveMenuItem('menu-mapa');
                 if (!window.mapInstance) initMap();
                 else setTimeout(() => window.mapInstance.invalidateSize(), 100);
+            } else if (screen === 'vendedores' || screen === 'empresas') {
+                if (vendedoresScreen) {
+                    vendedoresScreen.style.display = 'block';
+                    setActiveMenuItem('menu-vendedores');
+                }
             } else if (registeredScreens[screen]) {
                 registeredScreens[screen].style.display = 'block';
-                if (screen === 'empresas')   setActiveMenuItem('menu-empresas');
-                if (screen === 'vendedores') setActiveMenuItem('menu-vendedores');
             }
+
+            try {
+                window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+                document.documentElement.scrollTop = 0;
+                document.body.scrollTop = 0;
+                const mainEl = document.querySelector('.main');
+                if (mainEl) mainEl.scrollTop = 0;
+            } catch (e) { /* silencioso */ }
         }
 
         const btnLogout = document.getElementById('btn-logout');
@@ -470,7 +633,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     const csrf = document.cookie.split('; ').find(c => c.startsWith('login_delta_csrf='));
                     const csrfValor = csrf ? decodeURIComponent(csrf.split('=')[1]) : '';
                     await fetch('/api/logout', { method: 'POST', credentials: 'include', headers: csrfValor ? { 'X-CSRF-Token': csrfValor } : {} });
-                } catch (e) { /* silencioso */ }
+                } catch (e) {}
                 window.location.href = 'https://www.sistemas.deltafrio.com.br/central.html';
             });
         }
@@ -492,8 +655,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (!r.ok) {
                 const e = extrairErroResposta(json, r.status);
                 const err = new Error(e.mensagem);
-                err.codigo = e.codigo;
-                err.traceId = e.traceId;
+                err.codigo = e.codigo; err.traceId = e.traceId;
                 throw err;
             }
             return json;
@@ -515,8 +677,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (!r.ok) {
                 const e = extrairErroResposta(json, r.status);
                 const err = new Error(e.mensagem);
-                err.codigo = e.codigo;
-                err.traceId = e.traceId;
+                err.codigo = e.codigo; err.traceId = e.traceId;
                 throw err;
             }
             return json;
@@ -532,8 +693,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (!r.ok) {
                 const e = extrairErroResposta(json, r.status);
                 const err = new Error(e.mensagem);
-                err.codigo = e.codigo;
-                err.traceId = e.traceId;
+                err.codigo = e.codigo; err.traceId = e.traceId;
                 throw err;
             }
             return json;
@@ -549,8 +709,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (!r.ok) {
                 const e = extrairErroResposta(json, r.status);
                 const err = new Error(e.mensagem);
-                err.codigo = e.codigo;
-                err.traceId = e.traceId;
+                err.codigo = e.codigo; err.traceId = e.traceId;
                 throw err;
             }
             return json;
@@ -566,8 +725,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 let json; try { json = t ? JSON.parse(t) : {}; } catch (e) { json = {}; }
                 const e = extrairErroResposta(json, r.status);
                 const err = new Error(e.mensagem);
-                err.codigo = e.codigo;
-                err.traceId = e.traceId;
+                err.codigo = e.codigo; err.traceId = e.traceId;
                 throw err;
             }
             return r.status === 204 ? null : await r.json().catch(() => null);
@@ -580,25 +738,24 @@ document.addEventListener('DOMContentLoaded', async function() {
                     if (!r.ok) throw new Error(`HTTP ${r.status}`);
                     const d = await r.json();
                     return Array.isArray(d) ? d : (d.data || d.results || []);
-                } catch (e) { /* silencioso */ }
+                } catch (e) {}
             }
             return null;
         }
 
         // ============================================================
-        // CARREGAMENTOS COM CACHE
+        // CARREGAMENTOS AUXILIARES
         // ============================================================
         async function carregarUFs() {
             const cache = cacheGet(CACHE.UFS);
             if (cache) {
                 ufData = cache;
                 filterUf.innerHTML = '<option value="">Todos</option>' + ufData.map(u => `<option value="${u.sigla}">${u.sigla}</option>`).join('');
-                refreshCustomSelect(filterUf);
-                return;
+                refreshCustomSelect(filterUf); return;
             }
             try {
                 const data = await apiGet(`${API_URL}/ufs`);
-                ufData = data.map(i => ({ sigla: i.uf, nome: i.nome, full: i.ufNome || `${i.uf} - ${i.nome}` }));
+                ufData = data.map(i => ({ sigla: i.uf, nome: i.nome }));
                 filterUf.innerHTML = '<option value="">Todos</option>' + ufData.map(u => `<option value="${u.sigla}">${u.sigla}</option>`).join('');
                 refreshCustomSelect(filterUf);
                 cacheSet(CACHE.UFS, ufData);
@@ -608,30 +765,24 @@ document.addEventListener('DOMContentLoaded', async function() {
         async function carregarDDDs() {
             const cache = cacheGet(CACHE.DDDS);
             if (cache) {
-                const selectDDD = document.getElementById('filter-ddd');
-                selectDDD.innerHTML = '<option value="">Todos</option>';
-                cache.forEach(i => { const o = document.createElement('option'); o.value = i.ddd; o.textContent = `${i.ddd} - ${i.descricao}`; selectDDD.appendChild(o); });
-                refreshCustomSelect(selectDDD);
-                return;
+                const sel = document.getElementById('filter-ddd');
+                sel.innerHTML = '<option value="">Todos</option>';
+                cache.forEach(i => { const o = document.createElement('option'); o.value = i.ddd; o.textContent = `${i.ddd} - ${i.descricao}`; sel.appendChild(o); });
+                refreshCustomSelect(sel); return;
             }
             try {
                 const data = await apiGet(`${API_URL}/ddds`);
-                const selectDDD = document.getElementById('filter-ddd');
-                selectDDD.innerHTML = '<option value="">Todos</option>';
-                data.forEach(i => { const o = document.createElement('option'); o.value = i.ddd; o.textContent = `${i.ddd} - ${i.descricao}`; selectDDD.appendChild(o); });
-                refreshCustomSelect(selectDDD);
+                const sel = document.getElementById('filter-ddd');
+                sel.innerHTML = '<option value="">Todos</option>';
+                data.forEach(i => { const o = document.createElement('option'); o.value = i.ddd; o.textContent = `${i.ddd} - ${i.descricao}`; sel.appendChild(o); });
+                refreshCustomSelect(sel);
                 cacheSet(CACHE.DDDS, data.map(i => ({ ddd: i.ddd, descricao: i.descricao })));
             } catch (e) { console.error("Erro DDDs:", e); }
         }
 
         async function carregarCnaesIniciais() {
             const cache = cacheGet(CACHE.CNAES);
-            if (cache) {
-                allCnaesCache = cache;
-                cnaeData = allCnaesCache;
-                populateLinkSelect();
-                return;
-            }
+            if (cache) { allCnaesCache = cache; cnaeData = allCnaesCache; populateLinkSelect(); return; }
             try {
                 const data = await fetchFromAPI([`${API_URL}/cnaes`]);
                 if (data) {
@@ -660,7 +811,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                         allCnaesCache.push(r); return r;
                     }
                 }
-            } catch (e) { /* silencioso */ }
+            } catch (e) {}
             return null;
         }
 
@@ -669,22 +820,17 @@ document.addEventListener('DOMContentLoaded', async function() {
         // ============================================================
         async function carregarSegmentos() {
             if (segmentData.length > 0) { updateSegmentFilter(); renderSegmentTable(); return; }
-
             const cache = cacheGet(CACHE.SEGMENTOS);
             if (cache) {
                 segmentData = cache.segmentData || [];
                 segmentoCnaeLinks = cache.segmentoCnaeLinks || [];
-                updateSegmentFilter(); renderSegmentTable(); populateLinkSelect();
-                return;
+                updateSegmentFilter(); renderSegmentTable(); populateLinkSelect(); return;
             }
-
             try {
                 const data = await apiGet(`${API_URL}/segmentos`);
                 segmentData = data.map(i => ({ id: i.codigo, nome: i.descricao }));
                 segmentoCnaeLinks = [];
-
                 const cnaesVistos = new Set(allCnaesCache.map(x => String(x.codigo).trim()));
-
                 await executarEmLotesComPausa(segmentData, 3, 20, async (seg) => {
                     try {
                         const cnaes = await apiGet(`${API_URL}/segmentos/${seg.id}/cnaes`);
@@ -695,29 +841,17 @@ document.addEventListener('DOMContentLoaded', async function() {
                             const cv = String(c.codigo).trim();
                             if (!cnaesVistos.has(cv)) {
                                 cnaesVistos.add(cv);
-                                allCnaesCache.push({
-                                    codigo: cv,
-                                    descricao: c.descricao || '',
-                                    full: c.descricao ? `${cv} - ${c.descricao}` : cv
-                                });
+                                allCnaesCache.push({ codigo: cv, descricao: c.descricao || '', full: c.descricao ? `${cv} - ${c.descricao}` : cv });
                             }
                         });
-                    } catch (e) { /* silencioso */ }
+                    } catch (e) {}
                 });
-
-                updateSegmentFilter();
-                renderSegmentTable();
-                populateLinkSelect();
-
+                updateSegmentFilter(); renderSegmentTable(); populateLinkSelect();
                 cacheSet(CACHE.SEGMENTOS, { segmentData, segmentoCnaeLinks });
                 cacheSet(CACHE.CNAES, allCnaesCache);
-
             } catch (e) {
                 console.error("Erro Segmentos:", e);
-                if (filterSegmento) {
-                    filterSegmento.innerHTML = '<option value="">Todos</option>';
-                    refreshCustomSelect(filterSegmento);
-                }
+                if (filterSegmento) { filterSegmento.innerHTML = '<option value="">Todos</option>'; refreshCustomSelect(filterSegmento); }
             }
         }
 
@@ -742,7 +876,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             const cache = cacheGet(CACHE.MUNICIPIOS);
             if (cache && cache.length > 0) { municipiosCache = cache; return municipiosCache; }
             if (municipiosCarregando && municipiosPromise) return municipiosPromise;
-
             municipiosCarregando = true;
             municipiosPromise = (async () => {
                 try {
@@ -752,7 +885,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                         try {
                             const m = await apiGet(`${API_URL}/ddds/${d.ddd}/municipios`);
                             m.forEach(x => acumulado.push(`${x.municipio} - ${d.ddd}`));
-                        } catch (e) { /* silencioso */ }
+                        } catch (e) {}
                     });
                     if (acumulado.length > 0) {
                         municipiosCache = [...new Set(acumulado)].sort();
@@ -771,18 +904,14 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
 
         // ============================================================
-        // IGNORADOS (com empresaId obrigatório + cache por empresa)
+        // IGNORADOS
         // ============================================================
         async function carregarIgnorados() {
             if (ignoradosCarregados) return;
-
             const empresaId = obterEmpresaAtivaId();
 
-            // ✅ Se não há empresa ativa, mostra instrução clara (backend exige empresaId)
             if (!empresaId) {
-                ignorados = [];
-                ignoradosFiltrados = [];
-                ignoradosCarregados = true;
+                ignorados = []; ignoradosFiltrados = []; ignoradosCarregados = true;
                 renderIgnoradosTable();
                 const tb = document.getElementById('ignorados-table-body');
                 if (tb) {
@@ -791,11 +920,9 @@ document.addEventListener('DOMContentLoaded', async function() {
                         Selecione uma empresa ativa na barra lateral para ver os ignorados.
                     </td></tr>`;
                 }
-                console.warn('[ignorados] nenhuma empresa ativa selecionada');
                 return;
             }
 
-            // ✅ Cache POR empresa — só usa se tiver itens (> 0)
             const cacheKey = `${CACHE.IGNORADOS.key}_${empresaId}`;
             try {
                 const raw = localStorage.getItem(cacheKey);
@@ -806,34 +933,23 @@ document.addEventListener('DOMContentLoaded', async function() {
                         ignoradosCarregados = true;
                         ignoradosFiltrados = [...ignorados];
                         renderIgnoradosTable();
-                        console.log(`✅ [ignorados] ${ignorados.length} do cache (empresa ${empresaId})`);
                         return;
                     }
                     localStorage.removeItem(cacheKey);
                 }
-            } catch (e) { /* segue */ }
-
-            // ✅ Remove chave antiga global (versões anteriores)
+            } catch (e) {}
             try { localStorage.removeItem(CACHE.IGNORADOS.key); } catch (e) {}
 
-            // ✅ Fetch com empresaId OBRIGATÓRIO na query
             try {
                 const url = `${API_URL}/prospeccao/status-estabelecimentos?status=X&empresaId=${encodeURIComponent(empresaId)}`;
-                console.log(`[ignorados] GET ${url}`);
-
                 const r = await fetch(url, { credentials: 'include', headers: { 'Accept': 'application/json' } });
                 const raw = await r.text();
-                console.log(`[ignorados] → HTTP ${r.status}`);
-
                 if (!r.ok) {
                     let json = {}; try { json = JSON.parse(raw); } catch (e) {}
                     const erro = extrairErroResposta(json, r.status);
                     throw new Error(erro.mensagem || `HTTP ${r.status}`);
                 }
-
-                let d = {}; try { d = raw ? JSON.parse(raw) : {}; } catch (e) { d = {}; }
-
-                // ✅ Parsing tolerante a todos os formatos
+                let d = {}; try { d = raw ? JSON.parse(raw) : {}; } catch (e) {}
                 let lista = [];
                 if (Array.isArray(d))                        lista = d;
                 else if (Array.isArray(d.registros))         lista = d.registros;
@@ -843,34 +959,19 @@ document.addEventListener('DOMContentLoaded', async function() {
                 else if (Array.isArray(d.content))           lista = d.content;
 
                 ignorados = lista.map(i => ({
-                    cnpj: i.cnpj,
-                    cnpjFormatado: i.cnpjFormatado,
-                    razaoSocial: i.razaoSocial,
-                    nomeFantasia: i.nomeFantasia,
-                    uf: i.uf,
-                    municipio: i.municipio,
-                    ddd: i.ddd,
-                    telefone1: i.telefone1,
-                    telefone2: i.telefone2,
-                    email: i.email,
-                    status: i.status || 'X'
+                    cnpj: i.cnpj, cnpjFormatado: i.cnpjFormatado, razaoSocial: i.razaoSocial,
+                    nomeFantasia: i.nomeFantasia, uf: i.uf, municipio: i.municipio,
+                    ddd: i.ddd, telefone1: i.telefone1, telefone2: i.telefone2,
+                    email: i.email, status: i.status || 'X'
                 }));
-
                 ignoradosCarregados = true;
                 ignoradosFiltrados = [...ignorados];
                 renderIgnoradosTable();
-                console.log(`✅ [ignorados] ${ignorados.length} itens carregados (empresa ${empresaId})`);
-
-                // ✅ SÓ salva cache se tiver itens (evita cache envenenado)
                 if (ignorados.length > 0) {
-                    try {
-                        localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), dados: ignorados }));
-                    } catch (e) {}
+                    try { localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), dados: ignorados })); } catch (e) {}
                 }
             } catch (e) {
-                console.error('[ignorados] erro:', e?.message || e);
-                ignorados = []; ignoradosFiltrados = [];
-                ignoradosCarregados = true;
+                ignorados = []; ignoradosFiltrados = []; ignoradosCarregados = true;
                 renderIgnoradosTable();
                 const tb = document.getElementById('ignorados-table-body');
                 if (tb) {
@@ -940,21 +1041,13 @@ document.addEventListener('DOMContentLoaded', async function() {
             return d ? `(${d}) ${n}` : n;
         }
 
-        // ✅ Salvar status agora exige empresaId na query
         async function salvarStatus(cnpj, status) {
             const empresaId = obterEmpresaAtivaId();
             if (!empresaId) throw new Error('Selecione uma empresa ativa antes de classificar.');
-            await apiPost(
-                `${API_URL}/prospeccao/status-estabelecimentos?empresaId=${encodeURIComponent(empresaId)}`,
-                { cnpjCompleto: cnpj, status }
-            );
+            await apiPost(`${API_URL}/prospeccao/status-estabelecimentos?empresaId=${encodeURIComponent(empresaId)}`, { cnpjCompleto: cnpj, status });
             limparCacheIgnorados(empresaId);
         }
 
-        function removerStatusIgnorado(cnpj) {
-            const empresaId = obterEmpresaAtivaId();
-            limparCacheIgnorados(empresaId || null);
-        }
         function filtrarIgnorados() {
             const t = ignoradosSearch ? ignoradosSearch.value.toLowerCase().trim() : '';
             ignoradosFiltrados = !t ? [...ignorados] : ignorados.filter(i => (i.cnpj && i.cnpj.includes(t)) || (i.cnpjFormatado && i.cnpjFormatado.includes(t)) || (i.razaoSocial && i.razaoSocial.toLowerCase().includes(t)) || (i.nomeFantasia && i.nomeFantasia.toLowerCase().includes(t)) || (i.uf && i.uf.toLowerCase().includes(t)) || (i.telefone1 && i.telefone1.includes(t)) || (i.municipio && i.municipio.toLowerCase().includes(t)));
@@ -997,50 +1090,35 @@ document.addEventListener('DOMContentLoaded', async function() {
             let cnae = selectedCnaeCode; if (!cnae && filterCnaeInput.value.trim() !== '') { filterCnaeInput.value = ''; cnae = null; }
             const esc = filterTipoCnae ? filterTipoCnae.value : 'PRINCIPAL';
             const body = { uf: uf || null, ddd: uf ? null : (ddd || null), cnae: cnae || null, segmento: cnae ? null : (seg ? parseInt(seg) : null), escopoCnae: (cnae || seg) ? esc : null, ultimoCnpj: cursorEnv, limite: 50 };
-
             if (!body.uf && !body.ddd && !body.segmento && !body.cnae) { alert("Informe pelo menos um filtro."); return; }
-
-            // ✅ empresaId vai na QUERY, não no body
             const empresaId = obterEmpresaAtivaId();
             if (!empresaId) { alert("Selecione uma empresa ativa antes de pesquisar."); return; }
-
             btn.disabled = true; const origB = btn.innerHTML; const origP = pageIndicator.innerHTML;
             if (btn.classList.contains('page-btn')) pageIndicator.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; else btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Carregando...';
             if (pesquisaController) pesquisaController.abort(); pesquisaController = new AbortController();
             try {
-                const r = await fetch(
-                    `${API_URL}/prospeccao/pesquisar?empresaId=${encodeURIComponent(empresaId)}`,
-                    { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body), signal: pesquisaController.signal }
-                );
+                const r = await fetch(`${API_URL}/prospeccao/pesquisar?empresaId=${encodeURIComponent(empresaId)}`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body), signal: pesquisaController.signal });
                 const t = await r.text();
-                let json; try { json = t ? JSON.parse(t) : {}; } catch (e) { json = {}; }
-                if (!r.ok) {
-                    const e = extrairErroResposta(json, r.status);
-                    const err = new Error(e.mensagem);
-                    err.codigo = e.codigo; err.traceId = e.traceId;
-                    throw err;
-                }
+                let json; try { json = t ? JSON.parse(t) : {}; } catch (e) {}
+                if (!r.ok) { const e = extrairErroResposta(json, r.status); const err = new Error(e.mensagem); err.codigo = e.codigo; err.traceId = e.traceId; throw err; }
                 const d = json?.dados ?? json;
                 registros = d.registros || [];
                 temMais = d.temMais || false;
                 cursorAtual = d.ultimoCnpj || null;
                 renderTable(registros);
             } catch (e) {
-                if (e.name !== 'AbortError') {
-                    console.error(e);
-                    alert("Erro ao pesquisar: " + (e.message || 'tente novamente'));
-                }
+                if (e.name !== 'AbortError') { console.error(e); alert("Erro ao pesquisar: " + (e.message || 'tente novamente')); }
                 if (btn.classList.contains('page-btn')) pageIndicator.innerHTML = origP;
-            } finally {
-                btn.disabled = false; btn.innerHTML = origB; pesquisaController = null;
-            }
+            } finally { btn.disabled = false; btn.innerHTML = origB; pesquisaController = null; }
         }
 
-        // ✅ Detalhes agora expõe botões C e X com tratamento 409
-        function openDetailsModal(cnpj, isIgn = false) {
+                function openDetailsModal(cnpj, isIgn = false) {
             const list = isIgn ? ignorados : registros;
             const c = list.find(i => i.cnpj === cnpj);
             if (!c) return;
+
+            const nomeExibicao = c.nomeFantasia || c.razaoSocial || 'sem nome';
+            const cnpjExibicao = c.cnpjFormatado || c.cnpj || '';
 
             document.getElementById('det-cnpj').innerText = c.cnpjFormatado;
             document.getElementById('det-razao').innerText = c.razaoSocial || '-';
@@ -1063,97 +1141,112 @@ document.addEventListener('DOMContentLoaded', async function() {
             document.getElementById('det-tel2').innerText = formatarTelefone(c.ddd, c.telefone2);
             document.getElementById('det-email').innerText = c.email || '-';
 
-            // Badge de classificação atual
             const statusAtual = c.status || (isIgn ? 'X' : null);
+            
+            // Oculta o badge de classificação por completo (removeu o IGNORADO X e CLASSIFICADO C)
             if (detClassificacao) {
-                if (statusAtual === 'C') {
-                    detClassificacao.style.display = 'inline-block';
-                    detClassificacao.innerText = 'CLASSIFICADO C';
-                    detClassificacao.className = 'badge badge-blue';
-                } else if (statusAtual === 'X') {
-                    detClassificacao.style.display = 'inline-block';
-                    detClassificacao.innerText = 'SEM INTERESSE (X)';
-                    detClassificacao.className = 'badge badge-orange';
-                } else {
-                    detClassificacao.style.display = 'none';
-                }
+                detClassificacao.style.display = 'none'; 
             }
 
-            // Botões C e X
+            // Controle do botão de ação
             if (btnClassifyX) {
-                btnClassifyX.onclick = () => classificar(cnpj, 'X', statusAtual);
-                btnClassifyX.disabled = (statusAtual === 'X');
+                // Limpa as classes anteriores para não misturar as cores
+                btnClassifyX.classList.remove('btn-classify-x', 'btn-classify-activate');
+                
+                if (statusAtual === 'X' || isIgn) {
+                    btnClassifyX.innerHTML = '<i class="fas fa-undo"></i> Ativar Cadastro';
+                    btnClassifyX.classList.add('btn-classify-activate');
+                    btnClassifyX.onclick = () => ativarCadastro(cnpj, nomeExibicao, cnpjExibicao);
+                } else {
+                    btnClassifyX.innerHTML = '<i class="fas fa-ban"></i> Ignorar Cadastro';
+                    btnClassifyX.classList.add('btn-classify-x');
+                    btnClassifyX.onclick = () => classificar(cnpj, 'X', statusAtual, nomeExibicao, cnpjExibicao);
+                }
+                btnClassifyX.disabled = false;
             }
-            if (btnClassifyC) {
-                btnClassifyC.onclick = () => classificar(cnpj, 'C', statusAtual);
-                btnClassifyC.disabled = (statusAtual === 'C');
-            }
-
+            
             detailsModal.style.display = 'flex';
         }
 
-        async function classificar(cnpj, novoStatus, statusAtual) {
-            if (statusAtual === novoStatus) {
-                detailsModal.style.display = 'none';
-                return;
+                async function classificar(cnpj, novoStatus, statusAtual, nome, cnpjFmt) {
+            if (statusAtual === novoStatus) { 
+                detailsModal.style.display = 'none'; 
+                return; 
             }
+            
+            // Função auxiliar interna para remover o item da tabela visualmente
+            const removerDaTabela = () => {
+                if (novoStatus === 'X') {
+                    const idx = registros.findIndex(i => i.cnpj === cnpj);
+                    if (idx !== -1) {
+                        registros.splice(idx, 1);
+                        renderTable(registros);
+                    }
+                }
+            };
 
             if (statusAtual && statusAtual !== novoStatus) {
-                showConfirm(
-                    'Trocar classificação',
-                    `Este estabelecimento já está classificado como "${statusAtual}". Para mudar para "${novoStatus}", é necessário excluir a classificação atual primeiro. Deseja continuar?`,
-                    async () => {
-                        try {
-                            const empresaId = obterEmpresaAtivaId();
-                            await apiDelete(`${API_URL}/prospeccao/status-estabelecimentos/${encodeURIComponent(cnpj)}?empresaId=${encodeURIComponent(empresaId)}`);
-                            await salvarStatus(cnpj, novoStatus);
-                            await recarregarAposClassificacao();
-                            detailsModal.style.display = 'none';
-                            showWarning(`Classificação alterada para "${novoStatus}".`, 'Sucesso');
-                        } catch (e) {
-                            if (e.codigo === 409 || e.codigo === 'conflito') {
-                                showWarning('O servidor exige exclusão antes da troca. Avise o time de TI.', 'Atenção');
-                            } else {
-                                showWarning('Erro ao trocar classificação: ' + (e.message || ''));
-                            }
-                        }
+                showConfirm('Trocar classificação', `Este estabelecimento já está classificado como "${statusAtual}". Para ignorar, é necessário excluir a classificação atual primeiro. Deseja continuar?`, async () => {
+                    try {
+                        const empresaId = obterEmpresaAtivaId();
+                        await apiDelete(`${API_URL}/prospeccao/status-estabelecimentos/${encodeURIComponent(cnpj)}?empresaId=${encodeURIComponent(empresaId)}`);
+                        await salvarStatus(cnpj, novoStatus);
+                        
+                        removerDaTabela(); // Remove na hora
+                        
+                        await recarregarAposClassificacao();
+                        detailsModal.style.display = 'none';
+                        showWarning(`Cadastro ${nome} e CNPJ ${cnpjFmt} ignorado.`, 'Sucesso');
+                    } catch (e) {
+                        if (e.codigo === 409) showWarning('O servidor exige exclusão antes da troca.', 'Atenção');
+                        else showWarning('Erro ao trocar classificação: ' + (e.message || ''));
                     }
-                );
+                });
                 return;
             }
-
+            
             try {
                 await salvarStatus(cnpj, novoStatus);
+                
+                removerDaTabela(); // Remove na hora
+                
                 await recarregarAposClassificacao();
                 detailsModal.style.display = 'none';
-                showWarning(`Classificado como "${novoStatus}".`, 'Sucesso');
+                showWarning(`Cadastro ${nome} e CNPJ ${cnpjFmt} ignorado.`, 'Sucesso');
             } catch (e) {
-                if (e.codigo === 409) {
-                    showWarning('Este estabelecimento já possui classificação. Recarregue a página para atualizar.', 'Atenção');
-                } else {
-                    showWarning('Erro ao classificar: ' + (e.message || ''));
-                }
+                if (e.codigo === 409) showWarning('Este estabelecimento já possui classificação. Recarregue a página para atualizar.', 'Atenção');
+                else showWarning('Erro ao ignorar: ' + (e.message || ''));
             }
         }
 
+                async function ativarCadastro(cnpj, nome, cnpjFmt) {
+            try {
+                const empresaId = obterEmpresaAtivaId();
+                await apiDelete(`${API_URL}/prospeccao/status-estabelecimentos/${encodeURIComponent(cnpj)}?empresaId=${encodeURIComponent(empresaId)}`);
+                
+                // Remove o item da lista de ignorados na hora
+                const idx = ignorados.findIndex(i => i.cnpj === cnpj);
+                if (idx !== -1) {
+                    ignorados.splice(idx, 1);
+                    ignoradosFiltrados = [...ignorados];
+                    renderIgnoradosTable();
+                }
+                
+                await recarregarAposClassificacao();
+                detailsModal.style.display = 'none';
+                showWarning(`Cadastro ${nome} e CNPJ ${cnpjFmt} reativado com sucesso!`, 'Sucesso');
+            } catch (e) {
+                showWarning('Erro ao ativar cadastro: ' + (e.message || ''));
+            }
+        }
+
+
         async function recarregarAposClassificacao() {
-            // ✅ Limpa cache por empresa (não global, pois só a empresa atual mudou)
             const empresaId = obterEmpresaAtivaId();
-            if (empresaId) {
-                limparCacheIgnorados(empresaId);
-            } else {
-                limparCacheIgnorados();
-            }
-
-            // ✅ Reseta estado em memória
-            ignoradosCarregados = false;
-            ignorados = [];
-            ignoradosFiltrados = [];
-
-            // ✅ Se estiver na tela de ignorados, recarrega com a empresa atual
-            if (ignoradosScreen.style.display === 'block') {
-                await carregarIgnorados();
-            }
+            if (empresaId) limparCacheIgnorados(empresaId);
+            else limparCacheIgnorados();
+            ignoradosCarregados = false; ignorados = []; ignoradosFiltrados = [];
+            if (ignoradosScreen.style.display === 'block') await carregarIgnorados();
         }
 
         window.novoSegmento = function() { if (isDirty) { showUnsavedChangesModal('Deseja salvar antes de criar um novo segmento?', function() { document.getElementById('segmentoForm').requestSubmit(); resetSegmentForm(); }, function() { resetSegmentForm(); }); } else resetSegmentForm(); };
@@ -1286,24 +1379,26 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.getElementById('menu-municipios').addEventListener('click', async () => {
             if (municipiosCache && municipiosCache.length > 0) {
                 originalItems = municipiosCache; currentItems = municipiosCache;
-                openGenericModal('Pesquisa Município e DDDs', 'Informe o município ou DDD:', municipiosCache, 'municipio');
-                return;
+                openGenericModal('Pesquisa Município e DDDs', 'Informe o município ou DDD:', municipiosCache, 'municipio'); return;
             }
             openGenericModal('Pesquisa Município e DDDs', 'Carregando...', [], 'municipio');
             const m = await carregarMunicipiosDaAPI();
-            if (m && m.length > 0) {
-                originalItems = m; currentItems = m; renderGenericList();
-                genericModalSubtitle.innerText = 'Informe o município ou DDD:';
-            } else {
-                genericModalBody.innerHTML = '<p style="padding:15px;text-align:center;color:#666;">Nenhum município disponível.</p>';
-                genericModalSubtitle.innerText = 'Falha ao carregar municípios.';
-            }
+            if (m && m.length > 0) { originalItems = m; currentItems = m; renderGenericList(); genericModalSubtitle.innerText = 'Informe o município ou DDD:'; }
+            else { genericModalBody.innerHTML = '<p style="padding:15px;text-align:center;color:#666;">Nenhum município disponível.</p>'; genericModalSubtitle.innerText = 'Falha ao carregar municípios.'; }
         });
         document.getElementById('menu-natureza').addEventListener('click', async () => { const s = await carregarSituacoesCadastrais(); originalItems = s; openGenericModal('Pesquisa Natureza Jurídica', 'Informe a natureza:', s, 'natureza'); });
         document.getElementById('menu-dashboard').addEventListener('click', function() { if (segmentScreen.style.display === 'block') { if (isDirty) { showUnsavedChangesModal('Deseja salvar antes de sair?', function() { document.getElementById('segmentoForm').requestSubmit(); showScreen('main'); }, function() { resetSegmentForm(); showScreen('main'); }); } else showScreen('main'); return; } if (mainScreen.style.display !== 'block') showScreen('main'); else { setActiveMenuItem('menu-dashboard'); closeAllModals(); } });
         document.getElementById('menu-segmentos').addEventListener('click', function() { if (segmentScreen.style.display === 'block') { setActiveMenuItem('menu-segmentos'); return; } showScreen('segment'); });
         document.getElementById('menu-ignorados').addEventListener('click', function() { if (ignoradosScreen.style.display === 'block') { setActiveMenuItem('menu-ignorados'); return; } showScreen('ignorados'); });
         document.getElementById('menu-mapa').addEventListener('click', function() { showScreen('mapa'); });
+
+        document.getElementById('menu-vendedores').addEventListener('click', function() {
+            showScreen('vendedores');
+            if (window.__ativarAbaVendedoresEmpresas) {
+                window.__ativarAbaVendedoresEmpresas('vendedores');
+            }
+        });
+
         if (ignoradosSearch) ignoradosSearch.addEventListener('input', () => filtrarIgnorados());
 
         function clearFilters() {
@@ -1320,10 +1415,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         btnClear.addEventListener('click', clearFilters);
         btnPrev.addEventListener('click', function() { if (currentPage > 1 && historicoCursors.length > 1) { historicoCursors.pop(); currentPage--; cursorAtual = historicoCursors[historicoCursors.length - 1]; pesquisarProspeccao(this, cursorAtual); } else showWarning('Você já está na primeira página.', 'Aviso'); });
         btnNext.addEventListener('click', function() { if (temMais) { historicoCursors.push(cursorAtual); currentPage++; pesquisarProspeccao(this, cursorAtual); } else showWarning('Você já está na última página.', 'Aviso'); });
-        document.getElementById('filter-ddd').addEventListener('change', function() {});
 
         // ============================================================
-        // BOOT — inclui carregamento do contexto
+        // BOOT
         // ============================================================
         if (campoMunicipio) campoMunicipio.style.display = 'none';
         initializeCustomSelects();
@@ -1331,8 +1425,45 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         (async function boot() {
             try {
-                // ✅ Contexto primeiro (bloqueia até pegar empresas + capacidades)
-                await carregarContexto();
+                let ctxOk = false;
+                try {
+                    const ctx = await carregarContexto();
+                    ctxOk = !!ctx;
+                } catch (e) { console.warn('[boot] contexto falhou:', e); }
+
+                if (!ctxOk) {
+                    ADMIN_MENU_IDS.forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el) el.style.display = 'none';
+                    });
+                    const titulo = document.getElementById('gestao-menu-title');
+                    if (titulo) titulo.style.display = 'none';
+                    console.warn('[boot] Sem contexto — menus admin ocultos');
+                    return;
+                }
+
+                aplicarGuardrailsAdmin();
+
+                if (contextoCache?.semAcesso) {
+                    console.warn('[boot] Usuário sem empresas concedidas');
+                    const main = document.getElementById('main-screen');
+                    if (main) {
+                        main.innerHTML = `
+                            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:70vh;text-align:center;gap:16px;padding:40px;">
+                                <i class="fas fa-lock" style="font-size:72px;color:#94a3b8;"></i>
+                                <h2 style="color:var(--text-main);font-size:24px;margin:0;">Sem acesso ao PROSPECT</h2>
+                                <p style="color:var(--text-secondary);max-width:480px;font-size:15px;line-height:1.6;margin:0;">
+                                    Você ainda não tem empresas concedidas.<br>
+                                    Entre em contato com o administrador para solicitar acesso.
+                                </p>
+                                <p style="color:#94a3b8;font-size:12px;margin-top:20px;">
+                                    ${contextoCache.motivoAcesso || 'Acesso não permitido'}
+                                </p>
+                            </div>
+                        `;
+                    }
+                    return;
+                }
 
                 await Promise.all([carregarUFs(), carregarDDDs(), carregarCnaesIniciais()]);
                 await carregarSegmentos();
@@ -1344,30 +1475,23 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
         })();
 
-        // ========================================================================
-        // ===== MAPA =====
-        // ========================================================================
+        // ============================================================
+        // MAPA
+        // ============================================================
         window.mapFilters = { uf: null };
-
-        let terraLayer = null;
-        let stateLayer = null;
-        let municipiosLayer = null;
+        let terraLayer = null, stateLayer = null, municipiosLayer = null;
         const vendedoresLayers = {};
-
         const TERRA_CACHE_KEY = 'deltafrio_terra_geojson_v1';
         const UFS_CACHE_KEY = 'deltafrio_ufs_geojson_v18';
         const MUN_CACHE_KEY = 'deltafrio_municipios_geojson_v10';
-        let terraGeojsonCache = null;
-        let ufsGeojsonCache = null;
-        let municipiosGeojsonCache = null;
+        let terraGeojsonCache = null, ufsGeojsonCache = null, municipiosGeojsonCache = null;
 
         function isDark() { return document.body.classList.contains('dark-mode'); }
-
         function getTerraStyle() { const d = isDark(); return { color: d ? '#64748b' : '#94a3b8', weight: 0.6, opacity: 0.9, fill: true, fillColor: d ? '#1e293b' : '#f1f5f9', fillOpacity: 1 }; }
         function getStateStyle() { const d = isDark(); return { color: d ? '#94a3b8' : '#475569', weight: 1.5, opacity: 1, fill: true, fillColor: d ? '#334155' : '#e2e8f0', fillOpacity: 1 }; }
         function getMunicipalityStyle() { const d = isDark(); return { color: d ? '#475569' : '#94a3b8', weight: 0.4, opacity: 0.6, fill: false }; }
-        function getVendedorStyle(vendedor) { return { color: vendedor.cor, weight: 1.5, opacity: 0.95, fill: true, fillColor: vendedor.cor, fillOpacity: 0.75 }; }
-        function getVendedorHoverStyle(vendedor) { return { color: vendedor.cor, weight: 3, opacity: 1, fill: true, fillColor: vendedor.cor, fillOpacity: 0.95 }; }
+        function getVendedorStyle(v) { return { color: v.cor, weight: 1.5, opacity: 0.95, fill: true, fillColor: v.cor, fillOpacity: 0.75 }; }
+        function getVendedorHoverStyle(v) { return { color: v.cor, weight: 3, opacity: 1, fill: true, fillColor: v.cor, fillOpacity: 0.95 }; }
 
         async function carregarTerraGeoJSON() {
             if (terraGeojsonCache) return terraGeojsonCache;
@@ -1398,25 +1522,25 @@ document.addEventListener('DOMContentLoaded', async function() {
                 const r = await fetch(`${API_MAPAS}/municipios`, { credentials: 'include', headers: { 'Accept': 'application/json' } });
                 if (!r.ok) throw new Error(`HTTP ${r.status}`);
                 municipiosGeojsonCache = await r.json();
-                try { localStorage.setItem(MUN_CACHE_KEY, JSON.stringify(municipiosGeojsonCache)); } catch (e) { /* silencioso */ }
+                try { localStorage.setItem(MUN_CACHE_KEY, JSON.stringify(municipiosGeojsonCache)); } catch (e) {}
                 return municipiosGeojsonCache;
             } catch (e) { return null; }
         }
 
-        function criarCamadaTerra(geojson) { return geojson ? L.geoJSON(geojson, { style: () => getTerraStyle(), interactive: false }) : null; }
-        function criarCamadaEstados(geojson) { return geojson ? L.geoJSON(geojson, { style: () => getStateStyle(), interactive: false }) : null; }
-        function criarCamadaMunicipios(geojson) { return geojson ? L.geoJSON(geojson, { style: () => getMunicipalityStyle(), interactive: false }) : null; }
-        function criarCamadaVendedor(geojson, vendedor) {
-            if (!geojson || !geojson.features) return null;
-            const features = geojson.features.filter(f => { const v = getVendedorDaCidade(f.properties || {}); return v && v.id === vendedor.id; });
+        function criarCamadaTerra(g) { return g ? L.geoJSON(g, { style: () => getTerraStyle(), interactive: false }) : null; }
+        function criarCamadaEstados(g) { return g ? L.geoJSON(g, { style: () => getStateStyle(), interactive: false }) : null; }
+        function criarCamadaMunicipios(g) { return g ? L.geoJSON(g, { style: () => getMunicipalityStyle(), interactive: false }) : null; }
+        function criarCamadaVendedor(g, v) {
+            if (!g || !g.features) return null;
+            const features = g.features.filter(f => { const vv = getVendedorDaCidade(f.properties || {}); return vv && vv.id === v.id; });
             if (!features.length) return null;
             return L.geoJSON({ type: 'FeatureCollection', features }, {
-                style: () => getVendedorStyle(vendedor),
+                style: () => getVendedorStyle(v),
                 onEachFeature: (f, l) => {
                     const nome = f.properties?.nome || f.properties?.municipio || 'Cidade';
                     l.bindTooltip(nome, { sticky: true, direction: 'top', offset: [0, -8], className: 'vendedor-tooltip', opacity: 1 });
-                    l.on('mouseover', function() { this.setStyle(getVendedorHoverStyle(vendedor)); this.bringToFront(); });
-                    l.on('mouseout', function() { this.setStyle(getVendedorStyle(vendedor)); });
+                    l.on('mouseover', function() { this.setStyle(getVendedorHoverStyle(v)); this.bringToFront(); });
+                    l.on('mouseout', function() { this.setStyle(getVendedorStyle(v)); });
                 }
             });
         }
@@ -1448,7 +1572,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                         const d = dados?.dados ?? dados;
                         stats[v.id].pessoas = Number(d?.populacaoTotal || 0);
                     }
-                } catch (e) { /* silencioso */ }
+                } catch (e) {}
             }
             return stats;
         }
@@ -1460,7 +1584,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             let html = '';
             vendedoresMapa.forEach(v => {
                 const s = stats[v.id] || { cidades: v.cidades.length, pessoas: 0 };
-                const pessoasFmt = Number(s.pessoas || 0).toLocaleString('pt-BR');
+                const pf = Number(s.pessoas || 0).toLocaleString('pt-BR');
                 html += `
                     <label class="vendedor-stat" data-vendedor="${v.id}" style="--vendedor-cor:${v.cor};">
                         <input type="checkbox" class="vendedor-stat-checkbox" data-vendedor="${v.id}">
@@ -1471,11 +1595,10 @@ document.addEventListener('DOMContentLoaded', async function() {
                             </div>
                             <div class="vendedor-stat-numbers">
                                 <div class="vendedor-stat-num"><strong>${s.cidades}</strong><small>cidades</small></div>
-                                <div class="vendedor-stat-num"><strong>${pessoasFmt}</strong><small>pessoas</small></div>
+                                <div class="vendedor-stat-num"><strong>${pf}</strong><small>pessoas</small></div>
                             </div>
                         </div>
-                    </label>
-                `;
+                    </label>`;
             });
             container.innerHTML = html;
             container.querySelectorAll('.vendedor-stat-checkbox').forEach(cb => {
@@ -1493,7 +1616,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             const container = document.getElementById('map');
             if (!container) return;
             await carregarVendedoresMapa();
-
             const map = L.map('map', { minZoom: 3, maxZoom: 13, zoomControl: true, attributionControl: false }).setView([-14.2350, -51.9253], 4);
             window.mapInstance = map;
 
@@ -1534,36 +1656,30 @@ document.addEventListener('DOMContentLoaded', async function() {
         window.initMap = initMap;
 
         // ============================================================
-        // ✅ Debug helpers — úteis para o suporte
+        // DEBUG HELPERS
         // ============================================================
-        window.limparCacheIgnoradosDebug = function () {
-            limparCacheIgnorados();
-            console.log('🧹 Cache de ignorados limpo (todas as empresas).');
+        window.limparCacheIgnoradosDebug = function () { limparCacheIgnorados(); console.log('🧹 Cache de ignorados limpo.'); };
+        window.recarregarIgnoradosDebug = function () { limparCacheIgnorados(); ignoradosCarregados = false; ignorados = []; ignoradosFiltrados = []; carregarIgnorados(); console.log('🔄 Ignorados recarregados.'); };
+        window.forcarAdmin = function () {
+            const expiraEm = Date.now() + 30 * 60 * 1000;
+            sessionStorage.setItem('deltafrio_force_admin', String(expiraEm));
+            console.log('✅ Admin forçado por 30 minutos. F5 para aplicar.');
+        };
+        window.removerForcarAdmin = function () {
+            sessionStorage.removeItem('deltafrio_force_admin');
+            console.log('✅ Override removido. F5 para aplicar.');
+        };
+        window.verificarAdmin = function () {
+            console.log('👤 Sessão:', sessaoCache?.usuario || '(não carregada)');
+            console.log('📋 Contexto:', contextoCache);
+            console.log('🔑 administradorGlobal:', contextoCache?.administradorGlobal);
+            console.log('🔑 semAcesso:', contextoCache?.semAcesso || false);
+            console.log('🔑 funcionalidades:', contextoCache?.funcionalidades);
         };
 
-        window.recarregarIgnoradosDebug = function () {
-            limparCacheIgnorados();
-            ignoradosCarregados = false;
-            ignorados = [];
-            ignoradosFiltrados = [];
-            carregarIgnorados();
-            console.log('🔄 Ignorados recarregados (chamada manual).');
-        };
-
-        window.verCacheIgnoradosDebug = function () {
-            const chaves = Object.keys(localStorage).filter(k => k.startsWith(CACHE.IGNORADOS.key));
-            if (!chaves.length) { console.log('📦 Cache vazio'); return; }
-            chaves.forEach(k => {
-                const raw = localStorage.getItem(k);
-                try {
-                    const { ts, dados } = JSON.parse(raw);
-                    console.log(`📦 ${k}: ${dados.length} itens (salvo em ${new Date(ts).toLocaleString()})`);
-                } catch (e) {
-                    console.log(`📦 ${k}: (inválido)`);
-                }
-            });
-        };
-
+        // ============================================================
+        // ✅ APPCORE DEFINITIVO
+        // ============================================================
         window.AppCore = {
             apiGet, apiPost, apiPut, apiPatch, apiDelete,
             apiGetEnvelope,
@@ -1571,19 +1687,21 @@ document.addEventListener('DOMContentLoaded', async function() {
             showScreen, setActiveMenuItem, registerScreen,
             showWarning, showConfirm,
             refreshCustomSelect, formatarTelefone,
-            extrairErroResposta, extrairErro,
+            extrairErroResposta,
             API_URL,
             getMapInstance: () => window.mapInstance,
             getVendedores: () => vendedoresMapa,
             carregarVendedoresMapa,
-            // ✅ Contexto exposto para outros módulos
             getContexto: () => contextoCache,
             getEmpresaAtivaId: () => obterEmpresaAtivaId(),
             setEmpresaAtivaId: (id) => definirEmpresaAtivaId(id),
             carregarContexto,
             limparCacheIgnorados,
+            isAdminGlobal,
+            temFuncionalidade,
+            aplicarGuardrailsAdmin,
         };
-        console.log('✅ [AppCore] SDK disponível para módulos externos.');
+        console.log('✅ [AppCore] SDK completo disponível.');
 
     } catch (error) {
         console.error('❌ Erro durante a inicialização:', error);
