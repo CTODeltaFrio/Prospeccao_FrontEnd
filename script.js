@@ -638,15 +638,9 @@ document.addEventListener('DOMContentLoaded', async function() {
             let cnae = selectedCnaeCode; if (!cnae && filterCnaeInput.value.trim() !== '') { filterCnaeInput.value = ''; cnae = null; }
             const esc = filterTipoCnae ? filterTipoCnae.value : 'PRINCIPAL';
             const body = { uf: uf || null, ddd: uf ? null : (ddd || null), cnae: cnae || null, segmento: cnae ? null : (seg ? parseInt(seg) : null), escopoCnae: (cnae || seg) ? esc : null, ultimoCnpj: cursorEnv, limite: 50 };
-if (!body.uf && !body.ddd && !body.segmento && !body.cnae) { 
-    showWarning("Informe pelo menos um filtro para realizar a pesquisa.", "Atenção"); 
-    return; 
-}
-const empresaId = obterEmpresaAtivaId();
-if (!empresaId) { 
-    showWarning("Selecione uma empresa ativa na barra lateral antes de pesquisar.", "Atenção"); 
-    return; 
-}
+            if (!body.uf && !body.ddd && !body.segmento && !body.cnae) { alert("Informe pelo menos um filtro."); return; }
+            const empresaId = obterEmpresaAtivaId();
+            if (!empresaId) { alert("Selecione uma empresa ativa antes de pesquisar."); return; }
             btn.disabled = true; const origB = btn.innerHTML; const origP = pageIndicator.innerHTML;
             if (btn.classList.contains('page-btn')) pageIndicator.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; else btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Carregando...';
             if (pesquisaController) pesquisaController.abort(); pesquisaController = new AbortController();
@@ -731,6 +725,7 @@ if (!empresaId) {
         function renderLinkedCnaes() { linkedCnaeList.innerHTML = ''; if (!currentLinkedCnaes.length) { linkedCnaeList.innerHTML = 'Nenhum CNAE vinculado.'; return; } currentLinkedCnaes.forEach((c, i) => { const d = document.createElement('div'); d.classList.add('linked-item'); d.innerHTML = `<span>${c.codigo} - ${c.descricao}</span><button onclick="removerCNAE(${i})"><i class="fas fa-times"></i></button>`; linkedCnaeList.appendChild(d); }); }
         window.removerCNAE = function(i) { currentLinkedCnaes.splice(i, 1); renderLinkedCnaes(); populateLinkSelect(); setDirty(true); };
         
+        // ✅ CORREÇÃO 1: Notificação imediata e recarga em background
         document.getElementById('segmentoForm').addEventListener('submit', async function(e) {
             e.preventDefault(); const nome = segmentNome.value.trim(); if (!nome) { showWarning('Informe o nome do segmento.'); return; }
             try {
@@ -742,9 +737,22 @@ if (!empresaId) {
                     for (const c of orig) if (!atual.includes(c)) { try { await apiDelete(`${API_URL}/segmentos/${segId}/cnaes/${c}`); } catch (e) {} }
                     for (const c of currentLinkedCnaes) { if (orig.includes(c.codigo)) continue; try { await apiPost(`${API_URL}/segmentos/${segId}/cnaes`, { cnae: c.codigo }); } catch (e) {} }
                 }
-                setDirty(false); originalLinkedCnaes = [...currentLinkedCnaes]; resetSegmentForm(); localStorage.removeItem(CACHE.SEGMENTOS.key); segmentData = []; segmentoCnaeLinks = []; await carregarSegmentos(); updateSegmentFilter(); confirmModal.style.display = 'none'; showWarning('Segmento salvo com sucesso!', 'Sucesso');
+                
+                setDirty(false); originalLinkedCnaes = [...currentLinkedCnaes]; resetSegmentForm(); localStorage.removeItem(CACHE.SEGMENTOS.key); segmentData = []; segmentoCnaeLinks = [];
+                
+                // 1. Mostra a notificação na hora
+                showWarning('Segmento salvo com sucesso!', 'Sucesso');
+                confirmModal.style.display = 'none';
+
+                // 2. Recarrega a lista em segundo plano
+                carregarSegmentos().then(() => {
+                    updateSegmentFilter();
+                    renderSegmentTable(segmentSearch.value);
+                });
+
             } catch (e) { showWarning('Erro ao salvar segmento.'); }
         });
+        
         if (btnCancelSegment) btnCancelSegment.addEventListener('click', () => resetSegmentForm());
         segmentSearch.addEventListener('input', function() { renderSegmentTable(this.value); });
         
@@ -756,10 +764,29 @@ if (!empresaId) {
             setDirty(true);
         }
         
-        function excluirSegmento(id) {
+        // ✅ CORREÇÃO 2: Desvincular CNAEs antes de excluir o segmento (evita erro 409)
+        async function excluirSegmento(id) {
             const seg = segmentData.find(s => s.id === id); if (!seg) { showWarning('Segmento não encontrado.'); return; }
             showConfirm('Excluir Segmento', `Tem certeza que deseja excluir "${seg.nome}"?`, async function() {
-                try { await apiDelete(`${API_URL}/segmentos/${id}`); segmentData = segmentData.filter(s => s.id !== id); segmentoCnaeLinks = segmentoCnaeLinks.filter(l => l.segmentoId !== id); localStorage.removeItem(CACHE.SEGMENTOS.key); renderSegmentTable(segmentSearch.value); updateSegmentFilter(); if (editingSegmentId === id) resetSegmentForm(); } catch (e) { showWarning('Erro ao excluir segmento.'); }
+                try {
+                    // 1. Busca e desvincula todos os CNAEs
+                    const cnaes = await apiGet(`${API_URL}/segmentos/${id}/cnaes`);
+                    for (const c of cnaes) {
+                        try { await apiDelete(`${API_URL}/segmentos/${id}/cnaes/${c.codigo}`); } catch(err) {}
+                    }
+                    
+                    // 2. Exclui o segmento
+                    await apiDelete(`${API_URL}/segmentos/${id}`);
+                    
+                    // 3. Atualiza a UI
+                    segmentData = segmentData.filter(s => s.id !== id);
+                    segmentoCnaeLinks = segmentoCnaeLinks.filter(l => l.segmentoId !== id);
+                    localStorage.removeItem(CACHE.SEGMENTOS.key);
+                    renderSegmentTable(segmentSearch.value);
+                    updateSegmentFilter();
+                    if (editingSegmentId === id) resetSegmentForm();
+                    showWarning('Segmento excluído com sucesso!', 'Sucesso');
+                } catch (e) { showWarning('Erro ao excluir segmento: ' + (e.message || 'Verifique os vínculos.'), 'Atenção'); }
             });
         }
 
@@ -999,7 +1026,6 @@ if (!empresaId) {
         function criarCamadaVendedor(g, v) {
             if (!g || !g.features) return null;
 
-            // Filtra apenas as cidades que esse vendedor tem (não importa se é o "principal")
             const features = g.features.filter(f => {
                 const cod = String(f.properties?.codigoIbge || f.properties?.codigo || '').trim();
                 if (!cod) return false;
@@ -1086,7 +1112,6 @@ if (!empresaId) {
                         if (layer) map.removeLayer(layer); 
                     }
                     
-                    // ✅ Chama a atualização dinâmica de todas as camadas visíveis
                     atualizarEstilosVisiveis();
                 });
             });
