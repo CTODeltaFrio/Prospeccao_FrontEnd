@@ -449,7 +449,7 @@ body.dark-mode #segmentosTable .btn-delete:hover { background: #ef4444; color: #
 .modal-content { background: var(--bg-card); border-radius: 12px; padding: 24px; width: 100%; max-width: 600px; height: 600px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.3); position: relative; color: var(--text-main); display: flex; flex-direction: column; }
 .modal-content.large-modal { max-width: 900px; height: 700px; }
 .modal-content.generic-content { max-width: 750px; width: 90%; padding: 30px; height: 650px; display: flex; flex-direction: column; }
-.modal-content.confirm-content { max-width: 400px; text-align: center; height: auto; min-height: auto; display: block; }
+.modal-content.confirm-content { max-width: 500px; text-align: center; height: auto; min-height: auto; display: block; padding: 32px 28px; }
 .modal-scroll-area { flex: 1; overflow-y: auto; padding-right: 10px; margin-bottom: 20px; }
 .generic-modal-list-container { flex: 1; overflow-y: auto; padding-right: 5px; margin-bottom: 20px; max-height: 60vh; }
 .generic-search-box { margin-bottom: 20px; flex-shrink: 0; position: relative; }
@@ -571,12 +571,23 @@ body.dark-mode .generic-card.selected { background: #1e3a5f; border-color: #2563
 .card-nome { font-size: 14px; color: var(--text-secondary); line-height: 1.4; }
 .card-btn { background: #2563eb; color: white; border: none; padding: 10px 24px; border-radius: 50px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; flex-shrink: 0; }
 .card-btn:hover { background: #1d4ed8; transform: scale(1.03); }
-.confirm-icon { font-size: 48px; color: #f59e0b; margin-bottom: 15px; }
-.confirm-icon i { font-size: 48px; }
-.confirm-content h3 { font-size: 18px; color: var(--text-main); margin-bottom: 10px; }
-.confirm-content p { font-size: 14px; color: var(--text-secondary); margin-bottom: 20px; }
-.confirm-actions { display: flex; gap: 10px; justify-content: center; }
-.btn-danger { background: #ef4444; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+
+/* ============================================================
+   MODAL DE AVISO / CONFIRMAÇÃO (MAIOR)
+   ============================================================ */
+.confirm-icon { font-size: 64px; color: #f59e0b; margin-bottom: 20px; }
+.confirm-icon i { font-size: 64px; }
+.confirm-content h3 { font-size: 24px; font-weight: 700; color: var(--text-main); margin-bottom: 14px; }
+.confirm-content p { font-size: 16px; line-height: 1.5; color: var(--text-secondary); margin-bottom: 28px; }
+.confirm-actions { display: flex; gap: 12px; justify-content: center; }
+.confirm-actions .btn-primary, 
+.confirm-actions .btn-secondary, 
+.confirm-actions .btn-danger {
+    padding: 12px 28px;
+    font-size: 15px;
+    border-radius: 8px;
+}
+.btn-danger { background: #ef4444; color: white; border: none; font-weight: 600; cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
 .btn-danger:hover { background: #dc2626; transform: translateY(-4px); box-shadow: 0 8px 16px rgba(220, 38, 38, 0.3); }
 
 /* ================== DROPDOWN ================== */

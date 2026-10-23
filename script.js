@@ -638,9 +638,15 @@ document.addEventListener('DOMContentLoaded', async function() {
             let cnae = selectedCnaeCode; if (!cnae && filterCnaeInput.value.trim() !== '') { filterCnaeInput.value = ''; cnae = null; }
             const esc = filterTipoCnae ? filterTipoCnae.value : 'PRINCIPAL';
             const body = { uf: uf || null, ddd: uf ? null : (ddd || null), cnae: cnae || null, segmento: cnae ? null : (seg ? parseInt(seg) : null), escopoCnae: (cnae || seg) ? esc : null, ultimoCnpj: cursorEnv, limite: 50 };
-            if (!body.uf && !body.ddd && !body.segmento && !body.cnae) { alert("Informe pelo menos um filtro."); return; }
-            const empresaId = obterEmpresaAtivaId();
-            if (!empresaId) { alert("Selecione uma empresa ativa antes de pesquisar."); return; }
+if (!body.uf && !body.ddd && !body.segmento && !body.cnae) { 
+    showWarning("Informe pelo menos um filtro para realizar a pesquisa.", "Atenção"); 
+    return; 
+}
+const empresaId = obterEmpresaAtivaId();
+if (!empresaId) { 
+    showWarning("Selecione uma empresa ativa na barra lateral antes de pesquisar.", "Atenção"); 
+    return; 
+}
             btn.disabled = true; const origB = btn.innerHTML; const origP = pageIndicator.innerHTML;
             if (btn.classList.contains('page-btn')) pageIndicator.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; else btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Carregando...';
             if (pesquisaController) pesquisaController.abort(); pesquisaController = new AbortController();
