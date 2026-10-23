@@ -65,12 +65,32 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
 
         // ============================================================
-        // VENDEDORES DO MAPA
+        // VENDEDORES DO MAPA (COM SUPORTE A DDDs E ANTI-DUPLICIDADE)
         // ============================================================
         const CORES_VENDEDORES = ['#2463eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#14b8a6', '#a855f7', '#0ea5e9', '#dc2626', '#22c55e', '#eab308', '#64748b'];
         let vendedoresMapa = [];
         let vendedoresMapaCarregados = false;
         let vendedoresMapaPromise = null;
+        const municipiosPorDddCache = {};
+
+        async function carregarMunicipiosDoDdd(ddd) {
+            const key = String(ddd);
+            if (municipiosPorDddCache[key]) return municipiosPorDddCache[key];
+            try {
+                const r = await apiGet(`${API_URL}/ddds/${key}/municipios`);
+                const lista = Array.isArray(r) ? r : (r && Array.isArray(r.dados)) ? r.dados : [];
+                const cidades = lista.map(m => ({
+                    codigoIbge: m.codigoIbge ? String(m.codigoIbge).trim() : null,
+                    nome: m.municipio || m.nome || ''
+                })).filter(c => c.codigoIbge || c.nome);
+                municipiosPorDddCache[key] = cidades;
+                return cidades;
+            } catch (e) {
+                console.warn(`[mapa] Erro ao carregar municípios do DDD ${ddd}:`, e.message);
+                municipiosPorDddCache[key] = [];
+                return [];
+            }
+        }
 
         async function carregarVendedoresMapa() {
             if (vendedoresMapaCarregados) return vendedoresMapa;
@@ -78,22 +98,52 @@ document.addEventListener('DOMContentLoaded', async function() {
             vendedoresMapaPromise = (async () => {
                 try {
                     const envelope = await apiGetEnvelope(`${API_URL}/prospeccao/vendedores`);
-                    const lista = Array.isArray(envelope) ? envelope : (envelope && Array.isArray(envelope.dados)) ? envelope.dados : (envelope && Array.isArray(envelope.registros)) ? envelope.registros : (envelope && Array.isArray(envelope.vendedores)) ? envelope.vendedores : (envelope && Array.isArray(envelope.itens)) ? envelope.itens : [];
-                    vendedoresMapa = lista.map((v, i) => {
+                    const listaOriginal = Array.isArray(envelope) ? envelope : (envelope && Array.isArray(envelope.dados)) ? envelope.dados : (envelope && Array.isArray(envelope.registros)) ? envelope.registros : (envelope && Array.isArray(envelope.vendedores)) ? envelope.vendedores : (envelope && Array.isArray(envelope.itens)) ? envelope.itens : [];
+
+                    vendedoresMapa = await Promise.all(listaOriginal.map(async (v, i) => {
+                        const cidadesMap = new Map();
+                        
+                        const adicionarCidade = (codigoIbge, nome) => {
+                            const cod = String(codigoIbge || '').trim();
+                            const nom = String(nome || '').trim();
+                            if (cod) {
+                                if (!cidadesMap.has(cod)) cidadesMap.set(cod, { codigoIbge: cod, nome: nom });
+                            } else if (nom) {
+                                const chaveFallback = `nome:${normalizar(nom)}`;
+                                if (!cidadesMap.has(chaveFallback)) cidadesMap.set(chaveFallback, { codigoIbge: '', nome: nom });
+                            }
+                        };
+
+                        // 1. Cidades já vinculadas manualmente
                         const cidadesRaw = Array.isArray(v.cidades) ? v.cidades : (Array.isArray(v.cidadesIbge) ? v.cidadesIbge : []);
-                        const cidades = cidadesRaw.map(c => {
-                            if (typeof c === 'string') return c.trim();
-                            if (typeof c === 'number') return String(c);
-                            return String(c?.codigoIbge || c?.codigo || c?.id || '').trim();
-                        }).filter(Boolean);
+                        cidadesRaw.forEach(c => {
+                            if (typeof c === 'string' || typeof c === 'number') {
+                                const s = String(c).trim();
+                                if (/^\d{7}$/.test(s)) adicionarCidade(s, '');
+                                else adicionarCidade('', s);
+                            } else if (c && typeof c === 'object') {
+                                adicionarCidade(c.codigoIbge || c.codigo || c.id, c.nome || '');
+                            }
+                        });
+
+                        // 2. Cidades provenientes dos DDDs
+                        const dddsRaw = Array.isArray(v.ddds) ? v.ddds : [];
+                        if (dddsRaw.length > 0) {
+                            const dddsNumeros = dddsRaw.map(d => typeof d === 'object' ? d.ddd : d).filter(Boolean);
+                            const resultados = await Promise.all(dddsNumeros.map(d => carregarMunicipiosDoDdd(d)));
+                            resultados.flat().forEach(m => adicionarCidade(m.codigoIbge, m.nome));
+                        }
+
                         return {
                             id: String(v.id ?? v.codigo ?? `v${i}`),
                             nome: v.nome || `Vendedor #${v.id}`,
-                            cor: v.corMapa || v.cor || CORES_VENDEDORES[i % CORES_VENDEDORES.length], // ✅ LENDO COR MAPA AQUI
+                            cor: v.corMapa || v.cor || CORES_VENDEDORES[i % CORES_VENDEDORES.length],
                             regiao: v.regiao || '',
-                            cidades
+                            cidades: Array.from(cidadesMap.values()),
+                            ddds: dddsRaw
                         };
-                    }).filter(v => v.id);
+                    })).then(lista => lista.filter(v => v.id));
+
                     vendedoresMapaCarregados = true;
                 } catch (e) { vendedoresMapa = []; } finally { vendedoresMapaPromise = null; }
                 return vendedoresMapa;
@@ -102,15 +152,18 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
 
         function normalizar(str) { return String(str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').toLowerCase().trim(); }
+        
         function getVendedorDaCidade(props) {
             if (!props || !vendedoresMapa.length) return null;
             const codigo = String(props.codigoIbge || props.codigo || '').trim();
-            const nome = normalizar(props.nome);
+            const nome = normalizar(props.nome || props.municipio);
+            
             for (const v of vendedoresMapa) {
                 for (const c of v.cidades) {
-                    const cStr = String(c).trim();
-                    if (codigo && codigo === cStr) return v;
-                    if (!/^\d+$/.test(cStr) && nome === normalizar(cStr)) return v;
+                    // Match por código IBGE (evita duplicidade de nomes)
+                    if (codigo && c.codigoIbge && codigo === c.codigoIbge) return v;
+                    // Fallback: Match por nome APENAS se não houver código
+                    if (!codigo && !c.codigoIbge && nome && c.nome && nome === normalizar(c.nome)) return v;
                 }
             }
             return null;
@@ -407,7 +460,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
 
         // ============================================================
-        // CARREGAMENTOS AUXILIARES (UF, DDD, CNAE, MUNICIPIO)
+        // CARREGAMENTOS AUXILIARES
         // ============================================================
         async function carregarUFs() {
             const cache = cacheGet(CACHE.UFS);
@@ -865,17 +918,40 @@ document.addEventListener('DOMContentLoaded', async function() {
         function criarCamadaTerra(g) { return g ? L.geoJSON(g, { style: () => getTerraStyle(), interactive: false }) : null; }
         function criarCamadaEstados(g) { return g ? L.geoJSON(g, { style: () => getStateStyle(), interactive: false }) : null; }
         function criarCamadaMunicipios(g) { return g ? L.geoJSON(g, { style: () => getMunicipalityStyle(), interactive: false }) : null; }
-        function criarCamadaVendedor(g, v) {
+                function criarCamadaVendedor(g, v) {
             if (!g || !g.features) return null;
             const features = g.features.filter(f => { const vv = getVendedorDaCidade(f.properties || {}); return vv && vv.id === v.id; });
             if (!features.length) return null;
+            
             return L.geoJSON({ type: 'FeatureCollection', features }, {
                 style: () => getVendedorStyle(v),
                 onEachFeature: (f, l) => {
                     const nome = f.properties?.nome || f.properties?.municipio || 'Cidade';
-                    l.bindTooltip(nome, { sticky: true, direction: 'top', offset: [0, -8], className: 'vendedor-tooltip', opacity: 1 });
-                    l.on('mouseover', function() { this.setStyle(getVendedorHoverStyle(v)); this.bringToFront(); });
-                    l.on('mouseout', function() { this.setStyle(getVendedorStyle(v)); });
+                    
+                    // ✅ Removemos o 'sticky: true' para evitar o bug do mouseout
+                    l.bindTooltip(nome, { 
+                        direction: 'top', 
+                        offset: [0, -8], 
+                        className: 'vendedor-tooltip', 
+                        opacity: 1 
+                    });
+
+                    l.on('mouseover', function() { 
+                        // Fecha qualquer tooltip que tenha ficado aberto por bug em outras cidades
+                        if (window.mapInstance) {
+                            window.mapInstance.eachLayer(function(layer) {
+                                if (layer.closeTooltip && layer !== this) layer.closeTooltip();
+                            });
+                        }
+                        this.setStyle(getVendedorHoverStyle(v)); 
+                        this.bringToFront(); 
+                        this.openTooltip(); // ✅ Força a abertura
+                    });
+                    
+                    l.on('mouseout', function() { 
+                        this.setStyle(getVendedorStyle(v)); 
+                        this.closeTooltip(); // ✅ Força o fechamento
+                    });
                 }
             });
         }
@@ -889,9 +965,21 @@ document.addEventListener('DOMContentLoaded', async function() {
         async function buscarStatsVendedores() {
             const stats = {};
             for (const v of vendedoresMapa) {
+                const codigosValidos = v.cidades.map(c => c.codigoIbge).filter(c => c && /^\d{7}$/.test(c));
                 stats[v.id] = { cidades: v.cidades.length, pessoas: 0 };
-                if (!v.cidades || !v.cidades.length) continue;
-                try { const r = await fetch(`${API_URL}/municipios/populacao/total`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify({ codigosIbge: v.cidades.map(String) }) }); if (r.ok) { const dados = await r.json(); const d = dados?.dados ?? dados; stats[v.id].pessoas = Number(d?.populacaoTotal || 0); } } catch (e) {}
+                if (!codigosValidos.length) continue;
+                try {
+                    const r = await fetch(`${API_URL}/municipios/populacao/total`, {
+                        method: 'POST', credentials: 'include',
+                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                        body: JSON.stringify({ codigosIbge: codigosValidos })
+                    });
+                    if (r.ok) {
+                        const dados = await r.json();
+                        const d = dados?.dados ?? dados;
+                        stats[v.id].pessoas = Number(d?.populacaoTotal || 0);
+                    }
+                } catch (e) {}
             }
             return stats;
         }
@@ -932,7 +1020,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
         window.initMap = initMap;
 
-        // ✅ FUNÇÃO PARA RECARREGAR O MAPA QUANDO UM VENDEDOR FOR SALVO
         window.recarregarMapaDados = async function() {
             if (!window.mapInstance) return;
             vendedoresMapaCarregados = false;
@@ -956,18 +1043,12 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
         };
 
-        // ============================================================
-        // DEBUG HELPERS
-        // ============================================================
         window.limparCacheIgnoradosDebug = function () { limparCacheIgnorados(); console.log('🧹 Cache de ignorados limpo.'); };
         window.recarregarIgnoradosDebug = function () { limparCacheIgnorados(); ignoradosCarregados = false; ignorados = []; ignoradosFiltrados = []; carregarIgnorados(); console.log('🔄 Ignorados recarregados.'); };
         window.forcarAdmin = function () { const expiraEm = Date.now() + 30 * 60 * 1000; sessionStorage.setItem('deltafrio_force_admin', String(expiraEm)); console.log('✅ Admin forçado por 30 minutos. F5 para aplicar.'); };
         window.removerForcarAdmin = function () { sessionStorage.removeItem('deltafrio_force_admin'); console.log('✅ Override removido. F5 para aplicar.'); };
         window.verificarAdmin = function () { console.log('👤 Sessão:', sessaoCache?.usuario || '(não carregada)'); console.log('📋 Contexto:', contextoCache); console.log('🔑 administradorGlobal:', contextoCache?.administradorGlobal); console.log('🔑 semAcesso:', contextoCache?.semAcesso || false); console.log('🔑 funcionalidades:', contextoCache?.funcionalidades); };
 
-        // ============================================================
-        // ✅ APPCORE DEFINITIVO
-        // ============================================================
         window.AppCore = {
             apiGet, apiPost, apiPut, apiPatch: null, apiDelete,
             apiGetEnvelope,
