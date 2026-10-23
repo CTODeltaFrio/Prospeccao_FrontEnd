@@ -65,87 +65,76 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
 
         // ============================================================
-        // VENDEDORES DO MAPA (COM PRIORIDADE E CONFLITOS)
+        // VENDEDORES DO MAPA (INTEGRAÇÃO COM O NOVO ENDPOINT DE COBERTURA)
         // ============================================================
         const CORES_VENDEDORES = ['#2463eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#14b8a6', '#a855f7', '#0ea5e9', '#dc2626', '#22c55e', '#eab308', '#64748b'];
         let vendedoresMapa = [];
         let vendedoresMapaCarregados = false;
         let vendedoresMapaPromise = null;
-        const municipiosPorDddCache = {};
-
-        async function carregarMunicipiosDoDdd(ddd) {
-            const key = String(ddd);
-            if (municipiosPorDddCache[key]) return municipiosPorDddCache[key];
-            try {
-                const r = await apiGet(`${API_URL}/ddds/${key}/municipios`);
-                const lista = Array.isArray(r) ? r : (r && Array.isArray(r.dados)) ? r.dados : [];
-                const cidades = lista.map(m => ({
-                    codigoIbge: m.codigoIbge ? String(m.codigoIbge).trim() : null,
-                    nome: m.municipio || m.nome || ''
-                })).filter(c => c.codigoIbge || c.nome);
-                municipiosPorDddCache[key] = cidades;
-                return cidades;
-            } catch (e) {
-                console.warn(`[mapa] Erro ao carregar municípios do DDD ${ddd}:`, e.message);
-                municipiosPorDddCache[key] = [];
-                return [];
-            }
-        }
 
         async function carregarVendedoresMapa() {
             if (vendedoresMapaCarregados) return vendedoresMapa;
             if (vendedoresMapaPromise) return vendedoresMapaPromise;
+            
             vendedoresMapaPromise = (async () => {
                 try {
+                    // 1. Busca a lista base de vendedores
                     const envelope = await apiGetEnvelope(`${API_URL}/prospeccao/vendedores`);
-                    const listaOriginal = Array.isArray(envelope) ? envelope : (envelope && Array.isArray(envelope.dados)) ? envelope.dados : (envelope && Array.isArray(envelope.registros)) ? envelope.registros : (envelope && Array.isArray(envelope.vendedores)) ? envelope.vendedores : (envelope && Array.isArray(envelope.itens)) ? envelope.itens : [];
+                    const listaOriginal = Array.isArray(envelope) ? envelope 
+                        : (envelope && Array.isArray(envelope.dados)) ? envelope.dados 
+                        : (envelope && Array.isArray(envelope.registros)) ? envelope.registros 
+                        : (envelope && Array.isArray(envelope.vendedores)) ? envelope.vendedores 
+                        : (envelope && Array.isArray(envelope.itens)) ? envelope.itens : [];
 
+                    // 2. Para cada vendedor, busca a cobertura consolidada
                     vendedoresMapa = await Promise.all(listaOriginal.map(async (v, i) => {
-                        const cidadesMap = new Map();
-                        
-                        const adicionarCidade = (codigoIbge, nome, origem) => {
-                            const cod = String(codigoIbge || '').trim();
-                            const nom = String(nome || '').trim();
-                            if (cod) {
-                                if (!cidadesMap.has(cod)) {
-                                    cidadesMap.set(cod, { codigoIbge: cod, nome: nom, origem });
-                                } else if (origem === 'manual' && cidadesMap.get(cod).origem === 'ddd') {
-                                    cidadesMap.set(cod, { codigoIbge: cod, nome: nom, origem });
-                                }
-                            }
-                        };
-
-                        // 1. Cidades Manuais
-                        const cidadesRaw = Array.isArray(v.cidades) ? v.cidades : (Array.isArray(v.cidadesIbge) ? v.cidadesIbge : []);
-                        cidadesRaw.forEach(c => {
-                            if (typeof c === 'string' || typeof c === 'number') {
-                                const s = String(c).trim();
-                                if (/^\d{7}$/.test(s)) adicionarCidade(s, '', 'manual');
-                            } else if (c && typeof c === 'object') {
-                                adicionarCidade(c.codigoIbge || c.codigo || c.id, c.nome || '', 'manual');
-                            }
-                        });
-
-                        // 2. Cidades via DDD
-                        const dddsRaw = Array.isArray(v.ddds) ? v.ddds : [];
-                        if (dddsRaw.length > 0) {
-                            const dddsNumeros = dddsRaw.map(d => typeof d === 'object' ? d.ddd : d).filter(Boolean);
-                            const resultados = await Promise.all(dddsNumeros.map(d => carregarMunicipiosDoDdd(d)));
-                            resultados.flat().forEach(m => adicionarCidade(m.codigoIbge, m.nome, 'ddd'));
+                        let cobertura = null;
+                        try {
+                            const respCob = await apiGet(`${API_URL}/prospeccao/vendedores/${v.id}/cobertura`);
+                            cobertura = respCob?.dados ?? respCob;
+                        } catch (e) {
+                            console.warn(`[mapa] Falha ao buscar cobertura do vendedor ${v.id}`, e);
                         }
+
+                        // Se o backend retornou a cobertura, usamos ela.
+                        // Se falhou (ex: vendedor excluído), usamos fallback vazio.
+                        const cidadesDiretas = (cobertura?.cidadesDiretas || []).map(String);
+                        const municipios = (cobertura?.municipios || []).map(m => ({
+                            codigoIbge: String(m.codigoIbge || ''),
+                            nome: m.nomeMunicipio || '',
+                            uf: m.uf || '',
+                            populacao: m.populacao || 0
+                        }));
+
+                        // Monta a lista de cidades com a origem (manual vs ddd)
+                        const cidadesMap = new Map();
+                        municipios.forEach(m => {
+                            if (!m.codigoIbge) return;
+                            // Se está na lista de cidadesDiretas, a origem é 'manual'
+                            const origem = cidadesDiretas.includes(m.codigoIbge) ? 'manual' : 'ddd';
+                            cidadesMap.set(m.codigoIbge, { ...m, origem });
+                        });
 
                         return {
                             id: String(v.id ?? v.codigo ?? `v${i}`),
-                            nome: v.nome || `Vendedor #${v.id}`,
-                            cor: v.corMapa || v.cor || CORES_VENDEDORES[i % CORES_VENDEDORES.length],
+                            nome: v.nome || cobertura?.nome || `Vendedor #${v.id}`,
+                            cor: v.corMapa || cobertura?.corMapa || CORES_VENDEDORES[i % CORES_VENDEDORES.length],
                             regiao: v.regiao || '',
                             cidades: Array.from(cidadesMap.values()),
-                            ddds: dddsRaw
+                            ddds: cobertura?.ddds || v.ddds || [],
+                            // ✅ Novos campos de estatísticas vindos do backend
+                            quantidadeMunicipios: cobertura?.quantidadeMunicipios || 0,
+                            populacaoTotal: cobertura?.populacaoTotal || 0
                         };
                     })).then(lista => lista.filter(v => v.id));
 
                     vendedoresMapaCarregados = true;
-                } catch (e) { vendedoresMapa = []; } finally { vendedoresMapaPromise = null; }
+                } catch (e) { 
+                    console.error('[mapa] Erro ao carregar vendedores:', e);
+                    vendedoresMapa = []; 
+                } finally { 
+                    vendedoresMapaPromise = null; 
+                }
                 return vendedoresMapa;
             })();
             return vendedoresMapaPromise;
@@ -153,7 +142,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         function normalizar(str) { return String(str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').toLowerCase().trim(); }
         
-        // ✅ NOVA FUNÇÃO: Identifica o dono principal e se há conflito na cidade
+        // ✅ Identifica o dono principal e se há conflito na cidade
         function getVendedoresDaCidade(props) {
             if (!props || !vendedoresMapa.length) return null;
             const codigo = String(props.codigoIbge || props.codigo || '').trim();
@@ -947,6 +936,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     const info = getVendedoresDaCidade(feature.properties || {});
                     const style = getVendedorStyle(v);
                     
+                    // Se tiver conflito, deixa a borda tracejada e mais grossa
                     if (info && info.conflito) {
                         style.dashArray = '5, 5';
                         style.weight = 2.5;
@@ -1007,34 +997,16 @@ document.addEventListener('DOMContentLoaded', async function() {
             map.fitBounds(stateLayer.getBounds(), { padding: [20, 20] });
         };
 
-        async function buscarStatsVendedores() {
-            const stats = {};
-            for (const v of vendedoresMapa) {
-                const codigosValidos = v.cidades.map(c => c.codigoIbge).filter(c => c && /^\d{7}$/.test(c));
-                stats[v.id] = { cidades: v.cidades.length, pessoas: 0 };
-                if (!codigosValidos.length) continue;
-                try {
-                    const r = await fetch(`${API_URL}/municipios/populacao/total`, {
-                        method: 'POST', credentials: 'include',
-                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                        body: JSON.stringify({ codigosIbge: codigosValidos })
-                    });
-                    if (r.ok) {
-                        const dados = await r.json();
-                        const d = dados?.dados ?? dados;
-                        stats[v.id].pessoas = Number(d?.populacaoTotal || 0);
-                    }
-                } catch (e) {}
-            }
-            return stats;
-        }
-
+        // ✅ Não precisa mais calcular no frontend, o backend já mandou a quantidade e a população!
         async function renderStatsVendedores(map) {
             const container = document.getElementById('vendedores-stats'); if (!container || !map) return;
-            const stats = await buscarStatsVendedores(); let html = '';
+            let html = '';
             vendedoresMapa.forEach(v => {
-                const s = stats[v.id] || { cidades: v.cidades.length, pessoas: 0 }; const pf = Number(s.pessoas || 0).toLocaleString('pt-BR');
-                html += `<label class="vendedor-stat" data-vendedor="${v.id}" style="--vendedor-cor:${v.cor};"><input type="checkbox" class="vendedor-stat-checkbox" data-vendedor="${v.id}"><div class="vendedor-stat-body"><div class="vendedor-stat-header"><span class="vendedor-stat-color" style="background:${v.cor};"></span><span class="vendedor-stat-nome">${v.nome}</span></div><div class="vendedor-stat-numbers"><div class="vendedor-stat-num"><strong>${s.cidades}</strong><small>cidades</small></div><div class="vendedor-stat-num"><strong>${pf}</strong><small>pessoas</small></div></div></div></label>`;
+                // Usa os dados calculados pelo novo endpoint de cobertura do backend
+                const qtd = v.quantidadeMunicipios || 0;
+                const pf = Number(v.populacaoTotal || 0).toLocaleString('pt-BR');
+                
+                html += `<label class="vendedor-stat" data-vendedor="${v.id}" style="--vendedor-cor:${v.cor};"><input type="checkbox" class="vendedor-stat-checkbox" data-vendedor="${v.id}"><div class="vendedor-stat-body"><div class="vendedor-stat-header"><span class="vendedor-stat-color" style="background:${v.cor};"></span><span class="vendedor-stat-nome">${v.nome}</span></div><div class="vendedor-stat-numbers"><div class="vendedor-stat-num"><strong>${qtd}</strong><small>cidades</small></div><div class="vendedor-stat-num"><strong>${pf}</strong><small>pessoas</small></div></div></div></label>`;
             });
             container.innerHTML = html;
             container.querySelectorAll('.vendedor-stat-checkbox').forEach(cb => {
