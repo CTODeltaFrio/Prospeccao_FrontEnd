@@ -887,20 +887,34 @@ body.dark-mode .vendedor-stat-color { box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
     }
 }
 /* ============================================================
-   TOOLTIP DO MAPA (MAIOR E COM ZEBRADO)
+   TOOLTIP DO MAPA (NORMAL)
    ============================================================ */
 .custom-tooltip {
-    background: rgba(15, 23, 42, 0.95) !important;
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
-    border-radius: 10px !important;
-    padding: 12px 16px !important;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5) !important;
+    background: rgba(15, 23, 42, 0.96) !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    border-radius: 12px !important;
+    padding: 16px 20px !important;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6) !important;
     color: #fff !important;
     font-family: 'Inter', Arial, sans-serif !important;
-    line-height: 1.4 !important;
-    max-width: 250px !important;
+    line-height: 1.5 !important;
+    max-width: 320px !important;
+    min-width: 200px !important;
     white-space: normal !important;
 }
 .custom-tooltip::before {
-    border-top-color: rgba(15, 23, 42, 0.95) !important;
+    border-top-color: rgba(15, 23, 42, 0.96) !important;
+}
+
+/* ============================================================
+   TOOLTIP DO MAPA (CONFLITO - MAIOR E DESTACADO)
+   ============================================================ */
+.custom-tooltip-conflict {
+    padding: 22px 26px !important; 
+    max-width: 380px !important; 
+    border: 2px solid #fbbf24 !important; 
+    box-shadow: 0 0 20px rgba(251, 191, 36, 0.15), 0 12px 30px rgba(0, 0, 0, 0.6) !important;
+}
+.custom-tooltip-conflict::before {
+    border-top-color: #fbbf24 !important; 
 }

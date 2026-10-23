@@ -78,7 +78,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             
             vendedoresMapaPromise = (async () => {
                 try {
-                    // 1. Busca a lista base de vendedores
                     const envelope = await apiGetEnvelope(`${API_URL}/prospeccao/vendedores`);
                     const listaOriginal = Array.isArray(envelope) ? envelope 
                         : (envelope && Array.isArray(envelope.dados)) ? envelope.dados 
@@ -86,7 +85,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                         : (envelope && Array.isArray(envelope.vendedores)) ? envelope.vendedores 
                         : (envelope && Array.isArray(envelope.itens)) ? envelope.itens : [];
 
-                    // 2. Para cada vendedor, busca a cobertura consolidada
                     vendedoresMapa = await Promise.all(listaOriginal.map(async (v, i) => {
                         let cobertura = null;
                         try {
@@ -96,8 +94,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                             console.warn(`[mapa] Falha ao buscar cobertura do vendedor ${v.id}`, e);
                         }
 
-                        // Se o backend retornou a cobertura, usamos ela.
-                        // Se falhou (ex: vendedor excluído), usamos fallback vazio.
                         const cidadesDiretas = (cobertura?.cidadesDiretas || []).map(String);
                         const municipios = (cobertura?.municipios || []).map(m => ({
                             codigoIbge: String(m.codigoIbge || ''),
@@ -106,11 +102,9 @@ document.addEventListener('DOMContentLoaded', async function() {
                             populacao: m.populacao || 0
                         }));
 
-                        // Monta a lista de cidades com a origem (manual vs ddd)
                         const cidadesMap = new Map();
                         municipios.forEach(m => {
                             if (!m.codigoIbge) return;
-                            // Se está na lista de cidadesDiretas, a origem é 'manual'
                             const origem = cidadesDiretas.includes(m.codigoIbge) ? 'manual' : 'ddd';
                             cidadesMap.set(m.codigoIbge, { ...m, origem });
                         });
@@ -122,7 +116,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                             regiao: v.regiao || '',
                             cidades: Array.from(cidadesMap.values()),
                             ddds: cobertura?.ddds || v.ddds || [],
-                            // ✅ Novos campos de estatísticas vindos do backend
                             quantidadeMunicipios: cobertura?.quantidadeMunicipios || 0,
                             populacaoTotal: cobertura?.populacaoTotal || 0
                         };
@@ -141,33 +134,19 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
 
         function normalizar(str) { return String(str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').toLowerCase().trim(); }
-        
-        // ✅ Identifica o dono principal e se há conflito na cidade
-        function getVendedoresDaCidade(props) {
-            if (!props || !vendedoresMapa.length) return null;
-            const codigo = String(props.codigoIbge || props.codigo || '').trim();
-            if (!codigo) return null;
 
-            const vendedoresNaCidade = [];
+        // ✅ Retorna os vendedores ativos (checkbox) que cobrem uma cidade
+        function getVendedoresAtivosDaCidade(codigoIbge) {
+            if (!codigoIbge) return [];
+            const ativos = [];
             for (const v of vendedoresMapa) {
-                const match = v.cidades.find(c => c.codigoIbge === codigo);
-                if (match) vendedoresNaCidade.push({ vendedor: v, origem: match.origem });
+                const cb = document.querySelector(`.vendedor-stat-checkbox[data-vendedor="${v.id}"]`);
+                if (!cb || !cb.checked) continue; 
+
+                const match = v.cidades.find(c => c.codigoIbge === codigoIbge);
+                if (match) ativos.push({ vendedor: v, origem: match.origem });
             }
-
-            if (vendedoresNaCidade.length === 0) return null;
-
-            // Regra de Ouro: Vendedor Manual ganha do Vendedor DDD
-            vendedoresNaCidade.sort((a, b) => {
-                if (a.origem === 'manual' && b.origem === 'ddd') return -1;
-                if (a.origem === 'ddd' && b.origem === 'manual') return 1;
-                return 0;
-            });
-
-            return {
-                principal: vendedoresNaCidade[0].vendedor,
-                conflito: vendedoresNaCidade.length > 1,
-                todos: vendedoresNaCidade
-            };
+            return ativos;
         }
 
         // ============================================================
@@ -919,73 +898,153 @@ document.addEventListener('DOMContentLoaded', async function() {
         function criarCamadaTerra(g) { return g ? L.geoJSON(g, { style: () => getTerraStyle(), interactive: false }) : null; }
         function criarCamadaEstados(g) { return g ? L.geoJSON(g, { style: () => getStateStyle(), interactive: false }) : null; }
         function criarCamadaMunicipios(g) { return g ? L.geoJSON(g, { style: () => getMunicipalityStyle(), interactive: false }) : null; }
-        
+
+        function garantirPadraoZebrado(map, cores) {
+            const container = map.getRenderer({ options: {} })._container;
+            let defs = container.querySelector('defs');
+            if (!defs) {
+                defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+                container.appendChild(defs);
+            }
+
+            const coresLimpa = cores.map(c => c.replace('#', '')).join('-');
+            const id = `zebra-${coresLimpa}`;
+
+            if (!defs.querySelector(`#${id}`)) {
+                const pattern = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
+                pattern.setAttribute('id', id);
+                pattern.setAttribute('width', '24');
+                pattern.setAttribute('height', '24');
+                pattern.setAttribute('patternUnits', 'userSpaceOnUse');
+                pattern.setAttribute('patternTransform', 'rotate(45)');
+
+                const numCores = cores.length;
+                const larguraListra = 24 / numCores;
+
+                cores.forEach((cor, i) => {
+                    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    rect.setAttribute('width', larguraListra.toString());
+                    rect.setAttribute('height', '24');
+                    rect.setAttribute('x', (i * larguraListra).toString());
+                    rect.setAttribute('fill', cor);
+                    pattern.appendChild(rect);
+                });
+
+                defs.appendChild(pattern);
+            }
+            return id;
+        }
+
+        function atualizarEstiloFeature(l, v, map) {
+            const f = l.feature;
+            const props = f.properties || {};
+            const cod = String(props.codigoIbge || props.codigo || '').trim();
+            if (!cod) return;
+
+            const ativos = getVendedoresAtivosDaCidade(cod);
+            const estaAtivo = ativos.some(a => a.vendedor.id === v.id);
+
+            if (!estaAtivo) {
+                l.setStyle({ opacity: 0, fillOpacity: 0 }); 
+                return;
+            }
+
+            let style = getVendedorStyle(v);
+            let tooltipClass = 'vendedor-tooltip custom-tooltip';
+
+            if (ativos.length > 1) {
+                const cores = ativos.map(a => a.vendedor.cor);
+                const patternId = garantirPadraoZebrado(map, cores);
+                style = {
+                    color: '#64748b',
+                    weight: 1.5,
+                    fillColor: `url(#${patternId})`,
+                    fillOpacity: 1
+                };
+                tooltipClass = 'vendedor-tooltip custom-tooltip custom-tooltip-conflict';
+            }
+
+            l.setStyle(style);
+
+            const nomeCidade = props.nome || props.municipio || 'Cidade';
+            let tooltipTexto = '';
+            
+            if (ativos.length > 1) {
+                tooltipTexto += `<div style="font-size: 20px; font-weight: 700; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 6px;">${nomeCidade}</div>`;
+                tooltipTexto += `<div style="color: #fbbf24; font-size: 16px; font-weight: bold; margin-bottom: 10px;">⚠️ Sobreposição de Área</div>`;
+                ativos.forEach(item => {
+                    const label = item.origem === 'manual' ? 'Cidade Direta' : `DDD`;
+                    tooltipTexto += `<div style="font-size: 15px; margin-bottom: 6px;">• <strong>${item.vendedor.nome}</strong> <span style="color:#94a3b8; font-size: 13px;">(${label})</span></div>`;
+                });
+            } else {
+                tooltipTexto += `<div style="font-size: 18px; font-weight: 700; margin-bottom: 6px;">${nomeCidade}</div>`;
+                tooltipTexto += `<div style="font-size: 14px;">Vendedor: <strong>${v.nome}</strong></div>`;
+            }
+
+            l.unbindTooltip();
+            l.bindTooltip(tooltipTexto, { 
+                direction: 'top', 
+                offset: [0, -12], 
+                className: tooltipClass,
+                opacity: 1 
+            });
+        }
+
         function criarCamadaVendedor(g, v) {
             if (!g || !g.features) return null;
-            
-            // Filtra apenas as features onde ESTE vendedor é o "Principal"
-            const features = g.features.filter(f => { 
-                const info = getVendedoresDaCidade(f.properties || {}); 
-                return info && info.principal.id === v.id; 
+
+            // Filtra apenas as cidades que esse vendedor tem (não importa se é o "principal")
+            const features = g.features.filter(f => {
+                const cod = String(f.properties?.codigoIbge || f.properties?.codigo || '').trim();
+                if (!cod) return false;
+                return v.cidades.some(c => c.codigoIbge === cod);
             });
             
             if (!features.length) return null;
             
             return L.geoJSON({ type: 'FeatureCollection', features }, {
-                style: (feature) => {
-                    const info = getVendedoresDaCidade(feature.properties || {});
-                    const style = getVendedorStyle(v);
-                    
-                    // Se tiver conflito, deixa a borda tracejada e mais grossa
-                    if (info && info.conflito) {
-                        style.dashArray = '5, 5';
-                        style.weight = 2.5;
-                    }
-                    return style;
-                },
                 onEachFeature: (f, l) => {
-                    const info = getVendedoresDaCidade(f.properties || {});
-                    const nomeCidade = f.properties?.nome || f.properties?.municipio || 'Cidade';
+                    atualizarEstiloFeature(l, v, window.mapInstance);
                     
-                    let tooltipTexto = `<strong>${nomeCidade}</strong><br>`;
-                    
-                    if (info && info.conflito) {
-                        tooltipTexto += `<span style="color:#fbbf24; font-size:11px;">⚠️ Sobreposição de Área</span><br>`;
-                        info.todos.forEach(item => {
-                            const label = item.origem === 'manual' ? 'Cidade Direta' : `DDD`;
-                            tooltipTexto += `<span style="font-size:12px;">• ${item.vendedor.nome} (${label})</span><br>`;
-                        });
-                    } else {
-                        tooltipTexto += `<span style="font-size:12px;">Vendedor: ${v.nome}</span>`;
-                    }
-
-                    l.bindTooltip(tooltipTexto, { 
-                        direction: 'top', 
-                        offset: [0, -8], 
-                        className: 'vendedor-tooltip', 
-                        opacity: 1 
-                    });
-
                     l.on('mouseover', function() { 
                         if (window.mapInstance) {
                             window.mapInstance.eachLayer(function(layer) {
                                 if (layer.closeTooltip && layer !== this) layer.closeTooltip();
                             });
                         }
-                        this.setStyle(getVendedorHoverStyle(v)); 
+                        const props = l.feature.properties || {};
+                        const cod = String(props.codigoIbge || props.codigo || '').trim();
+                        const ativos = getVendedoresAtivosDaCidade(cod);
+                        
+                        if (ativos.length > 1) {
+                            this.setStyle({ weight: 3, color: '#ffffff' }); 
+                        } else {
+                            this.setStyle(getVendedorHoverStyle(v)); 
+                        }
                         this.bringToFront(); 
                         this.openTooltip(); 
                     });
                     
                     l.on('mouseout', function() { 
-                        const infoFeature = getVendedoresDaCidade(f.properties || {});
-                        const style = getVendedorStyle(v);
-                        if (infoFeature && infoFeature.conflito) {
-                            style.dashArray = '5, 5';
-                            style.weight = 2.5;
-                        }
-                        this.setStyle(style); 
+                        atualizarEstiloFeature(l, v, window.mapInstance);
                         this.closeTooltip(); 
+                    });
+                }
+            });
+        }
+
+        function atualizarEstilosVisiveis() {
+            if (!window.mapInstance) return;
+            Object.keys(vendedoresLayers).forEach(id => {
+                const layer = vendedoresLayers[id];
+                if (!layer || !layer.eachLayer) return;
+
+                const v = vendedoresMapa.find(x => x.id === id);
+                if (!v) return;
+
+                if (window.mapInstance.hasLayer(layer)) {
+                    layer.eachLayer(l => {
+                        atualizarEstiloFeature(l, v, window.mapInstance);
                     });
                 }
             });
@@ -997,12 +1056,10 @@ document.addEventListener('DOMContentLoaded', async function() {
             map.fitBounds(stateLayer.getBounds(), { padding: [20, 20] });
         };
 
-        // ✅ Não precisa mais calcular no frontend, o backend já mandou a quantidade e a população!
         async function renderStatsVendedores(map) {
             const container = document.getElementById('vendedores-stats'); if (!container || !map) return;
             let html = '';
             vendedoresMapa.forEach(v => {
-                // Usa os dados calculados pelo novo endpoint de cobertura do backend
                 const qtd = v.quantidadeMunicipios || 0;
                 const pf = Number(v.populacaoTotal || 0).toLocaleString('pt-BR');
                 
@@ -1011,8 +1068,20 @@ document.addEventListener('DOMContentLoaded', async function() {
             container.innerHTML = html;
             container.querySelectorAll('.vendedor-stat-checkbox').forEach(cb => {
                 cb.addEventListener('change', function(e) {
-                    e.stopPropagation(); const card = this.closest('.vendedor-stat'); const layer = vendedoresLayers[this.dataset.vendedor];
-                    if (this.checked) { card.classList.add('active'); if (layer) layer.addTo(map); } else { card.classList.remove('active'); if (layer) map.removeLayer(layer); }
+                    e.stopPropagation(); 
+                    const card = this.closest('.vendedor-stat'); 
+                    const layer = vendedoresLayers[this.dataset.vendedor];
+                    
+                    if (this.checked) { 
+                        card.classList.add('active'); 
+                        if (layer) layer.addTo(map); 
+                    } else { 
+                        card.classList.remove('active'); 
+                        if (layer) map.removeLayer(layer); 
+                    }
+                    
+                    // ✅ Chama a atualização dinâmica de todas as camadas visíveis
+                    atualizarEstilosVisiveis();
                 });
             });
         }
@@ -1058,6 +1127,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 });
                 renderStatsVendedores(window.mapInstance);
             }
+            atualizarEstilosVisiveis();
         };
 
         window.limparCacheIgnoradosDebug = function () { limparCacheIgnorados(); console.log('🧹 Cache de ignorados limpo.'); };
