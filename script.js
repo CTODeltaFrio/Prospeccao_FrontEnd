@@ -65,7 +65,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
 
         // ============================================================
-        // VENDEDORES DO MAPA (COM SUPORTE A DDDs E ANTI-DUPLICIDADE)
+        // VENDEDORES DO MAPA (COM PRIORIDADE E CONFLITOS)
         // ============================================================
         const CORES_VENDEDORES = ['#2463eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#14b8a6', '#a855f7', '#0ea5e9', '#dc2626', '#22c55e', '#eab308', '#64748b'];
         let vendedoresMapa = [];
@@ -103,35 +103,35 @@ document.addEventListener('DOMContentLoaded', async function() {
                     vendedoresMapa = await Promise.all(listaOriginal.map(async (v, i) => {
                         const cidadesMap = new Map();
                         
-                        const adicionarCidade = (codigoIbge, nome) => {
+                        const adicionarCidade = (codigoIbge, nome, origem) => {
                             const cod = String(codigoIbge || '').trim();
                             const nom = String(nome || '').trim();
                             if (cod) {
-                                if (!cidadesMap.has(cod)) cidadesMap.set(cod, { codigoIbge: cod, nome: nom });
-                            } else if (nom) {
-                                const chaveFallback = `nome:${normalizar(nom)}`;
-                                if (!cidadesMap.has(chaveFallback)) cidadesMap.set(chaveFallback, { codigoIbge: '', nome: nom });
+                                if (!cidadesMap.has(cod)) {
+                                    cidadesMap.set(cod, { codigoIbge: cod, nome: nom, origem });
+                                } else if (origem === 'manual' && cidadesMap.get(cod).origem === 'ddd') {
+                                    cidadesMap.set(cod, { codigoIbge: cod, nome: nom, origem });
+                                }
                             }
                         };
 
-                        // 1. Cidades já vinculadas manualmente
+                        // 1. Cidades Manuais
                         const cidadesRaw = Array.isArray(v.cidades) ? v.cidades : (Array.isArray(v.cidadesIbge) ? v.cidadesIbge : []);
                         cidadesRaw.forEach(c => {
                             if (typeof c === 'string' || typeof c === 'number') {
                                 const s = String(c).trim();
-                                if (/^\d{7}$/.test(s)) adicionarCidade(s, '');
-                                else adicionarCidade('', s);
+                                if (/^\d{7}$/.test(s)) adicionarCidade(s, '', 'manual');
                             } else if (c && typeof c === 'object') {
-                                adicionarCidade(c.codigoIbge || c.codigo || c.id, c.nome || '');
+                                adicionarCidade(c.codigoIbge || c.codigo || c.id, c.nome || '', 'manual');
                             }
                         });
 
-                        // 2. Cidades provenientes dos DDDs
+                        // 2. Cidades via DDD
                         const dddsRaw = Array.isArray(v.ddds) ? v.ddds : [];
                         if (dddsRaw.length > 0) {
                             const dddsNumeros = dddsRaw.map(d => typeof d === 'object' ? d.ddd : d).filter(Boolean);
                             const resultados = await Promise.all(dddsNumeros.map(d => carregarMunicipiosDoDdd(d)));
-                            resultados.flat().forEach(m => adicionarCidade(m.codigoIbge, m.nome));
+                            resultados.flat().forEach(m => adicionarCidade(m.codigoIbge, m.nome, 'ddd'));
                         }
 
                         return {
@@ -153,20 +153,32 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         function normalizar(str) { return String(str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').toLowerCase().trim(); }
         
-        function getVendedorDaCidade(props) {
+        // ✅ NOVA FUNÇÃO: Identifica o dono principal e se há conflito na cidade
+        function getVendedoresDaCidade(props) {
             if (!props || !vendedoresMapa.length) return null;
             const codigo = String(props.codigoIbge || props.codigo || '').trim();
-            const nome = normalizar(props.nome || props.municipio);
-            
+            if (!codigo) return null;
+
+            const vendedoresNaCidade = [];
             for (const v of vendedoresMapa) {
-                for (const c of v.cidades) {
-                    // Match por código IBGE (evita duplicidade de nomes)
-                    if (codigo && c.codigoIbge && codigo === c.codigoIbge) return v;
-                    // Fallback: Match por nome APENAS se não houver código
-                    if (!codigo && !c.codigoIbge && nome && c.nome && nome === normalizar(c.nome)) return v;
-                }
+                const match = v.cidades.find(c => c.codigoIbge === codigo);
+                if (match) vendedoresNaCidade.push({ vendedor: v, origem: match.origem });
             }
-            return null;
+
+            if (vendedoresNaCidade.length === 0) return null;
+
+            // Regra de Ouro: Vendedor Manual ganha do Vendedor DDD
+            vendedoresNaCidade.sort((a, b) => {
+                if (a.origem === 'manual' && b.origem === 'ddd') return -1;
+                if (a.origem === 'ddd' && b.origem === 'manual') return 1;
+                return 0;
+            });
+
+            return {
+                principal: vendedoresNaCidade[0].vendedor,
+                conflito: vendedoresNaCidade.length > 1,
+                todos: vendedoresNaCidade
+            };
         }
 
         // ============================================================
@@ -918,18 +930,46 @@ document.addEventListener('DOMContentLoaded', async function() {
         function criarCamadaTerra(g) { return g ? L.geoJSON(g, { style: () => getTerraStyle(), interactive: false }) : null; }
         function criarCamadaEstados(g) { return g ? L.geoJSON(g, { style: () => getStateStyle(), interactive: false }) : null; }
         function criarCamadaMunicipios(g) { return g ? L.geoJSON(g, { style: () => getMunicipalityStyle(), interactive: false }) : null; }
-                function criarCamadaVendedor(g, v) {
+        
+        function criarCamadaVendedor(g, v) {
             if (!g || !g.features) return null;
-            const features = g.features.filter(f => { const vv = getVendedorDaCidade(f.properties || {}); return vv && vv.id === v.id; });
+            
+            // Filtra apenas as features onde ESTE vendedor é o "Principal"
+            const features = g.features.filter(f => { 
+                const info = getVendedoresDaCidade(f.properties || {}); 
+                return info && info.principal.id === v.id; 
+            });
+            
             if (!features.length) return null;
             
             return L.geoJSON({ type: 'FeatureCollection', features }, {
-                style: () => getVendedorStyle(v),
-                onEachFeature: (f, l) => {
-                    const nome = f.properties?.nome || f.properties?.municipio || 'Cidade';
+                style: (feature) => {
+                    const info = getVendedoresDaCidade(feature.properties || {});
+                    const style = getVendedorStyle(v);
                     
-                    // ✅ Removemos o 'sticky: true' para evitar o bug do mouseout
-                    l.bindTooltip(nome, { 
+                    if (info && info.conflito) {
+                        style.dashArray = '5, 5';
+                        style.weight = 2.5;
+                    }
+                    return style;
+                },
+                onEachFeature: (f, l) => {
+                    const info = getVendedoresDaCidade(f.properties || {});
+                    const nomeCidade = f.properties?.nome || f.properties?.municipio || 'Cidade';
+                    
+                    let tooltipTexto = `<strong>${nomeCidade}</strong><br>`;
+                    
+                    if (info && info.conflito) {
+                        tooltipTexto += `<span style="color:#fbbf24; font-size:11px;">⚠️ Sobreposição de Área</span><br>`;
+                        info.todos.forEach(item => {
+                            const label = item.origem === 'manual' ? 'Cidade Direta' : `DDD`;
+                            tooltipTexto += `<span style="font-size:12px;">• ${item.vendedor.nome} (${label})</span><br>`;
+                        });
+                    } else {
+                        tooltipTexto += `<span style="font-size:12px;">Vendedor: ${v.nome}</span>`;
+                    }
+
+                    l.bindTooltip(tooltipTexto, { 
                         direction: 'top', 
                         offset: [0, -8], 
                         className: 'vendedor-tooltip', 
@@ -937,7 +977,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                     });
 
                     l.on('mouseover', function() { 
-                        // Fecha qualquer tooltip que tenha ficado aberto por bug em outras cidades
                         if (window.mapInstance) {
                             window.mapInstance.eachLayer(function(layer) {
                                 if (layer.closeTooltip && layer !== this) layer.closeTooltip();
@@ -945,12 +984,18 @@ document.addEventListener('DOMContentLoaded', async function() {
                         }
                         this.setStyle(getVendedorHoverStyle(v)); 
                         this.bringToFront(); 
-                        this.openTooltip(); // ✅ Força a abertura
+                        this.openTooltip(); 
                     });
                     
                     l.on('mouseout', function() { 
-                        this.setStyle(getVendedorStyle(v)); 
-                        this.closeTooltip(); // ✅ Força o fechamento
+                        const infoFeature = getVendedoresDaCidade(f.properties || {});
+                        const style = getVendedorStyle(v);
+                        if (infoFeature && infoFeature.conflito) {
+                            style.dashArray = '5, 5';
+                            style.weight = 2.5;
+                        }
+                        this.setStyle(style); 
+                        this.closeTooltip(); 
                     });
                 }
             });
