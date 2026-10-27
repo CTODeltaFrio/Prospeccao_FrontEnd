@@ -158,14 +158,86 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (respostaSessao.ok) { try { const json = await respostaSessao.json(); sessaoCache = json?.dados ?? json; } catch (e) {} }
         } catch (erro) {}
 
-        const btnDarkMode = document.getElementById('btn-dark-mode');
-        if (localStorage.getItem('darkMode') === 'true') { document.body.classList.add('dark-mode'); if (btnDarkMode) btnDarkMode.innerHTML = '<i class="fas fa-sun"></i>'; }
-        if (btnDarkMode) btnDarkMode.addEventListener('click', function() {
-            document.body.classList.toggle('dark-mode');
-            const isDark = document.body.classList.contains('dark-mode');
-            localStorage.setItem('darkMode', isDark);
-            btnDarkMode.innerHTML = isDark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+        // Preenche os dados do usuário no popover
+        if (sessaoCache?.usuario) {
+            const nome = sessaoCache.usuario.nome || 'Usuário';
+            const email = sessaoCache.usuario.email || '—';
+            const iniciais = nome.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
+            
+            const elAvatar = document.getElementById('user-avatar');
+            const elNameMini = document.getElementById('user-name-mini');
+            const elEmailMini = document.getElementById('user-email-mini');
+            const elAvatarPopover = document.getElementById('user-avatar-popover');
+            const elNamePopover = document.getElementById('user-name-popover');
+            const elEmailPopover = document.getElementById('user-email-popover');
+            
+            if (elAvatar) elAvatar.textContent = iniciais;
+            if (elNameMini) elNameMini.textContent = nome.split(' ')[0];
+            if (elEmailMini) elEmailMini.textContent = email;
+            if (elAvatarPopover) elAvatarPopover.textContent = iniciais;
+            if (elNamePopover) elNamePopover.textContent = nome;
+            if (elEmailPopover) elEmailPopover.textContent = email;
+        }
+
+        // Abrir/Fechar Popover do Usuário
+        const userWrapper = document.getElementById('sidebar-user-wrapper');
+        const userBtn = document.getElementById('sidebar-user-btn');
+        if (userBtn) {
+            userBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                userWrapper.classList.toggle('open');
+            });
+        }
+        document.addEventListener('click', (e) => {
+            if (userWrapper && !userWrapper.contains(e.target)) {
+                userWrapper.classList.remove('open');
+            }
         });
+
+        // Lógica do Botão de Tema (Toggle Claro/Escuro)
+        const btnLight = document.getElementById('theme-btn-light');
+        const btnDark = document.getElementById('theme-btn-dark');
+
+        function atualizarToggleTema(isDark) {
+            if (btnLight) btnLight.classList.toggle('active', !isDark);
+            if (btnDark) btnDark.classList.toggle('active', isDark);
+        }
+
+        if (localStorage.getItem('darkMode') === 'true') { 
+            document.body.classList.add('dark-mode'); 
+            atualizarToggleTema(true);
+        } else {
+            atualizarToggleTema(false);
+        }
+
+        if (btnLight) btnLight.addEventListener('click', () => {
+            document.body.classList.remove('dark-mode');
+            localStorage.setItem('darkMode', 'false');
+            atualizarToggleTema(false);
+        });
+
+        if (btnDark) btnDark.addEventListener('click', () => {
+            document.body.classList.add('dark-mode');
+            localStorage.setItem('darkMode', 'true');
+            atualizarToggleTema(true);
+        });
+
+        // Lógica do Botão Sair
+        const btnLogout = document.getElementById('btn-logout');
+        if (btnLogout) {
+            btnLogout.addEventListener('click', function () {
+                showConfirm('Sair do sistema', 'Deseja realmente sair?', async function() {
+                    btnLogout.disabled = true; 
+                    btnLogout.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saindo...';
+                    try { 
+                        const csrf = document.cookie.split('; ').find(c => c.startsWith('login_delta_csrf=')); 
+                        const csrfValor = csrf ? decodeURIComponent(csrf.split('=')[1]) : ''; 
+                        await fetch('/api/logout', { method: 'POST', credentials: 'include', headers: csrfValor ? { 'X-CSRF-Token': csrfValor } : {} }); 
+                    } catch (e) {} 
+                    window.location.href = 'https://www.sistemas.deltafrio.com.br/central.html';
+                });
+            });
+        }
 
         // ============================================================
         // SIDEBAR E ELEMENTOS
@@ -223,7 +295,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         const genericSearch = document.getElementById('generic-search');
         const companySelectorWrapper = document.getElementById('company-selector-wrapper');
         const companySelector        = document.getElementById('company-selector');
-        const companySelectorLabel   = document.getElementById('company-selector-label');
         const btnClassifyX           = document.getElementById('btn-classify-x');
         const detClassificacao       = document.getElementById('det-classificacao');
 
@@ -273,18 +344,58 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         function atualizarSeletorEmpresa() {
             if (!companySelector || !companySelectorWrapper) return;
+            
             const empresas = contextoCache?.empresas || [];
-            if (!empresas.length) { companySelectorWrapper.style.display = 'none'; return; }
+            const elEmpresaMini = document.getElementById('user-empresa-mini');
+
+            // Se não tem nenhuma empresa no contexto, esconde tudo
+            if (!empresas.length) { 
+                companySelectorWrapper.style.display = 'none'; 
+                if (elEmpresaMini) elEmpresaMini.style.display = 'none';
+                return; 
+            }
+            
             companySelectorWrapper.style.display = 'block';
             const ativo = obterEmpresaAtivaId();
             companySelector.innerHTML = '';
-            if (!ativo) { const opt = document.createElement('option'); opt.value = ''; opt.textContent = '— Selecione —'; companySelector.appendChild(opt); }
-            empresas.forEach(e => { const opt = document.createElement('option'); opt.value = String(e.id); opt.textContent = e.nome || e.nomeFantasia || e.razaoSocial || `#${e.id}`; companySelector.appendChild(opt); });
+            
+            // Se não tem nenhuma ativa, põe o placeholder no dropdown
+            if (!ativo) { 
+                const opt = document.createElement('option'); 
+                opt.value = ''; 
+                opt.textContent = '— Selecione —'; 
+                companySelector.appendChild(opt); 
+            }
+            
+            empresas.forEach(e => { 
+                const opt = document.createElement('option'); 
+                opt.value = String(e.id); 
+                opt.textContent = e.nome || e.nomeFantasia || e.razaoSocial || `#${e.id}`; 
+                companySelector.appendChild(opt); 
+            });
+            
             if (ativo) companySelector.value = ativo;
-            if (companySelectorLabel) {
-                const empresaAtual = empresas.find(e => String(e.id) === String(ativo));
-                const nomeEmpresa = empresaAtual ? (empresaAtual.nome || empresaAtual.nomeFantasia || `#${empresaAtual.id}`) : null;
-                companySelectorLabel.title = nomeEmpresa ? `Empresa ativa: ${nomeEmpresa}` : 'Selecione uma empresa ativa';
+            
+            refreshCustomSelect(companySelector);
+
+            // ✅ Atualiza o nome da empresa na sidebar
+            if (elEmpresaMini) {
+                if (ativo) {
+                    const emp = empresas.find(e => String(e.id) === String(ativo));
+                    if (emp) {
+                        const nomeEmp = emp.nome || emp.nomeFantasia || emp.razaoSocial || 'Empresa';
+                        elEmpresaMini.innerHTML = `<i class="fas fa-building"></i> ${nomeEmp}`;
+                        elEmpresaMini.style.display = 'flex';
+                    } else {
+                        // Caso tenha o ID mas não ache a empresa na lista
+                        elEmpresaMini.innerHTML = `<i class="fas fa-building"></i> Selecione uma empresa`;
+                        elEmpresaMini.style.display = 'flex';
+                    }
+                } else {
+                    // ✅ Se não tem empresa ativa, mostra o aviso
+                    elEmpresaMini.innerHTML = `<i class="fas fa-building"></i> Selecione uma empresa`;
+                    elEmpresaMini.style.display = 'flex';
+                }
             }
         }
 
@@ -308,15 +419,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                 limparCacheIgnorados(); ignoradosCarregados = false; ignorados = []; ignoradosFiltrados = [];
                 if (registros.length) { currentPage = 1; historicoCursors = [null]; cursorAtual = null; registros = []; temMais = false; renderTable([]); }
                 if (ignoradosScreen.style.display === 'block') carregarIgnorados();
-            });
-        }
-
-        if (companySelectorLabel) {
-            companySelectorLabel.addEventListener('click', (e) => {
-                if (sidebar.classList.contains('collapsed')) {
-                    e.preventDefault(); sidebar.classList.remove('collapsed');
-                    setTimeout(() => { if (companySelector) { companySelector.focus(); try { companySelector.showPicker?.(); } catch (err) {} } }, 400);
-                }
             });
         }
 
@@ -382,22 +484,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             else if (screen === 'vendedores' || screen === 'empresas') { if (vendedoresScreen) { vendedoresScreen.style.display = 'block'; setActiveMenuItem('menu-vendedores'); } }
             else if (registeredScreens[screen]) registeredScreens[screen].style.display = 'block';
             try { window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); document.documentElement.scrollTop = 0; document.body.scrollTop = 0; const mainEl = document.querySelector('.main'); if (mainEl) mainEl.scrollTop = 0; } catch (e) {}
-        }
-
-        const btnLogout = document.getElementById('btn-logout');
-        if (btnLogout) {
-            btnLogout.addEventListener('click', function () {
-                showConfirm('Sair do sistema', 'Deseja realmente sair?', async function() {
-                    btnLogout.disabled = true; 
-                    btnLogout.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-                    try { 
-                        const csrf = document.cookie.split('; ').find(c => c.startsWith('login_delta_csrf=')); 
-                        const csrfValor = csrf ? decodeURIComponent(csrf.split('=')[1]) : ''; 
-                        await fetch('/api/logout', { method: 'POST', credentials: 'include', headers: csrfValor ? { 'X-CSRF-Token': csrfValor } : {} }); 
-                    } catch (e) {} 
-                    window.location.href = 'https://www.sistemas.deltafrio.com.br/central.html';
-                });
-            });
         }
 
         function normalizarTexto(t) { return t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
@@ -800,9 +886,66 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (detailsModal) detailsModal.addEventListener('click', function(e) { if (e.target === this) detailsModal.style.display = 'none'; });
         if (genericModal) genericModal.addEventListener('click', function(e) { if (e.target === this) { genericModal.style.display = 'none'; restoreActiveMenuItem(); } });
         if (confirmModal) confirmModal.addEventListener('click', function(e) { if (e.target === this) { confirmModal.style.display = 'none'; restoreActiveMenuItem(); } });
-        function showConfirm(t, m, cb) { confirmTitle.innerText = t; confirmMessage.innerText = m; btnConfirmOk.innerText = 'Confirmar'; btnConfirmCancel.innerText = 'Cancelar'; btnConfirmDiscard.style.display = 'none'; confirmCallback = cb; btnConfirmCancel.style.display = 'inline-block'; confirmModal.style.display = 'flex'; }
-        function showWarning(m, t = 'Aviso') { confirmTitle.innerText = t; confirmMessage.innerText = m; btnConfirmOk.innerText = 'OK'; btnConfirmCancel.style.display = 'none'; btnConfirmDiscard.style.display = 'none'; confirmCallback = null; confirmModal.style.display = 'flex'; }
-        function showUnsavedChangesModal(m, onSave, onDiscard) { confirmTitle.innerText = 'Alterações não salvas'; confirmMessage.innerText = m; btnConfirmOk.innerText = 'Salvar'; btnConfirmCancel.innerText = 'Cancelar'; btnConfirmDiscard.style.display = 'inline-block'; confirmCallback = onSave; confirmModal.style.display = 'flex'; btnConfirmDiscard.onclick = function() { if (onDiscard) onDiscard(); confirmModal.style.display = 'none'; btnConfirmDiscard.style.display = 'none'; btnConfirmCancel.style.display = 'inline-block'; btnConfirmOk.innerText = 'Confirmar'; confirmCallback = null; restoreActiveMenuItem(); }; }
+
+        // ✅ Função para mudar o ícone e a cor baseado no título
+        function setIconConfirmacao(titulo) {
+            const iconWrapper = document.getElementById('confirm-icon-wrapper');
+            const iconI = document.getElementById('confirm-icon-i');
+            if (!iconWrapper || !iconI) return;
+
+            const t = String(titulo).toLowerCase();
+            
+            // Limpa as classes anteriores
+            iconWrapper.classList.remove('success', 'error', 'warning');
+
+            if (t.includes('sucesso')) {
+                iconWrapper.classList.add('success');
+                iconI.className = 'fas fa-check-circle'; // Ícone de Check
+            } else if (t.includes('erro') || t.includes('falha') || t.includes('negado') || t.includes('atenção')) {
+                iconWrapper.classList.add('error');
+                iconI.className = 'fas fa-times-circle'; // Ícone de X
+            } else {
+                // Para 'Aviso', 'Confirmação', etc.
+                iconWrapper.classList.add('warning');
+                iconI.className = 'fas fa-exclamation-triangle'; // Ícone de Atenção
+            }
+        }
+
+        function showConfirm(t, m, cb) { 
+            setIconConfirmacao(t);
+            confirmTitle.innerText = t; 
+            confirmMessage.innerText = m; 
+            btnConfirmOk.innerText = 'Confirmar'; 
+            btnConfirmCancel.innerText = 'Cancelar'; 
+            btnConfirmDiscard.style.display = 'none'; 
+            confirmCallback = cb; 
+            btnConfirmCancel.style.display = 'inline-block'; 
+            confirmModal.style.display = 'flex'; 
+        }
+
+        function showWarning(m, t = 'Aviso') { 
+            setIconConfirmacao(t);
+            confirmTitle.innerText = t; 
+            confirmMessage.innerText = m; 
+            btnConfirmOk.innerText = 'OK'; 
+            btnConfirmCancel.style.display = 'none'; 
+            btnConfirmDiscard.style.display = 'none'; 
+            confirmCallback = null; 
+            confirmModal.style.display = 'flex'; 
+        }
+
+        function showUnsavedChangesModal(m, onSave, onDiscard) { 
+            setIconConfirmacao('Alterações não salvas');
+            confirmTitle.innerText = 'Alterações não salvas'; 
+            confirmMessage.innerText = m; 
+            btnConfirmOk.innerText = 'Salvar'; 
+            btnConfirmCancel.innerText = 'Cancelar'; 
+            btnConfirmDiscard.style.display = 'inline-block'; 
+            confirmCallback = onSave; 
+            confirmModal.style.display = 'flex'; 
+            btnConfirmDiscard.onclick = function() { if (onDiscard) onDiscard(); confirmModal.style.display = 'none'; btnConfirmDiscard.style.display = 'none'; btnConfirmCancel.style.display = 'inline-block'; btnConfirmOk.innerText = 'Confirmar'; confirmCallback = null; restoreActiveMenuItem(); }; 
+        }
+
         btnConfirmOk.addEventListener('click', function() { if (confirmCallback) { const cb = confirmCallback; confirmCallback = null; cb(); } confirmModal.style.display = 'none'; btnConfirmCancel.style.display = 'inline-block'; btnConfirmOk.innerText = 'Confirmar'; btnConfirmDiscard.style.display = 'none'; restoreActiveMenuItem(); });
         btnConfirmCancel.addEventListener('click', function() { confirmModal.style.display = 'none'; confirmCallback = null; btnConfirmDiscard.style.display = 'none'; restoreActiveMenuItem(); });
 

@@ -4,7 +4,7 @@
 .form-modal {
     max-width: 720px;
     width: 90%;
-    height: auto;
+    height: 85vh; /* ✅ Tamanho fixo para não pular ao filtrar cidades */
     max-height: 90vh;
     padding: 0;
     display: flex;
@@ -98,16 +98,6 @@
     border: 2px solid var(--bg-card);
     flex-shrink: 0;
 }
-
-/* Larguras das colunas da tabela de vendedores */
-#vendedores-screen .table-responsive th:nth-child(1), #vendedores-screen .table-responsive td:nth-child(1) { width: 48px; }
-#vendedores-screen .table-responsive th:nth-child(2), #vendedores-screen .table-responsive td:nth-child(2) { width: 20%; }
-#vendedores-screen .table-responsive th:nth-child(3), #vendedores-screen .table-responsive td:nth-child(3) { width: 20%; }
-#vendedores-screen .table-responsive th:nth-child(4), #vendedores-screen .table-responsive td:nth-child(4) { width: 14%; }
-#vendedores-screen .table-responsive th:nth-child(5), #vendedores-screen .table-responsive td:nth-child(5) { width: 14%; }
-#vendedores-screen .table-responsive th:nth-child(6), #vendedores-screen .table-responsive td:nth-child(6) { width: 8%; }
-#vendedores-screen .table-responsive th:nth-child(7), #vendedores-screen .table-responsive td:nth-child(7) { width: 8%; }
-#vendedores-screen .table-responsive th:nth-child(8), #vendedores-screen .table-responsive td:nth-child(8) { width: 16%; }
 
 .vendedor-ativo-badge {
     display: inline-flex; align-items: center; gap: 6px;
@@ -656,3 +646,109 @@ body.dark-mode .btn-secondary:not(:disabled):hover {
     }
     .btn-table:hover { transform: translateY(-1px) !important; }
 }
+
+/* ============================================================
+   TABELA DE VENDEDORES (IDÊNTICA À DE EMPRESAS)
+   ============================================================ */
+#vtab-panel-vendedores .table-responsive {
+    overflow-x: auto;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+}
+
+#vtab-panel-vendedores .table-responsive table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    display: block;
+}
+
+#vtab-panel-vendedores .table-responsive thead {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: #1e3a8a;
+}
+
+#vtab-panel-vendedores .table-responsive thead th {
+    background: #1e3a8a;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 14px 16px;
+    text-align: left;
+    border: none;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+#vtab-panel-vendedores .table-responsive thead th:first-child {
+    border-top-left-radius: 12px;
+}
+
+#vtab-panel-vendedores .table-responsive thead th:last-child {
+    border-top-right-radius: 12px;
+}
+
+#vtab-panel-vendedores .table-responsive tbody {
+    display: block;
+    max-height: 520px;
+    overflow-y: auto;
+    width: 100%;
+}
+
+#vtab-panel-vendedores .table-responsive tbody tr {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+    transition: background 0.2s ease;
+}
+
+#vtab-panel-vendedores .table-responsive tbody tr:hover {
+    background: var(--bg-hover);
+}
+
+#vtab-panel-vendedores .table-responsive tbody td {
+    padding: 12px 16px;
+    color: var(--text-main);
+    font-size: 13px;
+    border-bottom: 1px solid var(--border-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+}
+
+#vtab-panel-vendedores .table-responsive tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Centraliza os títulos específicos (Empresas, Status, Ações) */
+#vtab-panel-vendedores .table-responsive thead th:nth-child(6),
+#vtab-panel-vendedores .table-responsive thead th:nth-child(7),
+#vtab-panel-vendedores .table-responsive thead th:nth-child(8) {
+    text-align: center !important;
+}
+
+/* Ajuste fino das larguras das colunas */
+#vtab-panel-vendedores .table-responsive th:nth-child(1),
+#vtab-panel-vendedores .table-responsive td:nth-child(1) { width: 5%; }
+#vtab-panel-vendedores .table-responsive th:nth-child(2),
+#vtab-panel-vendedores .table-responsive td:nth-child(2) { width: 22%; }
+#vtab-panel-vendedores .table-responsive th:nth-child(3),
+#vtab-panel-vendedores .table-responsive td:nth-child(3) { width: 20%; }
+#vtab-panel-vendedores .table-responsive th:nth-child(4),
+#vtab-panel-vendedores .table-responsive td:nth-child(4) { width: 13%; }
+#vtab-panel-vendedores .table-responsive th:nth-child(5),
+#vtab-panel-vendedores .table-responsive td:nth-child(5) { width: 13%; }
+#vtab-panel-vendedores .table-responsive th:nth-child(6),
+#vtab-panel-vendedores .table-responsive td:nth-child(6) { width: 9%; }
+#vtab-panel-vendedores .table-responsive th:nth-child(7),
+#vtab-panel-vendedores .table-responsive td:nth-child(7) { width: 9%; }
+#vtab-panel-vendedores .table-responsive th:nth-child(8),
+#vtab-panel-vendedores .table-responsive td:nth-child(8) { width: 9%; }

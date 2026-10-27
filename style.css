@@ -36,15 +36,13 @@ body { background: var(--bg-body); color: var(--text-main); }
     background: linear-gradient(180deg, #071a3d 0%, #061b48 100%); 
     color: white; 
     padding: 70px 16px 16px; 
-    z-index: 10; 
+    z-index: 9999; 
     display: flex; 
     flex-direction: column; 
     align-items: center; 
     transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1); 
-    /* ✅ Mudança para o dropdown não ser cortado */
     overflow: visible; 
 }
-
 .sidebar-toggle { 
     position: absolute; 
     top: 15px; 
@@ -64,28 +62,23 @@ body { background: var(--bg-body); color: var(--text-main); }
     transition: background 0.3s, color 0.3s, transform 0.3s, left 0.4s cubic-bezier(0.4, 0, 0.2, 1), margin-left 0.4s cubic-bezier(0.4, 0, 0.2, 1); 
     z-index: 10; 
 }
-.sidebar-toggle:hover { 
-    background: rgba(255,255,255,0.25); 
-    color: #fff; 
-    transform: scale(1.1); 
-}
+.sidebar-toggle:hover { background: rgba(255,255,255,0.25); color: #fff; transform: scale(1.1); }
+.sidebar.collapsed .sidebar-toggle { left: 50%; margin-left: -18px; }
 
-.sidebar.collapsed .sidebar-toggle {
-    left: 50%;
-    margin-left: -18px;
-}
-
-/* Container de rolagem */
 .sidebar-menu-scroll {
     width: 100%;
     flex: 1;
-    /* ✅ Mudança para o dropdown não ser cortado */
-    overflow: visible;
+    overflow-y: auto;
+    overflow-x: hidden;
     display: flex;
     flex-direction: column;
     align-items: center;
     padding-right: 2px;
 }
+.sidebar-menu-scroll::-webkit-scrollbar { width: 4px; }
+.sidebar-menu-scroll::-webkit-scrollbar-track { background: transparent; }
+.sidebar-menu-scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 4px; }
+.sidebar-menu-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.4); }
 
 .menu-title { color: #8492ae; font-size: 11px; font-weight: 600; letter-spacing: .5px; margin: 15px 9px 10px; white-space: nowrap; align-self: flex-start; transition: opacity 0.3s ease; }
 .menu-item { height: 55px; display: flex; align-items: center; gap: 12px; padding: 0 10px; border-radius: 10px; margin-bottom: 4px; color: #e5eaf4; cursor: pointer; transition: background 0.3s, transform 0.3s ease; position: relative; overflow: hidden; width: 100%; justify-content: flex-start; }
@@ -109,252 +102,288 @@ body { background: var(--bg-body); color: var(--text-main); }
 .sidebar:not(.collapsed) .menu-icon { animation: slideIn 0.4s ease; }
 @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
 
-/* ================== HEADER ================== */
-.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
-.header h1 { font-size: 25px; color: var(--text-main); margin-bottom: 7px; font-weight: 700; letter-spacing: -0.5px; }
-.subtitle { color: var(--text-secondary); font-size: 13px; }
-.status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #13b879; margin-right: 6px; }
-.header-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-
-/* Competência no Header */
-.competencia-header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    border-radius: 10px;
-    padding: 8px 16px;
-    box-shadow: 0 2px 5px rgba(0,0,0,.03);
+/* ================== RODAPÉ USUÁRIO SIDEBAR ================== */
+.sidebar-footer {
+    width: 100%;
+    margin-top: auto;
+    padding-top: 15px;
+    border-top: 1px solid rgba(255,255,255,0.1);
 }
-.competencia-header .calendar { font-size: 18px; color: #2463eb; }
-body.dark-mode .competencia-header .calendar { color: #60a5fa; }
-.competencia-header .competencia-text strong { display: block; font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
-.competencia-header .competencia-text span { display: block; font-size: 14px; color: var(--text-main); font-weight: 700; line-height: 1.2; }
 
-/* ================== SIDEBAR FOOTER ================== */
-.sidebar-footer { 
-    margin-top: auto; 
-    padding-top: 15px; 
-    border-top: 1px solid rgba(255,255,255,0.1); 
-    width: 100%; 
-    display: flex; 
-    flex-direction: column; 
-    gap: 10px; 
-    box-sizing: border-box; 
-    flex-shrink: 0;
+.sidebar-user-wrapper {
+    position: relative;
+    width: 100%;
 }
-.sidebar-actions {
+
+.sidebar-user-btn {
     display: flex;
-    justify-content: space-between;
     align-items: center;
     gap: 10px;
     width: 100%;
-    margin-top: 10px;
-    transition: all 0.3s ease;
-    padding: 0 4px;
-}
-.sidebar-actions .dark-mode-toggle,
-.sidebar-actions .logout-toggle {
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #8998b5;
-    width: 40px;
-    height: 40px;
-    box-shadow: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 10px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-.sidebar-actions .dark-mode-toggle:hover {
-    background: rgba(96, 165, 250, 0.15);
-    border-color: rgba(96, 165, 250, 0.4);
-    color: #60a5fa;
-}
-.sidebar-actions .logout-toggle:hover {
-    background: rgba(239, 68, 68, 0.15);
-    border-color: rgba(239, 68, 68, 0.4);
-    color: #f87171;
-}
-body.dark-mode .sidebar-actions .dark-mode-toggle { color: #fbbf24; }
-
-.sidebar.collapsed .sidebar-actions {
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    margin-top: 5px;
-    padding: 0;
-}
-
-/* ================== SELETOR DE EMPRESA ATIVA ================== */
-.company-selector {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding: 8px 4px;
-    
-    /* ✅ Removemos o fundo e a borda do container para ele se misturar à sidebar */
     background: transparent;
     border: none;
-    border-radius: 0;
-    margin-top: 5px;
-    margin-bottom: 15px;
-    width: 100%;
-    box-sizing: border-box;
-    position: relative;
-    overflow: visible; 
+    padding: 8px;
+    border-radius: 10px;
+    cursor: pointer;
+    color: #e5eaf4;
+    transition: background 0.2s;
+    text-align: left;
 }
+.sidebar-user-btn:hover { background: rgba(255,255,255,0.08); }
 
-.company-selector::before {
-    display: none; /* Remove a linha brilhante do topo */
-}
-
-.company-selector label {
+.user-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #2463eb, #1a4fc4);
+    color: white;
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-size: 10px;
-    font-weight: 600;
-    color: #8998b5; /* Cor padrão dos textos secundários da sidebar */
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    white-space: nowrap;
-    margin: 0 0 4px 6px;
-    cursor: pointer;
-}
-
-.company-selector label i {
-    color: #8998b5;
-    font-size: 12px;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
     flex-shrink: 0;
 }
+.user-info-mini {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    flex: 1;
+}
+.user-info-mini strong {
+    font-size: 13px;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.user-info-mini small {
+    font-size: 11px;
+    color: #8998b5;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.user-chevron { font-size: 12px; color: #8998b5; margin-left: auto; }
 
-.company-selector-inner {
-    position: relative;
-    width: 100%;
+/* Sidebar Colapsada - Usuário */
+.sidebar.collapsed .sidebar-user-btn { justify-content: center; padding: 8px 0; }
+.sidebar.collapsed .user-info-mini, .sidebar.collapsed .user-chevron { display: none; }
+
+/* Popover do Usuário */
+.sidebar-user-popover {
+    position: absolute;
+    bottom: 0;
+    left: 100%;
+    margin-left: 15px;
+    width: 280px;
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 14px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    padding: 16px;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(-10px);
+    transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: 10000;
 }
+.sidebar-user-wrapper.open .sidebar-user-popover {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(0);
+}
 
-/* ✅ Botão do seletor - Mesmo estilo dos botões de tema/logout da sidebar */
-.company-selector-inner .custom-select-trigger {
-    background: rgba(255, 255, 255, 0.04); /* Fundo quase transparente */
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #e5eaf4; /* Texto claro igual aos itens do menu */
+.sidebar-user-wrapper.open .user-chevron { transform: rotate(180deg); }
+
+.popover-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+.user-avatar.large { width: 48px; height: 48px; font-size: 18px; flex-shrink: 0; }
+.user-info-popover { display: flex; flex-direction: column; overflow: visible !important; width: 100%; }
+.user-info-popover strong { font-size: 14px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.user-info-popover small { font-size: 12px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.popover-divider { height: 1px; background: #334155; margin: 12px 0; }
+.popover-section { margin-bottom: 12px; }
+.popover-label { display: block; font-size: 11px; font-weight: 600; color: #8998b5; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+
+/* Toggle de Tema */
+.theme-toggle-group {
+    display: flex;
+    background: #1e293b;
     border-radius: 8px;
-    min-height: 40px;
-    height: 40px;
+    padding: 4px;
+    gap: 4px;
+}
+.theme-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.theme-btn:hover { color: #e2e8f0; }
+.theme-btn.active {
+    background: #334155;
+    color: #fff;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.popover-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    background: transparent;
+    border: none;
+    padding: 10px 12px;
+    border-radius: 8px;
     font-size: 13px;
     font-weight: 500;
-    padding: 0 12px;
-    transition: all 0.2s ease;
+    color: #e2e8f0;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s;
+}
+.popover-item:hover { background: #1e293b; }
+.popover-item.text-danger { color: #ef4444; }
+.popover-item.text-danger:hover { background: rgba(239, 68, 68, 0.1); }
+
+/* ================== SELETOR DE EMPRESA DENTRO DO POPOVER ================== */
+.sidebar-user-popover .company-selector {
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+    box-shadow: none;
+}
+.sidebar-user-popover .company-selector::before { display: none; }
+
+/* ✅ Estilo para a Empresa Ativa (Botão/Chip) */
+.sidebar-user-popover .company-selector-inner .custom-select-trigger {
+    background: rgba(96, 165, 250, 0.1) !important;
+    border: 1px solid rgba(96, 165, 250, 0.2) !important;
+    color: #60a5fa !important;
+    border-radius: 6px;
+    min-height: 26px !important;
+    height: 26px !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    padding: 0 8px !important;
+    box-shadow: none !important;
+    display: inline-flex;
+    gap: 6px;
+    width: auto !important;
+    max-width: 100%;
+    justify-content: flex-start; /* Garante que o texto fique na esquerda */
+    margin-top: 6px;
+    transition: background 0.2s ease;
 }
 
-.company-selector-inner .custom-select-trigger:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.2);
+.sidebar-user-popover .company-selector-inner .custom-select-trigger:hover {
+    background: rgba(96, 165, 250, 0.2) !important;
 }
 
-.company-selector-inner .custom-select.open .custom-select-trigger {
-    border-color: #60a5fa;
-    box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.15);
+/* Garante que o nome da empresa não quebre a tela */
+.sidebar-user-popover .company-selector-inner .custom-select-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 160px;
 }
 
-.company-selector-inner .custom-select-trigger i {
-    color: #8998b5;
-    transition: color 0.2s;
+/* Ajusta a cor da setinha */
+.sidebar-user-popover .company-selector-inner .custom-select-trigger i {
+    color: #60a5fa !important;
+    font-size: 10px !important;
+    margin-left: 4px;
+    transition: transform 0.2s ease;
 }
 
-.company-selector-inner .custom-select-trigger:hover i {
-    color: #e5eaf4;
-}
-
-/* ✅ O Dropdown (Menu de opções) */
-.company-selector-inner .custom-select-options {
-    background: #0f172a; /* Cor sólida para garantir a leitura das opções */
+/* ✅ Dropdown menu (abre paralelo para o lado direito) */
+.sidebar-user-popover .company-selector-inner .custom-select-options {
+    background: #0f172a;
     border: 1px solid #334155;
     border-radius: 10px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+    box-shadow: 10px 0 30px rgba(0, 0, 0, 0.6);
     padding: 6px;
-    top: calc(100% + 6px);
-    z-index: 99999 !important;
+    
+    /* Alinhamento paralelo (topo com topo) */
+    top: 0 !important; 
+    bottom: auto !important;
+    
+    left: calc(100% + 8px) !important; 
+    right: auto !important; 
+    
+    /* Mudança 1: Largura igual à da caixa do usuário */
+    width: 280px; 
+    
+    /* Rolagem para não estourar a tela */
+    max-height: 160px; 
+    overflow-y: auto;
+    
+    animation: fadeInRight 0.15s ease !important;
 }
 
-.company-selector-inner .custom-option {
+/* Mudança 2: Gira a setinha para a direita quando aberto */
+.sidebar-user-popover .company-selector-inner .custom-select.open .custom-select-trigger i {
+    transform: rotate(-90deg) !important;
+}
+
+/* Deixa a barra de rolagem mais fina e bonita */
+.sidebar-user-popover .company-selector-inner .custom-select-options::-webkit-scrollbar {
+    width: 6px;
+}
+.sidebar-user-popover .company-selector-inner .custom-select-options::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 10px;
+}
+
+/* Animação para deslizar da esquerda para a direita */
+@keyframes fadeInRight { 
+    from { opacity: 0; transform: translateX(-5px); } 
+    to { opacity: 1; transform: translateX(0); } 
+}
+
+/* Estilo das opções */
+.sidebar-user-popover .company-selector-inner .custom-option {
     color: #cbd5e1;
     border-radius: 6px;
     font-size: 13px;
     padding: 10px 12px;
-    transition: background 0.15s, color 0.15s;
 }
-
-.company-selector-inner .custom-option:hover {
-    background: rgba(255, 255, 255, 0.08);
+.sidebar-user-popover .company-selector-inner .custom-option:hover {
+    background: rgba(96, 165, 250, 0.15);
     color: #ffffff;
 }
-
-.company-selector-inner .custom-option.selected {
-    background: rgba(96, 165, 250, 0.15); /* Azul bem sutil */
-    color: #93c5fd;
+.sidebar-user-popover .company-selector-inner .custom-option.selected {
+    background: #2563eb;
+    color: #ffffff;
     font-weight: 600;
 }
 
-.company-selector-inner select {
-    display: none;
-}
+/* ================== HEADER ================== */
+.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; gap: 20px; flex-wrap: wrap; }
+.header-left { display: flex; flex-direction: column; gap: 8px; }
+.header h1 { font-size: 25px; color: var(--text-main); margin-bottom: 0; font-weight: 700; letter-spacing: -0.5px; }
+.header-subtitle-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.subtitle { color: var(--text-secondary); font-size: 13px; display: flex; align-items: center; }
+.status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #13b879; margin-right: 6px; }
+.header-right { display: flex; align-items: center; gap: 16px; flex-shrink: 0; }
 
-/* Sidebar colapsada: só o ícone */
-.sidebar.collapsed .company-selector {
-    padding: 0;
-    margin: 0 auto 8px;
-    width: 44px;
-    min-width: 44px;
-    max-width: 44px;
-    height: 44px;
-    min-height: 44px;
-    max-height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    gap: 0;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 10px;
-    cursor: pointer;
-}
-.sidebar.collapsed .company-selector:hover {
-    background: rgba(96, 165, 250, 0.15);
-    border-color: rgba(96, 165, 250, 0.4);
-}
-.sidebar.collapsed .company-selector label {
-    width: 100%;
-    height: 100%;
-    padding: 0;
-    margin: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0;
-    cursor: pointer;
-}
-.sidebar.collapsed .company-selector .company-selector-label-text {
-    display: none !important;
-}
-.sidebar.collapsed .company-selector .company-selector-inner {
-    display: none !important;
-}
-.sidebar.collapsed .company-selector label i {
-    font-size: 18px;
-    color: #60a5fa;
-    margin: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
+/* Competência no canto direito */
+.competencia-header { display: flex; align-items: center; gap: 8px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 4px 12px; box-shadow: 0 2px 5px rgba(0,0,0,.03); }
+.competencia-header .calendar { font-size: 14px; color: #2463eb; }
+body.dark-mode .competencia-header .calendar { color: #60a5fa; }
+.competencia-header .competencia-text strong { display: block; font-size: 9px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+.competencia-header .competencia-text span { display: block; font-size: 12px; color: var(--text-main); font-weight: 700; line-height: 1.2; }
 
 /* ================== CARDS KPI ================== */
 .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 24px; }
@@ -747,22 +776,21 @@ body.dark-mode #btn-ignore-cadastro.btn-secondary:hover { background: #ef4444; c
     .search-btn { width: 100%; }
 }
 @media (max-width: 900px) {
+    .header { flex-direction: column; align-items: stretch; }
+    .header-right { flex-wrap: wrap; width: 100%; justify-content: flex-start; margin-top: 10px; }
     .sidebar { width: 75px; }
     .sidebar .menu-title, .sidebar .menu-text { display: none; }
     .sidebar .menu-item { justify-content: center; padding: 0; }
+    .sidebar-user-btn { justify-content: center; padding: 8px 0; }
+    .sidebar-user-btn .user-info-mini, .sidebar-user-btn .user-chevron { display: none; }
     .main { margin-left: 75px; padding: 20px; }
-    .header { align-items: flex-start; gap: 15px; }
     .filter-row { grid-template-columns: 1fr; }
     .filter-row-bottom { grid-template-columns: 1fr; }
 }
 @media (max-width: 650px) {
     .cards { grid-template-columns: 1fr; }
-    .header { flex-direction: column; }
-    .header-right { width: 100%; justify-content: flex-end; }
-    .competencia { width: 100%; }
     .results { overflow-x: auto; position: static; z-index: auto; }
     table { min-width: 900px; }
-    .dark-mode-toggle, .logout-toggle { width: 40px; height: 40px; }
     .footer-classificacao { flex-direction: column; width: 100%; }
     .btn-classify { justify-content: center; width: 100%; }
 }
@@ -908,67 +936,29 @@ body.dark-mode .vendedor-stat-color { box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
 /* ============================================================
    AJUSTE DE LARGURA DA SIDEBAR POR TAMANHO DE TELA
    ============================================================ */
-
-/* Notebooks (Até 1366px) - Mantém a barra esbelta */
 @media (max-width: 1366px) {
-    .sidebar:not(.collapsed) {
-        width: 215px;
-    }
-    .sidebar:not(.collapsed) + .main {
-        margin-left: 215px;
-    }
-    .sidebar:not(.collapsed) .menu-item {
-        gap: 10px;
-        padding: 0 8px;
-    }
-    .sidebar.collapsed {
-        width: 70px;
-    }
-    .sidebar.collapsed + .main {
-        margin-left: 70px;
-    }
+    .sidebar:not(.collapsed) { width: 215px; }
+    .sidebar:not(.collapsed) + .main { margin-left: 215px; }
+    .sidebar:not(.collapsed) .menu-item { gap: 10px; padding: 0 8px; }
+    .sidebar.collapsed { width: 70px; }
+    .sidebar.collapsed + .main { margin-left: 70px; }
 }
-
-/* Monitores Padrão (1367px a 1599px) - Aumenta um pouco */
 @media (min-width: 1367px) and (max-width: 1599px) {
-    .sidebar:not(.collapsed) {
-        width: 230px;
-    }
-    .sidebar:not(.collapsed) + .main {
-        margin-left: 230px;
-    }
-    .sidebar.collapsed {
-        width: 85px;
-    }
-    .sidebar.collapsed + .main {
-        margin-left: 85px;
-    }
-    .menu-text {
-        font-size: 15px;
-    }
+    .sidebar:not(.collapsed) { width: 230px; }
+    .sidebar:not(.collapsed) + .main { margin-left: 230px; }
+    .sidebar.collapsed { width: 85px; }
+    .sidebar.collapsed + .main { margin-left: 85px; }
+    .menu-text { font-size: 15px; }
+}
+@media (min-width: 1600px) {
+    .sidebar:not(.collapsed) { width: 250px; }
+    .sidebar:not(.collapsed) + .main { margin-left: 250px; }
+    .sidebar.collapsed { width: 90px; }
+    .sidebar.collapsed + .main { margin-left: 90px; }
+    .menu-text { font-size: 16px; }
+    .menu-icon { font-size: 22px; }
 }
 
-/* Monitores Grandes (1600px+) - Presença visual */
-@media (min-width: 1600px) {
-    .sidebar:not(.collapsed) {
-        width: 250px;
-    }
-    .sidebar:not(.collapsed) + .main {
-        margin-left: 250px;
-    }
-    .sidebar.collapsed {
-        width: 90px;
-    }
-    .sidebar.collapsed + .main {
-        margin-left: 90px;
-    }
-    .menu-text {
-        font-size: 16px;
-    }
-    .menu-icon {
-        font-size: 22px;
-    }
-}
 /* ============================================================
    TOOLTIP DO MAPA (NORMAL)
    ============================================================ */
@@ -1001,3 +991,25 @@ body.dark-mode .vendedor-stat-color { box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
 .custom-tooltip-conflict::before {
     border-top-color: #fbbf24 !important; 
 }
+/* Estilo da empresa no mini-perfil da sidebar */
+.user-empresa-mini {
+    font-size: 10px;
+    color: #60a5fa;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 3px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 500;
+}
+.user-empresa-mini i {
+    font-size: 9px;
+    opacity: 0.8;
+}
+
+/* Cores dinâmicas do ícone de confirmação */
+.confirm-icon.success i { color: #10b981 !important; } /* Verde */
+.confirm-icon.error i { color: #ef4444 !important; }   /* Vermelho */
+.confirm-icon.warning i { color: #f59e0b !important; } /* Amarelo/Laranja */
