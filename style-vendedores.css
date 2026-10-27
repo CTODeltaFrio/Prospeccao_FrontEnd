@@ -423,7 +423,15 @@ body.dark-mode .usuario-sugg-badge {
     z-index: 9999;
     grid-template-columns: repeat(4, 1fr);
     gap: 10px;
+    
+    /* ✅ Adicionado para suportar a lista maior de cores */
+    max-height: 260px; 
+    overflow-y: auto;
 }
+
+/* Deixa a barra de rolagem do menu de cores fininha */
+.color-select-options::-webkit-scrollbar { width: 5px; }
+.color-select-options::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
 
 .color-select.open .color-select-options { display: grid; }
 

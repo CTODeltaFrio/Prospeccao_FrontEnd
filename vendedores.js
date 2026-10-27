@@ -172,15 +172,23 @@ document.addEventListener('DOMContentLoaded', () => {
         // ============================================================
         // DROPDOWN DE CORES
         // ============================================================
-        const CORES_DISPONIVEIS = [
-            { hex: '#2463eb', nome: 'Azul' }, { hex: '#0ea5e9', nome: 'Céu' },
+                const CORES_DISPONIVEIS = [
+            { hex: '#2463eb', nome: 'Azul Padrão' }, { hex: '#1d4ed8', nome: 'Azul Escuro' },
+            { hex: '#3b82f6', nome: 'Azul Claro' }, { hex: '#0ea5e9', nome: 'Céu' },
             { hex: '#06b6d4', nome: 'Ciano' }, { hex: '#14b8a6', nome: 'Teal' },
             { hex: '#10b981', nome: 'Esmeralda' }, { hex: '#22c55e', nome: 'Verde' },
             { hex: '#84cc16', nome: 'Lima' }, { hex: '#eab308', nome: 'Amarelo' },
             { hex: '#f59e0b', nome: 'Âmbar' }, { hex: '#f97316', nome: 'Laranja' },
             { hex: '#ef4444', nome: 'Vermelho' }, { hex: '#dc2626', nome: 'Carmim' },
-            { hex: '#ec4899', nome: 'Rosa' }, { hex: '#a855f7', nome: 'Violeta' },
-            { hex: '#8b5cf6', nome: 'Roxo' }, { hex: '#64748b', nome: 'Cinza' }
+            { hex: '#ec4899', nome: 'Rosa' }, { hex: '#d946ef', nome: 'Fúcsia' },
+            { hex: '#a855f7', nome: 'Violeta' }, { hex: '#8b5cf6', nome: 'Roxo' },
+            { hex: '#6366f1', nome: 'Índigo' }, { hex: '#64748b', nome: 'Cinza' },
+            { hex: '#475569', nome: 'Cinza Escuro' }, { hex: '#78716c', nome: 'Pedra' },
+            { hex: '#b45309', nome: 'Marrom' }, { hex: '#065f46', nome: 'Verde Escuro' },
+            { hex: '#831843', nome: 'Vinho' }, { hex: '#1e3a8a', nome: 'Azul Marinho' },
+            { hex: '#0891b2', nome: 'Ciano Escuro' }, { hex: '#4d7c0f', nome: 'Oliva' },
+            { hex: '#9a3412', nome: 'Tijolo' }, { hex: '#be185d', nome: 'Rosa Escuro' },
+            { hex: '#4338ca', nome: 'Indigo Escuro' }, { hex: '#15803d', nome: 'Floresta' }
         ];
 
         function coresEmUso() {
@@ -707,13 +715,28 @@ document.addEventListener('DOMContentLoaded', () => {
         // ============================================================
         // FORM E EDIÇÃO
         // ============================================================
-        function resetVendedorForm() {
+                        function resetVendedorForm() {
             editingVendedorId = null;
             if (vendNome) vendNome.value = ''; if (vendTipoPessoa) vendTipoPessoa.value = ''; if (vendCpfCnpj) { vendCpfCnpj.value = ''; vendCpfCnpj.maxLength = 14; } if (vendEmail) vendEmail.value = ''; if (vendFone) vendFone.value = '';
-            aplicarCorSelecionada('#2463eb'); fecharColorSelect();
+            
+            // ✅ Descobre qual é a primeira cor disponível
+            const usadas = coresEmUso();
+            let corSugerida = '#2463eb'; // Fallback
+            for (const c of CORES_DISPONIVEIS) {
+                if (!usadas.has(c.hex.toLowerCase())) {
+                    corSugerida = c.hex;
+                    break;
+                }
+            }
+            
+            aplicarCorSelecionada(corSugerida);
+            fecharColorSelect();
+            
             const titleEl = document.getElementById('vendedor-modal-title'); if (titleEl) titleEl.innerText = 'Cadastro de vendedor';
             if (btnSaveVendedor) btnSaveVendedor.innerText = 'Salvar vendedor';
             currentVendedorCidades = []; currentVendedorDdds = []; currentVendedorUsuario = null; currentVendedorEmpresas = []; originalVendedorEmpresas = [];
+            
+            // ✅ CORRIGIDO AQUI (Sugg em vez de Sugestao)
             if (vendCidadeSearch) vendCidadeSearch.value = ''; if (vendCidadeSugg) { vendCidadeSugg.classList.remove('active'); vendCidadeSugg.innerHTML = ''; }
             if (vendDddSearch) vendDddSearch.value = ''; if (vendDddSugg) { vendDddSugg.classList.remove('active'); vendDddSugg.innerHTML = ''; }
             if (vendUsuarioSearch) vendUsuarioSearch.value = ''; if (vendUsuarioSugg) { vendUsuarioSugg.classList.remove('active'); vendUsuarioSugg.innerHTML = ''; }
