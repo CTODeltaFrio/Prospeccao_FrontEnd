@@ -65,7 +65,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
 
         // ============================================================
-        // VENDEDORES DO MAPA (INTEGRAÇÃO COM O NOVO ENDPOINT DE COBERTURA)
+        // VENDEDORES DO MAPA
         // ============================================================
         const CORES_VENDEDORES = ['#2463eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#14b8a6', '#a855f7', '#0ea5e9', '#dc2626', '#22c55e', '#eab308', '#64748b'];
         let vendedoresMapa = [];
@@ -135,7 +135,6 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         function normalizar(str) { return String(str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').toLowerCase().trim(); }
 
-        // ✅ Retorna os vendedores ativos (checkbox) que cobrem uma cidade
         function getVendedoresAtivosDaCidade(codigoIbge) {
             if (!codigoIbge) return [];
             const ativos = [];
@@ -256,19 +255,19 @@ document.addEventListener('DOMContentLoaded', async function() {
         // CONTEXTO + EMPRESA ATIVA
         // ============================================================
         let contextoCache = null;
-        let empresaAtivaId = null;
-        const STORAGE_KEY = 'deltafrio_empresa_ativa';
+        let empresaAtivaId = null; // Fica apenas em memória, não no sessionStorage
 
         function obterEmpresaAtivaId() {
             if (empresaAtivaId) return empresaAtivaId;
-            try { const salvo = sessionStorage.getItem(STORAGE_KEY); if (salvo) { empresaAtivaId = salvo; return salvo; } } catch (e) {}
-            if (contextoCache?.empresas?.length === 1) { empresaAtivaId = String(contextoCache.empresas[0].id); try { sessionStorage.setItem(STORAGE_KEY, empresaAtivaId); } catch (e) {} return empresaAtivaId; }
+            if (contextoCache?.empresas?.length === 1) { 
+                empresaAtivaId = String(contextoCache.empresas[0].id); 
+                return empresaAtivaId; 
+            }
             return null;
         }
 
         function definirEmpresaAtivaId(id) {
             empresaAtivaId = id ? String(id) : null;
-            try { if (empresaAtivaId) sessionStorage.setItem(STORAGE_KEY, empresaAtivaId); else sessionStorage.removeItem(STORAGE_KEY); } catch (e) {}
             atualizarSeletorEmpresa();
         }
 
@@ -387,11 +386,17 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         const btnLogout = document.getElementById('btn-logout');
         if (btnLogout) {
-            btnLogout.addEventListener('click', async function () {
-                if (!confirm('Deseja realmente sair?')) return;
-                btnLogout.disabled = true; btnLogout.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-                try { const csrf = document.cookie.split('; ').find(c => c.startsWith('login_delta_csrf=')); const csrfValor = csrf ? decodeURIComponent(csrf.split('=')[1]) : ''; await fetch('/api/logout', { method: 'POST', credentials: 'include', headers: csrfValor ? { 'X-CSRF-Token': csrfValor } : {} }); } catch (e) {}
-                window.location.href = 'https://www.sistemas.deltafrio.com.br/central.html';
+            btnLogout.addEventListener('click', function () {
+                showConfirm('Sair do sistema', 'Deseja realmente sair?', async function() {
+                    btnLogout.disabled = true; 
+                    btnLogout.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                    try { 
+                        const csrf = document.cookie.split('; ').find(c => c.startsWith('login_delta_csrf=')); 
+                        const csrfValor = csrf ? decodeURIComponent(csrf.split('=')[1]) : ''; 
+                        await fetch('/api/logout', { method: 'POST', credentials: 'include', headers: csrfValor ? { 'X-CSRF-Token': csrfValor } : {} }); 
+                    } catch (e) {} 
+                    window.location.href = 'https://www.sistemas.deltafrio.com.br/central.html';
+                });
             });
         }
 
@@ -638,9 +643,12 @@ document.addEventListener('DOMContentLoaded', async function() {
             let cnae = selectedCnaeCode; if (!cnae && filterCnaeInput.value.trim() !== '') { filterCnaeInput.value = ''; cnae = null; }
             const esc = filterTipoCnae ? filterTipoCnae.value : 'PRINCIPAL';
             const body = { uf: uf || null, ddd: uf ? null : (ddd || null), cnae: cnae || null, segmento: cnae ? null : (seg ? parseInt(seg) : null), escopoCnae: (cnae || seg) ? esc : null, ultimoCnpj: cursorEnv, limite: 50 };
-            if (!body.uf && !body.ddd && !body.segmento && !body.cnae) { alert("Informe pelo menos um filtro."); return; }
+            
+            if (!body.uf && !body.ddd && !body.segmento && !body.cnae) { showWarning("Informe pelo menos um filtro para realizar a pesquisa.", "Atenção"); return; }
+            
             const empresaId = obterEmpresaAtivaId();
-            if (!empresaId) { alert("Selecione uma empresa ativa antes de pesquisar."); return; }
+            if (!empresaId) { showWarning("Selecione uma empresa ativa na barra lateral antes de pesquisar.", "Atenção"); return; }
+
             btn.disabled = true; const origB = btn.innerHTML; const origP = pageIndicator.innerHTML;
             if (btn.classList.contains('page-btn')) pageIndicator.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; else btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Carregando...';
             if (pesquisaController) pesquisaController.abort(); pesquisaController = new AbortController();
@@ -649,7 +657,10 @@ document.addEventListener('DOMContentLoaded', async function() {
                 const t = await r.text(); let json; try { json = t ? JSON.parse(t) : {}; } catch (e) {}
                 if (!r.ok) { const e = extrairErroResposta(json, r.status); const err = new Error(e.mensagem); err.codigo = e.codigo; err.traceId = e.traceId; throw err; }
                 const d = json?.dados ?? json; registros = d.registros || []; temMais = d.temMais || false; cursorAtual = d.ultimoCnpj || null; renderTable(registros);
-            } catch (e) { if (e.name !== 'AbortError') { console.error(e); alert("Erro ao pesquisar: " + (e.message || 'tente novamente')); } if (btn.classList.contains('page-btn')) pageIndicator.innerHTML = origP; } finally { btn.disabled = false; btn.innerHTML = origB; pesquisaController = null; }
+            } catch (e) { 
+                if (e.name !== 'AbortError') { console.error(e); showWarning("Erro ao pesquisar: " + (e.message || 'Tente novamente mais tarde.'), "Erro"); } 
+                if (btn.classList.contains('page-btn')) pageIndicator.innerHTML = origP; 
+            } finally { btn.disabled = false; btn.innerHTML = origB; pesquisaController = null; }
         }
 
         function openDetailsModal(cnpj, isIgn = false) {
@@ -725,7 +736,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         function renderLinkedCnaes() { linkedCnaeList.innerHTML = ''; if (!currentLinkedCnaes.length) { linkedCnaeList.innerHTML = 'Nenhum CNAE vinculado.'; return; } currentLinkedCnaes.forEach((c, i) => { const d = document.createElement('div'); d.classList.add('linked-item'); d.innerHTML = `<span>${c.codigo} - ${c.descricao}</span><button onclick="removerCNAE(${i})"><i class="fas fa-times"></i></button>`; linkedCnaeList.appendChild(d); }); }
         window.removerCNAE = function(i) { currentLinkedCnaes.splice(i, 1); renderLinkedCnaes(); populateLinkSelect(); setDirty(true); };
         
-        // ✅ CORREÇÃO 1: Notificação imediata e recarga em background
         document.getElementById('segmentoForm').addEventListener('submit', async function(e) {
             e.preventDefault(); const nome = segmentNome.value.trim(); if (!nome) { showWarning('Informe o nome do segmento.'); return; }
             try {
@@ -740,11 +750,9 @@ document.addEventListener('DOMContentLoaded', async function() {
                 
                 setDirty(false); originalLinkedCnaes = [...currentLinkedCnaes]; resetSegmentForm(); localStorage.removeItem(CACHE.SEGMENTOS.key); segmentData = []; segmentoCnaeLinks = [];
                 
-                // 1. Mostra a notificação na hora
                 showWarning('Segmento salvo com sucesso!', 'Sucesso');
                 confirmModal.style.display = 'none';
 
-                // 2. Recarrega a lista em segundo plano
                 carregarSegmentos().then(() => {
                     updateSegmentFilter();
                     renderSegmentTable(segmentSearch.value);
@@ -752,7 +760,6 @@ document.addEventListener('DOMContentLoaded', async function() {
 
             } catch (e) { showWarning('Erro ao salvar segmento.'); }
         });
-        
         if (btnCancelSegment) btnCancelSegment.addEventListener('click', () => resetSegmentForm());
         segmentSearch.addEventListener('input', function() { renderSegmentTable(this.value); });
         
@@ -764,21 +771,16 @@ document.addEventListener('DOMContentLoaded', async function() {
             setDirty(true);
         }
         
-        // ✅ CORREÇÃO 2: Desvincular CNAEs antes de excluir o segmento (evita erro 409)
         async function excluirSegmento(id) {
             const seg = segmentData.find(s => s.id === id); if (!seg) { showWarning('Segmento não encontrado.'); return; }
             showConfirm('Excluir Segmento', `Tem certeza que deseja excluir "${seg.nome}"?`, async function() {
                 try {
-                    // 1. Busca e desvincula todos os CNAEs
                     const cnaes = await apiGet(`${API_URL}/segmentos/${id}/cnaes`);
                     for (const c of cnaes) {
                         try { await apiDelete(`${API_URL}/segmentos/${id}/cnaes/${c.codigo}`); } catch(err) {}
                     }
-                    
-                    // 2. Exclui o segmento
                     await apiDelete(`${API_URL}/segmentos/${id}`);
                     
-                    // 3. Atualiza a UI
                     segmentData = segmentData.filter(s => s.id !== id);
                     segmentoCnaeLinks = segmentoCnaeLinks.filter(l => l.segmentoId !== id);
                     localStorage.removeItem(CACHE.SEGMENTOS.key);
