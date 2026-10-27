@@ -26,7 +26,9 @@ body.dark-mode {
 * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 body { background: var(--bg-body); color: var(--text-main); }
 
-/* ================== SIDEBAR ================== */
+/* ============================================================
+   SIDEBAR (NOVA ESTRUTURA COM LOGO E BOTÃO HAMBURGUER)
+   ============================================================ */
 .sidebar { 
     position: fixed; 
     left: 0; 
@@ -35,7 +37,7 @@ body { background: var(--bg-body); color: var(--text-main); }
     width: 220px; 
     background: linear-gradient(180deg, #071a3d 0%, #061b48 100%); 
     color: white; 
-    padding: 70px 16px 16px; 
+    padding: 15px 16px 16px; /* Ajustado para o cabeçalho */
     z-index: 9999; 
     display: flex; 
     flex-direction: column; 
@@ -43,15 +45,62 @@ body { background: var(--bg-body); color: var(--text-main); }
     transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1); 
     overflow: visible; 
 }
+
+/* ✅ NOVO CABEÇALHO DA SIDEBAR */
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    margin-bottom: 20px;
+    flex-shrink: 0;
+    padding: 0 2px;
+}
+
+.sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    overflow: hidden;
+    white-space: nowrap;
+    transition: opacity 0.3s ease;
+}
+
+.sidebar-brand-logo {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+    flex-shrink: 0;
+    border-radius: 6px;
+}
+
+.sidebar-brand-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-brand-text strong {
+    font-size: 15px;
+    color: #fff;
+    line-height: 1.1;
+    letter-spacing: 0.3px;
+}
+
+.sidebar-brand-text small {
+    font-size: 9px;
+    color: #8998b5;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-top: 2px;
+}
+
+/* BOTÃO HAMBURGUER (Agora flex, não absoluto) */
 .sidebar-toggle { 
-    position: absolute; 
-    top: 15px; 
-    left: 15px; 
     background: rgba(255,255,255,0.1); 
     border: none; 
     color: #e5eaf4; 
     font-size: 18px; 
-    padding: 8px; 
+    padding: 0; 
     border-radius: 6px; 
     cursor: pointer; 
     width: 36px; 
@@ -59,12 +108,20 @@ body { background: var(--bg-body); color: var(--text-main); }
     display: flex; 
     align-items: center; 
     justify-content: center; 
-    transition: background 0.3s, color 0.3s, transform 0.3s, left 0.4s cubic-bezier(0.4, 0, 0.2, 1), margin-left 0.4s cubic-bezier(0.4, 0, 0.2, 1); 
-    z-index: 10; 
+    transition: background 0.3s, color 0.3s, transform 0.3s; 
+    flex-shrink: 0;
 }
 .sidebar-toggle:hover { background: rgba(255,255,255,0.25); color: #fff; transform: scale(1.1); }
-.sidebar.collapsed .sidebar-toggle { left: 50%; margin-left: -18px; }
 
+/* Ocultar logo quando colapsada */
+.sidebar.collapsed { 
+    width: 75px; 
+    padding: 15px 8px 16px; 
+}
+.sidebar.collapsed .sidebar-header { justify-content: center; }
+.sidebar.collapsed .sidebar-brand { display: none; }
+
+/* SCROLL DO MENU */
 .sidebar-menu-scroll {
     width: 100%;
     flex: 1;
@@ -91,7 +148,6 @@ body { background: var(--bg-body); color: var(--text-main); }
 .menu-text { display: flex; flex-direction: column; gap: 4px; font-size: 14px; white-space: nowrap; opacity: 1; transition: opacity 0.3s ease, transform 0.3s ease; }
 .menu-text small { color: #8998b5; font-size: 11px; }
 
-.sidebar.collapsed { width: 75px; padding: 70px 8px 16px; }
 .sidebar.collapsed .menu-title, .sidebar.collapsed .menu-text { opacity: 0; transform: translateX(-20px); pointer-events: none; display: none; }
 .sidebar.collapsed .menu-item { justify-content: center; padding: 0; }
 .sidebar.collapsed .menu-icon { margin-right: 0; font-size: 22px; }
@@ -164,7 +220,25 @@ body { background: var(--bg-body); color: var(--text-main); }
     overflow: hidden;
     text-overflow: ellipsis;
 }
-.user-chevron { font-size: 12px; color: #8998b5; margin-left: auto; }
+.user-chevron { font-size: 12px; color: #8998b5; margin-left: auto; transition: transform 0.3s ease; }
+
+/* ✅ EMPRESA MINI NO PERFIL */
+.user-empresa-mini {
+    font-size: 10px;
+    color: #60a5fa;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 3px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 500;
+}
+.user-empresa-mini i {
+    font-size: 9px;
+    opacity: 0.8;
+}
 
 /* Sidebar Colapsada - Usuário */
 .sidebar.collapsed .sidebar-user-btn { justify-content: center; padding: 8px 0; }
@@ -198,7 +272,7 @@ body { background: var(--bg-body); color: var(--text-main); }
 
 .popover-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
 .user-avatar.large { width: 48px; height: 48px; font-size: 18px; flex-shrink: 0; }
-.user-info-popover { display: flex; flex-direction: column; overflow: visible !important; width: 100%; }
+.user-info-popover { display: flex; flex-direction: column; overflow: visible; width: 100%; }
 .user-info-popover strong { font-size: 14px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .user-info-popover small { font-size: 12px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
@@ -266,7 +340,6 @@ body { background: var(--bg-body); color: var(--text-main); }
 }
 .sidebar-user-popover .company-selector::before { display: none; }
 
-/* ✅ Estilo para a Empresa Ativa (Botão/Chip) */
 .sidebar-user-popover .company-selector-inner .custom-select-trigger {
     background: rgba(96, 165, 250, 0.1) !important;
     border: 1px solid rgba(96, 165, 250, 0.2) !important;
@@ -282,24 +355,19 @@ body { background: var(--bg-body); color: var(--text-main); }
     gap: 6px;
     width: auto !important;
     max-width: 100%;
-    justify-content: flex-start; /* Garante que o texto fique na esquerda */
+    justify-content: flex-start;
     margin-top: 6px;
     transition: background 0.2s ease;
 }
-
 .sidebar-user-popover .company-selector-inner .custom-select-trigger:hover {
     background: rgba(96, 165, 250, 0.2) !important;
 }
-
-/* Garante que o nome da empresa não quebre a tela */
 .sidebar-user-popover .company-selector-inner .custom-select-text {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 160px;
 }
-
-/* Ajusta a cor da setinha */
 .sidebar-user-popover .company-selector-inner .custom-select-trigger i {
     color: #60a5fa !important;
     font-size: 10px !important;
@@ -307,7 +375,12 @@ body { background: var(--bg-body); color: var(--text-main); }
     transition: transform 0.2s ease;
 }
 
-/* ✅ Dropdown menu (abre paralelo para o lado direito) */
+/* Gira a setinha para a direita quando aberto */
+.sidebar-user-popover .company-selector-inner .custom-select.open .custom-select-trigger i {
+    transform: rotate(-90deg) !important;
+}
+
+/* Dropdown menu (abre paralelo para o lado direito com scroll) */
 .sidebar-user-popover .company-selector-inner .custom-select-options {
     background: #0f172a;
     border: 1px solid #334155;
@@ -315,29 +388,18 @@ body { background: var(--bg-body); color: var(--text-main); }
     box-shadow: 10px 0 30px rgba(0, 0, 0, 0.6);
     padding: 6px;
     
-    /* Alinhamento paralelo (topo com topo) */
     top: 0 !important; 
     bottom: auto !important;
-    
     left: calc(100% + 8px) !important; 
     right: auto !important; 
+    width: 250px; 
     
-    /* Mudança 1: Largura igual à da caixa do usuário */
-    width: 280px; 
-    
-    /* Rolagem para não estourar a tela */
     max-height: 160px; 
     overflow-y: auto;
     
     animation: fadeInRight 0.15s ease !important;
 }
 
-/* Mudança 2: Gira a setinha para a direita quando aberto */
-.sidebar-user-popover .company-selector-inner .custom-select.open .custom-select-trigger i {
-    transform: rotate(-90deg) !important;
-}
-
-/* Deixa a barra de rolagem mais fina e bonita */
 .sidebar-user-popover .company-selector-inner .custom-select-options::-webkit-scrollbar {
     width: 6px;
 }
@@ -346,13 +408,11 @@ body { background: var(--bg-body); color: var(--text-main); }
     border-radius: 10px;
 }
 
-/* Animação para deslizar da esquerda para a direita */
 @keyframes fadeInRight { 
     from { opacity: 0; transform: translateX(-5px); } 
     to { opacity: 1; transform: translateX(0); } 
 }
 
-/* Estilo das opções */
 .sidebar-user-popover .company-selector-inner .custom-option {
     color: #cbd5e1;
     border-radius: 6px;
@@ -378,7 +438,6 @@ body { background: var(--bg-body); color: var(--text-main); }
 .status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #13b879; margin-right: 6px; }
 .header-right { display: flex; align-items: center; gap: 16px; flex-shrink: 0; }
 
-/* Competência no canto direito */
 .competencia-header { display: flex; align-items: center; gap: 8px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 4px 12px; box-shadow: 0 2px 5px rgba(0,0,0,.03); }
 .competencia-header .calendar { font-size: 14px; color: #2463eb; }
 body.dark-mode .competencia-header .calendar { color: #60a5fa; }
@@ -676,8 +735,11 @@ body.dark-mode .generic-card.selected { background: #1e3a5f; border-color: #2563
 /* ============================================================
    MODAL DE AVISO / CONFIRMAÇÃO (MAIOR)
    ============================================================ */
-.confirm-icon { font-size: 64px; color: #f59e0b; margin-bottom: 20px; }
+.confirm-icon { font-size: 64px; margin-bottom: 20px; }
 .confirm-icon i { font-size: 64px; }
+.confirm-icon.success i { color: #10b981 !important; } /* Verde */
+.confirm-icon.error i { color: #ef4444 !important; }   /* Vermelho */
+.confirm-icon.warning i { color: #f59e0b !important; } /* Amarelo/Laranja */
 .confirm-content h3 { font-size: 24px; font-weight: 700; color: var(--text-main); margin-bottom: 14px; }
 .confirm-content p { font-size: 16px; line-height: 1.5; color: var(--text-secondary); margin-bottom: 28px; }
 .confirm-actions { display: flex; gap: 12px; justify-content: center; }
@@ -778,7 +840,9 @@ body.dark-mode #btn-ignore-cadastro.btn-secondary:hover { background: #ef4444; c
 @media (max-width: 900px) {
     .header { flex-direction: column; align-items: stretch; }
     .header-right { flex-wrap: wrap; width: 100%; justify-content: flex-start; margin-top: 10px; }
-    .sidebar { width: 75px; }
+    .sidebar { width: 75px; padding: 15px 8px 16px; }
+    .sidebar-header { justify-content: center; }
+    .sidebar-brand { display: none; }
     .sidebar .menu-title, .sidebar .menu-text { display: none; }
     .sidebar .menu-item { justify-content: center; padding: 0; }
     .sidebar-user-btn { justify-content: center; padding: 8px 0; }
@@ -960,7 +1024,7 @@ body.dark-mode .vendedor-stat-color { box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
 }
 
 /* ============================================================
-   TOOLTIP DO MAPA (NORMAL)
+   TOOLTIP DO MAPA (NORMAL E CONFLITO)
    ============================================================ */
 .custom-tooltip {
     background: rgba(15, 23, 42, 0.96) !important;
@@ -978,10 +1042,6 @@ body.dark-mode .vendedor-stat-color { box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
 .custom-tooltip::before {
     border-top-color: rgba(15, 23, 42, 0.96) !important;
 }
-
-/* ============================================================
-   TOOLTIP DO MAPA (CONFLITO - MAIOR E DESTACADO)
-   ============================================================ */
 .custom-tooltip-conflict {
     padding: 22px 26px !important; 
     max-width: 380px !important; 
@@ -991,25 +1051,3 @@ body.dark-mode .vendedor-stat-color { box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
 .custom-tooltip-conflict::before {
     border-top-color: #fbbf24 !important; 
 }
-/* Estilo da empresa no mini-perfil da sidebar */
-.user-empresa-mini {
-    font-size: 10px;
-    color: #60a5fa;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    margin-top: 3px;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-weight: 500;
-}
-.user-empresa-mini i {
-    font-size: 9px;
-    opacity: 0.8;
-}
-
-/* Cores dinâmicas do ícone de confirmação */
-.confirm-icon.success i { color: #10b981 !important; } /* Verde */
-.confirm-icon.error i { color: #ef4444 !important; }   /* Vermelho */
-.confirm-icon.warning i { color: #f59e0b !important; } /* Amarelo/Laranja */
