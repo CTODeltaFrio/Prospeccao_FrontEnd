@@ -64,6 +64,16 @@ document.addEventListener('DOMContentLoaded', async function() {
             await Promise.all(Array.from({ length: Math.min(limite, itens.length) }, worker));
         }
 
+        // ✅ NOVO HELPER DE DATA (Correção do Erro)
+        function formatarData(isoString) {
+            if (!isoString) return '—';
+            try {
+                const d = new Date(isoString);
+                if (isNaN(d.getTime())) return isoString;
+                return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+            } catch (e) { return isoString; }
+        }
+
         // ============================================================
         // VENDEDORES DO MAPA
         // ============================================================
@@ -298,6 +308,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         const btnClassifyX           = document.getElementById('btn-classify-x');
         const detClassificacao       = document.getElementById('det-classificacao');
 
+        // ✅ VARIÁVEIS DA IA
+        const iaDataModal = document.getElementById('ia-data-modal');
+        const iaDataEmpresa = document.getElementById('ia-data-empresa');
+        const iaDataContent = document.getElementById('ia-data-content');
+        const globalLoading = document.getElementById('global-loading');
+
         // ============================================================
         // DADOS
         // ============================================================
@@ -326,7 +342,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         // CONTEXTO + EMPRESA ATIVA
         // ============================================================
         let contextoCache = null;
-        let empresaAtivaId = null; // Fica apenas em memória, não no sessionStorage
+        let empresaAtivaId = null; 
 
         function obterEmpresaAtivaId() {
             if (empresaAtivaId) return empresaAtivaId;
@@ -340,7 +356,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         function definirEmpresaAtivaId(id) {
             empresaAtivaId = id ? String(id) : null;
             atualizarSeletorEmpresa();
-            atualizarHeaderEmpresa(empresaAtivaId); // ✅ Chama a atualização do cabeçalho
+            atualizarHeaderEmpresa(empresaAtivaId); 
         }
 
         function atualizarSeletorEmpresa() {
@@ -467,8 +483,8 @@ document.addEventListener('DOMContentLoaded', async function() {
                 if (ativo && !ids.includes(String(ativo))) definirEmpresaAtivaId(null);
                 
                 atualizarSeletorEmpresa();
-                atualizarHeaderEmpresa(obterEmpresaAtivaId()); // ✅ Atualiza o header
-                verificarSelecaoObrigatoria(); // ✅ Chama a verificação do modal
+                atualizarHeaderEmpresa(obterEmpresaAtivaId()); 
+                verificarSelecaoObrigatoria(); 
                 
                 return ctx;
             } catch (e) { return null; }
@@ -810,6 +826,102 @@ document.addEventListener('DOMContentLoaded', async function() {
             } finally { btn.disabled = false; btn.innerHTML = origB; pesquisaController = null; }
         }
 
+        // ============================================================
+        // INTEGRAÇÃO COM A IA
+        // ============================================================
+        async function solicitarDadosIA(cnpj) {
+            showConfirm('Aviso de Espera', 'A busca de dados com Inteligência Artificial pode demorar até 2 minutos e o sistema ficará bloqueado durante o processo. Deseja continuar?', async () => {
+                const empresaId = obterEmpresaAtivaId();
+                if (!empresaId) return showWarning('Selecione uma empresa ativa antes de continuar.', 'Atenção');
+
+                if (globalLoading) globalLoading.style.display = 'flex';
+
+                try {
+                    const url = `${API_URL}/prospeccao/estabelecimentos/${encodeURIComponent(cnpj)}/enriquecimento?empresaId=${encodeURIComponent(empresaId)}`;
+                    const json = await apiPost(url, {}); 
+                    
+                    const dados = json?.dados ?? json;
+                    renderIAData(dados);
+                    
+                } catch (err) {
+                    console.error('[IA] Erro:', err);
+                    showWarning('Erro ao buscar dados com IA: ' + (err.message || 'Tente novamente mais tarde.'), 'Erro');
+                } finally {
+                    if (globalLoading) globalLoading.style.display = 'none';
+                }
+            });
+        }
+
+                function renderIAData(data) {
+            if (!iaDataContent || !iaDataModal) return;
+
+            const res = data.resultado || {};
+            
+            iaDataEmpresa.innerHTML = `<strong>${data.razaoSocial || '-'}</strong> • CNPJ: ${data.cnpj || '-'} • Consultado em: ${formatarData(data.consultadoEm)}`;
+
+            let html = '';
+            let temDados = false;
+
+            // --- 1. Contatos e Redes ---
+            let htmlContatos = '';
+            if (res.site) htmlContatos += `<div class="ia-item"><span>Site</span><strong><a href="${res.site}" target="_blank" rel="noopener">${res.site}</a></strong></div>`;
+            if (res.linkedin) htmlContatos += `<div class="ia-item"><span>LinkedIn</span><strong><a href="${res.linkedin}" target="_blank">Acessar Perfil</a></strong></div>`;
+            if (res.instagram) htmlContatos += `<div class="ia-item"><span>Instagram</span><strong><a href="${res.instagram}" target="_blank">Acessar Perfil</a></strong></div>`;
+            if (res.facebook) htmlContatos += `<div class="ia-item"><span>Facebook</span><strong><a href="${res.facebook}" target="_blank">Acessar Perfil</a></strong></div>`;
+
+            let htmlTelefones = '';
+            if (res.telefones?.length) htmlTelefones += `<div class="ia-item"><span>Telefones</span><ul class="ia-list">${res.telefones.map(t => `<li><i class="fas fa-phone"></i> ${t}</li>`).join('')}</ul></div>`;
+            if (res.whatsapps?.length) htmlTelefones += `<div class="ia-item"><span>WhatsApp</span><ul class="ia-list">${res.whatsapps.map(w => `<li><i class="fab fa-whatsapp" style="color:#10b981;"></i> ${w}</li>`).join('')}</ul></div>`;
+            if (res.emails?.length) htmlTelefones += `<div class="ia-item" style="grid-column: 1 / -1;"><span>E-mails</span><ul class="ia-list">${res.emails.map(e => `<li><i class="fas fa-envelope"></i> ${e}</li>`).join('')}</ul></div>`;
+
+            if (htmlContatos || htmlTelefones) {
+                temDados = true;
+                html += `<div class="ia-section">
+                    <h4><i class="fas fa-address-card"></i> Contatos e Presença Digital</h4>
+                    <div class="ia-grid">${htmlContatos}</div>
+                    ${htmlTelefones ? `<div style="margin-top: 15px; border-top: 1px dashed var(--border-color); padding-top: 15px;"><div class="ia-grid">${htmlTelefones}</div></div>` : ''}
+                </div>`;
+            }
+
+            // --- 2. Endereço ---
+            if (res.enderecoAtualizado) {
+                temDados = true;
+                html += `<div class="ia-section">
+                    <h4><i class="fas fa-map-marker-alt"></i> Endereço Atualizado</h4>
+                    <div class="ia-item"><strong>${res.enderecoAtualizado}</strong></div>
+                </div>`;
+            }
+
+            // --- 3. Descrição e Info ---
+            if (res.descricaoEmpresa || res.informacoesAdicionais?.length) {
+                temDados = true;
+                html += `<div class="ia-section">
+                    <h4><i class="fas fa-info-circle"></i> Sobre a Empresa</h4>`;
+                if (res.descricaoEmpresa) html += `<p class="ia-description">${res.descricaoEmpresa}</p>`;
+                if (res.informacoesAdicionais?.length) {
+                    html += `<ul class="ia-additional-list">`;
+                    res.informacoesAdicionais.forEach(info => { html += `<li>${info}</li>`; });
+                    html += `</ul>`;
+                }
+                html += `</div>`;
+            }
+
+            // --- 4. Empty State (Nenhum dado encontrado) ---
+            if (!temDados) {
+                html = `<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; text-align:center; padding: 40px; color: var(--text-secondary);">
+                    <i class="fas fa-search-minus" style="font-size: 60px; color: #94a3b8; margin-bottom: 20px;"></i>
+                    <h3 style="font-size: 18px; color: var(--text-main); margin-bottom: 8px;">Nenhum dado adicional encontrado</h3>
+                    <p style="font-size: 14px; max-width: 400px; line-height: 1.5;">A Inteligência Artificial não encontrou novos contatos, sites ou informações públicas para esta empresa.</p>
+                </div>`;
+            }
+
+            iaDataContent.innerHTML = html;
+            iaDataModal.style.display = 'flex';
+        }
+
+        // ============================================================
+        // DETALHES DO ESTABELECIMENTO
+        // ============================================================
         function openDetailsModal(cnpj, isIgn = false) {
             const list = isIgn ? ignorados : registros; const c = list.find(i => i.cnpj === cnpj); if (!c) return;
             const nomeExibicao = c.nomeFantasia || c.razaoSocial || 'sem nome'; const cnpjExibicao = c.cnpjFormatado || c.cnpj || '';
@@ -825,6 +937,12 @@ document.addEventListener('DOMContentLoaded', async function() {
                 else { btnClassifyX.innerHTML = '<i class="fas fa-ban"></i> Ignorar Cadastro'; btnClassifyX.classList.add('btn-classify-x'); btnClassifyX.onclick = () => classificar(cnpj, 'X', statusAtual, nomeExibicao, cnpjExibicao); }
                 btnClassifyX.disabled = false;
             }
+
+            const btnIA = document.getElementById('btn-dados-ia');
+            if (btnIA) {
+                btnIA.onclick = () => solicitarDadosIA(cnpj);
+            }
+            
             detailsModal.style.display = 'flex';
         }
 
@@ -947,6 +1065,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (detailsModal) detailsModal.addEventListener('click', function(e) { if (e.target === this) detailsModal.style.display = 'none'; });
         if (genericModal) genericModal.addEventListener('click', function(e) { if (e.target === this) { genericModal.style.display = 'none'; restoreActiveMenuItem(); } });
         if (confirmModal) confirmModal.addEventListener('click', function(e) { if (e.target === this) { confirmModal.style.display = 'none'; restoreActiveMenuItem(); } });
+
+        document.getElementById('close-ia-data-modal')?.addEventListener('click', () => iaDataModal.style.display = 'none');
+        iaDataModal?.addEventListener('click', function(e) { if (e.target === this) iaDataModal.style.display = 'none'; });
 
         function setIconConfirmacao(titulo) {
             const iconWrapper = document.getElementById('confirm-icon-wrapper');
