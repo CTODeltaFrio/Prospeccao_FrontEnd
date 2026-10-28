@@ -505,7 +505,7 @@
                     </button>
                 </div>
                 <div class="footer-actions">
-                    <button class="btn-light-blue">Dados com IA</button>
+                    <button class="btn-light-blue" id="btn-dados-ia"><i class="fas fa-robot"></i> Dados com IA</button>
                     <button class="btn-primary btn-register">Registro CRM</button>
                 </div>
             </div>
@@ -539,7 +539,7 @@
         </div>
     </div>
 
-    <!-- ✅ MODAL DE SELEÇÃO OBRIGATÓRIA DE EMPRESA (CORRIGIDO) -->
+    <!-- ✅ MODAL DE SELEÇÃO OBRIGATÓRIA DE EMPRESA -->
     <div id="empresa-select-modal" class="modal-overlay" style="z-index: 2147483000;">
         <div class="modal-content confirm-content">
             <div class="confirm-icon warning" style="color: #2463eb;"><i class="fas fa-building"></i></div>
@@ -547,7 +547,7 @@
             <p>Para acessar o sistema, escolha com qual empresa você deseja trabalhar agora.</p>
             
             <div class="form-group" style="text-align: left; margin-top: 20px;">
-                <!-- ✅ Correção: Deixamos o select limpo, o script.js cria a estrutura visual sozinho -->
+                <!-- Deixamos o select limpo, o script.js cria a estrutura visual sozinho -->
                 <select id="empresa-select-obrigatoria" class="input">
                     <option value="">— Escolha uma empresa —</option>
                 </select>
@@ -559,6 +559,7 @@
         </div>
     </div>
 
+    <!-- MODAL DO VENDEDOR -->
     <div id="vendedor-modal" class="modal-overlay">
         <div class="modal-content form-modal">
             <span class="close-modal" id="close-vendedor-modal">&times;</span>
@@ -681,11 +682,11 @@
                     <div class="form-group">
                         <label>Cidades vinculadas</label>
                         <div class="cidade-search-wrapper">
-                            <input type="text" id="vend-cidade-search" class="input" placeholder="Digite 2+ letras para buscar cidade..." autocomplete="off">
+                            <input type="text" id="vend-cidade-search" class="input" placeholder="Digite 2+ letras para buscar e adicionar cidade..." autocomplete="off">
                             <span class="search-icon"><i class="fas fa-search"></i></span>
                             <div id="vend-cidade-suggestions" class="autocomplete-list"></div>
                         </div>
-
+                        
                         <div id="vend-cidades-list" class="cidades-list" style="margin-top: 15px;">
                             <span class="cidades-empty">Nenhuma cidade vinculada ainda.</span>
                         </div>
@@ -728,6 +729,33 @@
             <div class="modal-footer">
                 <button type="button" class="btn-secondary" id="btn-cancel-empresa">Cancelar</button>
                 <button type="submit" form="empresaForm" class="btn-primary" id="btn-save-empresa">Salvar empresa</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ✅ TELA DE BLOQUEIO (LOADING IA) -->
+    <div id="global-loading" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(5px); z-index: 99999; flex-direction: column; align-items: center; justify-content: center; color: white;">
+        <i class="fas fa-circle-notch fa-spin" style="font-size: 60px; color: #60a5fa; margin-bottom: 20px;"></i>
+        <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 10px;">Buscando dados com IA...</h2>
+        <p style="color: #cbd5e1; font-size: 15px;">Isso pode levar até 2 minutos. Por favor, aguarde.</p>
+        <div style="margin-top: 20px; width: 300px; height: 6px; background: rgba(255,255,255,0.1); border-radius: 10px; overflow: hidden;">
+            <div style="width: 50%; height: 100%; background: #3b82f6; border-radius: 10px; animation: pulseBar 2s infinite ease-in-out;"></div>
+        </div>
+    </div>
+
+    <!-- ✅ MODAL DE DADOS DA IA -->
+    <div id="ia-data-modal" class="modal-overlay">
+        <div class="modal-content large-modal" style="max-width: 800px; height: 80vh;">
+            <span class="close-modal" id="close-ia-data-modal">&times;</span>
+            <div class="modal-header">
+                <h2><i class="fas fa-robot" style="color: #2463eb;"></i> Dados Enriquecidos por IA</h2>
+                <p id="ia-data-empresa">Carregando informações...</p>
+            </div>
+            <div class="modal-scroll-area" id="ia-data-content" style="padding-right: 15px;">
+                <!-- O conteúdo será injetado pelo JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn-primary" onclick="document.getElementById('ia-data-modal').style.display='none'">Fechar</button>
             </div>
         </div>
     </div>
