@@ -44,6 +44,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const ENDPOINT = `${API_URL}/prospeccao/vendedores`;
 
+        // ✅ NOVO: Dicionário de DDD para UF
+        const DDD_TO_UF = {
+            '11':'SP', '12':'SP', '13':'SP', '14':'SP', '15':'SP', '16':'SP', '17':'SP', '18':'SP', '19':'SP',
+            '21':'RJ', '22':'RJ', '24':'RJ', '27':'ES', '28':'ES',
+            '31':'MG', '32':'MG', '33':'MG', '34':'MG', '35':'MG', '37':'MG', '38':'MG',
+            '41':'PR', '42':'PR', '43':'PR', '44':'PR', '45':'PR', '46':'PR',
+            '47':'SC', '48':'SC', '49':'SC',
+            '51':'RS', '53':'RS', '54':'RS', '55':'RS',
+            '61':'DF', '62':'GO', '63':'TO', '64':'GO', '65':'MT', '66':'MT', '67':'MS', '68':'AC', '69':'RO',
+            '71':'BA', '73':'BA', '74':'BA', '75':'BA', '77':'BA', '79':'SE',
+            '81':'PE', '82':'AL', '83':'PB', '84':'RN', '85':'CE', '86':'PI', '87':'PE', '88':'CE', '89':'PI',
+            '91':'PA', '92':'AM', '93':'PA', '94':'PA', '95':'RR', '96':'AP', '97':'AM', '98':'MA', '99':'MA'
+        };
+
         // ============================================================
         // EXTRAIR MENSAGEM DE ERRO
         // ============================================================
@@ -146,7 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let empresasCarregando = false;
         let empresasPromise = null;
         let empresaDebounce = null;
-        let cidadesComDDD = null; // ✅ NOVO: Dicionário para buscar DDD das cidades
+        let cidadesComDDD = null; // Dicionário global de cidades
 
         // --- Helpers ---
         function formatarCPF(v) {
@@ -456,7 +470,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return dddsPromise;
         }
 
-        // ✅ NOVO: Mapeia todas as cidades para seus DDDs e UFs
+        // ✅ Mapeia todas as cidades para seus DDDs e UFs (usando o dicionário)
         async function carregarMapaCidadesDDD() {
             if (cidadesComDDD) return cidadesComDDD;
             const mapa = new Map();
@@ -466,8 +480,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     try {
                         const res = await apiGet(`${API_URL}/ddds/${d.ddd}/municipios`);
                         const lista = Array.isArray(res) ? res : (res && Array.isArray(res.dados)) ? res.dados : [];
+                        const ufReal = DDD_TO_UF[d.ddd] || ''; // ✅ Usa o dicionário para pegar a UF real
+                        
                         lista.forEach(m => {
-                            mapa.set(String(m.codigoIbge || m.codigo), { ddd: String(d.ddd), uf: d.descricao || '' });
+                            mapa.set(String(m.codigoIbge || m.codigo), { ddd: String(d.ddd), uf: ufReal });
                         });
                     } catch (e) {}
                 }));
@@ -505,6 +521,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!municipiosLista) await carregarListaMunicipios();
                 
                 let novasCidades = 0;
+                const ufReal = DDD_TO_UF[ddd.ddd] || ''; // ✅ Pega a UF real pelo dicionário
+
                 for (const m of lista) {
                     let cod = m.codigoIbge || m.codigo;
                     const nome = m.municipio || m.nome;
@@ -515,8 +533,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     
                     if (cod && !currentVendedorCidades.some(c => c.codigoIbge === String(cod))) {
-                        // ✅ Adicionado o campo 'ddd' no objeto da cidade
-                        currentVendedorCidades.push({ codigoIbge: String(cod), nome: nome, uf: m.uf || ddd.descricao || '', ddd: ddd.ddd });
+                        currentVendedorCidades.push({ codigoIbge: String(cod), nome: nome, uf: ufReal, ddd: ddd.ddd });
                         novasCidades++;
                     }
                 }
@@ -601,12 +618,13 @@ document.addEventListener('DOMContentLoaded', () => {
             
             vendCidadesList.innerHTML = currentVendedorCidades.map((c, i) => {
                 const dddStr = c.ddd ? `(${c.ddd})` : '';
-                const ufStr = c.uf ? c.uf.toUpperCase() : '';
+                // ✅ Garante que só mostra a UF se ela tiver 2 letras (evita mostrar o nome da região)
+                const ufStr = (c.uf && c.uf.length === 2) ? c.uf.toUpperCase() : '';
                 const infoExtra = [dddStr, ufStr].filter(Boolean).join(' - ');
 
-                return `<span class="cidade-chip" data-index="${i}">
+                                return `<span class="cidade-chip" data-index="${i}">
                     <span class="chip-nome">${c.nome}</span>
-                    ${infoExtra ? `<span class="chip-uf" style="background: rgba(36, 99, 235, 0.1); color: #1d4ed8; font-size: 10px; font-weight: 700; margin-left: 4px;">${infoExtra}</span>` : ''}
+                    ${infoExtra ? `<span class="chip-uf">${infoExtra}</span>` : ''}
                     <button type="button" class="chip-remove" data-index="${i}" title="Remover"><i class="fas fa-times"></i></button>
                 </span>`;
             }).join('');
@@ -623,8 +641,13 @@ document.addEventListener('DOMContentLoaded', () => {
         function adicionarCidade(m) {
             if (!m) return;
             if (currentVendedorCidades.some(c => c.codigoIbge === m.codigoIbge)) return showWarning('Esta cidade já está vinculada.');
-            // ✅ Adicionado o campo 'ddd'
-            currentVendedorCidades.push({ codigoIbge: m.codigoIbge, nome: m.nome, uf: m.uf || '', ddd: m.ddd || '' });
+            
+            // ✅ Fallback para buscar a UF no dicionário caso a cidade tenha um DDD mapeado
+            let ufFinal = m.uf || '';
+            const info = cidadesComDDD ? cidadesComDDD.get(String(m.codigoIbge)) : null;
+            if (info && info.uf) ufFinal = info.uf;
+
+            currentVendedorCidades.push({ codigoIbge: m.codigoIbge, nome: m.nome, uf: ufFinal, ddd: (info ? info.ddd : '') });
             renderVendedorCidades();
         }
 
@@ -768,7 +791,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const titleEl = document.getElementById('vendedor-modal-title'); if (titleEl) titleEl.innerText = 'Editar vendedor';
             if (btnSaveVendedor) btnSaveVendedor.innerText = 'Atualizar vendedor';
             
-            // ✅ Aguarda carregar todas as bases necessárias (incluindo o mapa de DDDs das cidades)
             await Promise.all([
                 carregarListaMunicipios().catch(() => {}),
                 carregarListaDdds().catch(() => {}),
@@ -782,7 +804,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const m = (municipiosLista || []).find(x => String(x.codigoIbge) === String(cod));
                 const info = (cidadesComDDD && cidadesComDDD.get(String(cod))) || { ddd: '', uf: '' };
 
-                // ✅ Tenta pegar o DDD do objeto, da lista de municipios, ou do mapa global
                 const dddFinal = (typeof c === 'object' && c.ddd) ? c.ddd : (m?.ddd || info.ddd || '');
                 const ufFinal = (typeof c === 'object' && c.uf) ? c.uf : (m?.uf || info.uf || '');
                 const nomeFinal = m ? m.nome : (typeof c === 'object' && c.nome ? c.nome : `Cidade ${cod}`);
@@ -790,7 +811,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return {
                     codigoIbge: String(cod),
                     nome: nomeFinal,
-                    uf: ufFinal,
+                    uf: ufFinal.length === 2 ? ufFinal : '', // Sanitiza a UF
                     ddd: dddFinal
                 };
             });
