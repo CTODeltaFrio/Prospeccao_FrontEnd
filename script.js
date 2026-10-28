@@ -340,6 +340,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         function definirEmpresaAtivaId(id) {
             empresaAtivaId = id ? String(id) : null;
             atualizarSeletorEmpresa();
+            atualizarHeaderEmpresa(empresaAtivaId); // ✅ Chama a atualização do cabeçalho
         }
 
         function atualizarSeletorEmpresa() {
@@ -348,7 +349,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             const empresas = contextoCache?.empresas || [];
             const elEmpresaMini = document.getElementById('user-empresa-mini');
 
-            // Se não tem nenhuma empresa no contexto, esconde tudo
             if (!empresas.length) { 
                 companySelectorWrapper.style.display = 'none'; 
                 if (elEmpresaMini) elEmpresaMini.style.display = 'none';
@@ -359,7 +359,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             const ativo = obterEmpresaAtivaId();
             companySelector.innerHTML = '';
             
-            // Se não tem nenhuma ativa, põe o placeholder no dropdown
             if (!ativo) { 
                 const opt = document.createElement('option'); 
                 opt.value = ''; 
@@ -378,7 +377,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             
             refreshCustomSelect(companySelector);
 
-            // ✅ Atualiza o nome da empresa na sidebar
             if (elEmpresaMini) {
                 if (ativo) {
                     const emp = empresas.find(e => String(e.id) === String(ativo));
@@ -387,14 +385,73 @@ document.addEventListener('DOMContentLoaded', async function() {
                         elEmpresaMini.innerHTML = `<i class="fas fa-building"></i> ${nomeEmp}`;
                         elEmpresaMini.style.display = 'flex';
                     } else {
-                        // Caso tenha o ID mas não ache a empresa na lista
                         elEmpresaMini.innerHTML = `<i class="fas fa-building"></i> Selecione uma empresa`;
                         elEmpresaMini.style.display = 'flex';
                     }
                 } else {
-                    // ✅ Se não tem empresa ativa, mostra o aviso
                     elEmpresaMini.innerHTML = `<i class="fas fa-building"></i> Selecione uma empresa`;
                     elEmpresaMini.style.display = 'flex';
+                }
+            }
+        }
+
+        function atualizarHeaderEmpresa(id) {
+            const box = document.getElementById('header-empresa-ativa');
+            const nomeEl = document.getElementById('header-empresa-nome');
+            if (!box || !nomeEl) return;
+
+            if (id && contextoCache?.empresas) {
+                const emp = contextoCache.empresas.find(e => String(e.id) === String(id));
+                if (emp) {
+                    nomeEl.textContent = emp.nome || emp.nomeFantasia || emp.razaoSocial || `#${emp.id}`;
+                    box.style.display = 'flex';
+                    return;
+                }
+            }
+            box.style.display = 'none';
+        }
+
+        function verificarSelecaoObrigatoria() {
+            const modal = document.getElementById('empresa-select-modal');
+            const select = document.getElementById('empresa-select-obrigatoria');
+            const btn = document.getElementById('btn-confirmar-empresa');
+            if (!modal || !select || !btn) return;
+
+            const empresas = contextoCache?.empresas || [];
+            if (empresas.length === 0) return;
+
+            if (empresas.length === 1) {
+                const idUnico = empresas[0].id;
+                if (obterEmpresaAtivaId() !== String(idUnico)) {
+                    definirEmpresaAtivaId(idUnico);
+                }
+                modal.style.display = 'none';
+            } else {
+                if (!obterEmpresaAtivaId()) {
+                    select.innerHTML = '<option value="">— Escolha uma empresa —</option>';
+                    empresas.forEach(e => {
+                        const opt = document.createElement('option');
+                        opt.value = String(e.id);
+                        opt.textContent = e.nome || e.nomeFantasia || e.razaoSocial || `#${e.id}`;
+                        select.appendChild(opt);
+                    });
+
+                    btn.disabled = true;
+                    select.onchange = () => { btn.disabled = !select.value; };
+                    btn.onclick = () => {
+                        if (select.value) {
+                            definirEmpresaAtivaId(select.value);
+                            modal.style.display = 'none';
+                        }
+                    };
+
+                    if (window.AppCore && window.AppCore.refreshCustomSelect) {
+                        setTimeout(() => window.AppCore.refreshCustomSelect(select), 100);
+                    }
+
+                    modal.style.display = 'flex';
+                } else {
+                    modal.style.display = 'none';
                 }
             }
         }
@@ -408,7 +465,11 @@ document.addEventListener('DOMContentLoaded', async function() {
                 contextoCache = ctx;
                 const ativo = obterEmpresaAtivaId(); const ids = (ctx?.empresas || []).map(e => String(e.id));
                 if (ativo && !ids.includes(String(ativo))) definirEmpresaAtivaId(null);
+                
                 atualizarSeletorEmpresa();
+                atualizarHeaderEmpresa(obterEmpresaAtivaId()); // ✅ Atualiza o header
+                verificarSelecaoObrigatoria(); // ✅ Chama a verificação do modal
+                
                 return ctx;
             } catch (e) { return null; }
         }
@@ -887,7 +948,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (genericModal) genericModal.addEventListener('click', function(e) { if (e.target === this) { genericModal.style.display = 'none'; restoreActiveMenuItem(); } });
         if (confirmModal) confirmModal.addEventListener('click', function(e) { if (e.target === this) { confirmModal.style.display = 'none'; restoreActiveMenuItem(); } });
 
-        // ✅ Função para mudar o ícone e a cor baseado no título
         function setIconConfirmacao(titulo) {
             const iconWrapper = document.getElementById('confirm-icon-wrapper');
             const iconI = document.getElementById('confirm-icon-i');
@@ -895,19 +955,17 @@ document.addEventListener('DOMContentLoaded', async function() {
 
             const t = String(titulo).toLowerCase();
             
-            // Limpa as classes anteriores
             iconWrapper.classList.remove('success', 'error', 'warning');
 
             if (t.includes('sucesso')) {
                 iconWrapper.classList.add('success');
-                iconI.className = 'fas fa-check-circle'; // Ícone de Check
+                iconI.className = 'fas fa-check-circle';
             } else if (t.includes('erro') || t.includes('falha') || t.includes('negado') || t.includes('atenção')) {
                 iconWrapper.classList.add('error');
-                iconI.className = 'fas fa-times-circle'; // Ícone de X
+                iconI.className = 'fas fa-times-circle';
             } else {
-                // Para 'Aviso', 'Confirmação', etc.
                 iconWrapper.classList.add('warning');
-                iconI.className = 'fas fa-exclamation-triangle'; // Ícone de Atenção
+                iconI.className = 'fas fa-exclamation-triangle';
             }
         }
 

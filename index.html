@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Prospec&ccedil;&atilde;o de Empresas e Estabelecimentos</title>
-    <link rel="icon" type="image.svg" href="favicon.svg">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="style.css">
@@ -21,7 +21,7 @@
 </head>
 <body>
 
-        <aside class="sidebar" id="sidebar">
+    <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <div class="sidebar-brand">
                 <img src="favicon.svg" alt="Logo" class="sidebar-brand-logo">
@@ -30,7 +30,6 @@
                     <small>PROSPECT</small>
                 </div>
             </div>
-            
             <button class="sidebar-toggle" id="sidebar-toggle">
                 <i class="fas fa-bars"></i>
             </button>
@@ -85,7 +84,6 @@
             </div>
         </div>
 
-        <!-- RODAPÉ DO USUÁRIO NA SIDEBAR -->
         <div class="sidebar-footer">
             <div class="sidebar-user-wrapper" id="sidebar-user-wrapper">
                 <button class="sidebar-user-btn" id="sidebar-user-btn">
@@ -98,7 +96,6 @@
                     <i class="fas fa-chevron-right user-chevron"></i>
                 </button>
 
-                <!-- Popover Menu -->
                 <div class="sidebar-user-popover" id="sidebar-user-popover">
                     <div class="popover-header" style="align-items: flex-start;">
                         <div class="user-avatar large" id="user-avatar-popover">U</div>
@@ -106,7 +103,6 @@
                             <strong id="user-name-popover">Usuário</strong>
                             <small id="user-email-popover">...</small>
                             
-                            <!-- EMPRESA ATIVA (Estilo texto discreto) -->
                             <div class="company-selector" id="company-selector-wrapper" style="display:none; margin-top: 6px;">
                                 <div class="company-selector-inner">
                                     <select id="company-selector" class="input"></select>
@@ -152,8 +148,12 @@
                         </div>
                     </div>
                 </div>
-                <!-- ✅ COMPETÊNCIA DE VOLTA AO CANTO DIREITO -->
                 <div class="header-right">
+                    <div class="empresa-ativa-header" id="header-empresa-ativa" style="display: none;">
+                        <i class="fas fa-building"></i>
+                        <span id="header-empresa-nome"></span>
+                    </div>
+
                     <div class="competencia-header" title="Competência">
                         <div class="calendar"><i class="fas fa-calendar-alt"></i></div>
                         <div class="competencia-text">
@@ -539,6 +539,26 @@
         </div>
     </div>
 
+    <!-- ✅ MODAL DE SELEÇÃO OBRIGATÓRIA DE EMPRESA (CORRIGIDO) -->
+    <div id="empresa-select-modal" class="modal-overlay" style="z-index: 2147483000;">
+        <div class="modal-content confirm-content">
+            <div class="confirm-icon warning" style="color: #2463eb;"><i class="fas fa-building"></i></div>
+            <h3>Selecione uma Empresa</h3>
+            <p>Para acessar o sistema, escolha com qual empresa você deseja trabalhar agora.</p>
+            
+            <div class="form-group" style="text-align: left; margin-top: 20px;">
+                <!-- ✅ Correção: Deixamos o select limpo, o script.js cria a estrutura visual sozinho -->
+                <select id="empresa-select-obrigatoria" class="input">
+                    <option value="">— Escolha uma empresa —</option>
+                </select>
+            </div>
+
+            <div class="confirm-actions" style="margin-top: 25px;">
+                <button class="btn-primary" id="btn-confirmar-empresa" disabled style="width: 100%;">Confirmar e Entrar</button>
+            </div>
+        </div>
+    </div>
+
     <div id="vendedor-modal" class="modal-overlay">
         <div class="modal-content form-modal">
             <span class="close-modal" id="close-vendedor-modal">&times;</span>
@@ -546,114 +566,133 @@
                 <h2 id="vendedor-modal-title">Cadastro de vendedor</h2>
                 <p>Preencha os dados do vendedor e vincule as empresas atendidas</p>
             </div>
+            
             <form id="vendedorForm" class="modal-scroll-area">
-                <div class="form-group">
-                    <label for="vend-usuario-search">Usuário do sistema (login) *</label>
-                    <div class="cidade-search-wrapper" id="vend-usuario-wrapper">
-                        <input type="text" id="vend-usuario-search" class="input" placeholder="Buscar usuário por nome, e-mail ou CPF..." autocomplete="off">
-                        <span class="search-icon"><i class="fas fa-user-check"></i></span>
-                        <div id="vend-usuario-suggestions" class="autocomplete-list"></div>
-                    </div>
-                    <div id="vend-usuario-selected" class="usuario-selected-card" style="display:none;">
-                        <div class="usuario-selected-avatar" id="vend-usuario-avatar">--</div>
-                        <div class="usuario-selected-info">
-                            <strong id="vend-usuario-nome">--</strong>
-                            <small id="vend-usuario-email">--</small>
-                        </div>
-                        <button type="button" id="vend-usuario-remove" class="usuario-selected-remove" title="Remover vínculo">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
+                <div class="vmodal-tabs">
+                    <button type="button" class="vmodal-tab active" data-vtab="dados">
+                        <i class="fas fa-id-card"></i> Dados
+                    </button>
+                    <button type="button" class="vmodal-tab" data-vtab="empresas">
+                        <i class="fas fa-building"></i> Empresas
+                    </button>
+                    <button type="button" class="vmodal-tab" data-vtab="ddd">
+                        <i class="fas fa-phone"></i> DDDs
+                    </button>
+                    <button type="button" class="vmodal-tab" data-vtab="cidades">
+                        <i class="fas fa-map-marker-alt"></i> Cidades
+                    </button>
                 </div>
 
-                <div class="form-row">
-                    <div class="form-group" style="flex:2;">
-                        <label for="vend-nome">Nome *</label>
-                        <input type="text" id="vend-nome" placeholder="Nome completo" autocomplete="off">
-                    </div>
-                    <div class="form-group" style="flex:1;">
-                        <label>Cor</label>
-                        <div class="color-select" id="vend-cor-select">
-                            <button type="button" class="color-select-trigger" id="vend-cor-trigger">
-                                <span class="color-select-preview" id="vend-cor-preview"></span>
-                                <span class="color-select-label" id="vend-cor-label">Selecione...</span>
-                                <i class="fas fa-chevron-down"></i>
+                <div class="vmodal-panel active" id="vpanel-dados">
+                    <div class="form-group">
+                        <label for="vend-usuario-search">Usuário do sistema (login) *</label>
+                        <div class="cidade-search-wrapper" id="vend-usuario-wrapper">
+                            <input type="text" id="vend-usuario-search" class="input" placeholder="Buscar usuário por nome, e-mail ou CPF..." autocomplete="off">
+                            <span class="search-icon"><i class="fas fa-user-check"></i></span>
+                            <div id="vend-usuario-suggestions" class="autocomplete-list"></div>
+                        </div>
+                        <div id="vend-usuario-selected" class="usuario-selected-card" style="display:none;">
+                            <div class="usuario-selected-avatar" id="vend-usuario-avatar">--</div>
+                            <div class="usuario-selected-info">
+                                <strong id="vend-usuario-nome">--</strong>
+                                <small id="vend-usuario-email">--</small>
+                            </div>
+                            <button type="button" id="vend-usuario-remove" class="usuario-selected-remove" title="Remover vínculo">
+                                <i class="fas fa-times"></i>
                             </button>
-                            <div class="color-select-options" id="vend-cor-options"></div>
                         </div>
-                        <input type="hidden" id="vend-cor" value="#2463eb">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group" style="flex:2;">
+                            <label for="vend-nome">Nome *</label>
+                            <input type="text" id="vend-nome" placeholder="Nome completo" autocomplete="off">
+                        </div>
+                        <div class="form-group" style="flex:1;">
+                            <label>Cor</label>
+                            <div class="color-select" id="vend-cor-select">
+                                <button type="button" class="color-select-trigger" id="vend-cor-trigger">
+                                    <span class="color-select-preview" id="vend-cor-preview"></span>
+                                    <span class="color-select-label" id="vend-cor-label">Selecione...</span>
+                                    <i class="fas fa-chevron-down"></i>
+                                </button>
+                                <div class="color-select-options" id="vend-cor-options"></div>
+                            </div>
+                            <input type="hidden" id="vend-cor" value="#2463eb">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1;">
+                            <label for="vend-tipo-pessoa">Tipo pessoa *</label>
+                            <select id="vend-tipo-pessoa" class="input">
+                                <option value="">Selecione...</option>
+                                <option value="PF">Física</option>
+                                <option value="PJ">Jurídica</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex:2;">
+                            <label for="vend-cpf-cnpj">CPF / CNPJ</label>
+                            <input type="text" id="vend-cpf-cnpj" placeholder="Só números" autocomplete="off" maxlength="14">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1;">
+                            <label for="vend-email">E-mail</label>
+                            <input type="email" id="vend-email" placeholder="email@exemplo.com" autocomplete="off">
+                        </div>
+                        <div class="form-group" style="flex:1;">
+                            <label for="vend-fone">Fone</label>
+                            <input type="text" id="vend-fone" placeholder="11999990000" autocomplete="off" maxlength="11" inputmode="numeric">
+                        </div>
                     </div>
                 </div>
 
-                <div class="form-row">
-                    <div class="form-group" style="flex:1;">
-                        <label for="vend-tipo-pessoa">Tipo pessoa *</label>
-                        <select id="vend-tipo-pessoa" class="input">
-                            <option value="">Selecione...</option>
-                            <option value="PF">Física</option>
-                            <option value="PJ">Jurídica</option>
-                        </select>
-                    </div>
-                    <div class="form-group" style="flex:2;">
-                        <label for="vend-cpf-cnpj">CPF / CNPJ</label>
-                        <input type="text" id="vend-cpf-cnpj" placeholder="Só números" autocomplete="off" maxlength="14">
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group" style="flex:1;">
-                        <label for="vend-email">E-mail</label>
-                        <input type="email" id="vend-email" placeholder="email@exemplo.com" autocomplete="off">
-                    </div>
-                    <div class="form-group" style="flex:1;">
-                        <label for="vend-fone">Fone</label>
-                        <input type="text" id="vend-fone" placeholder="11999990000" autocomplete="off" maxlength="11" inputmode="numeric">
+                <div class="vmodal-panel" id="vpanel-empresas">
+                    <div class="form-group">
+                        <label>Empresas vinculadas</label>
+                        <div class="cidade-search-wrapper" id="vend-empresa-wrapper">
+                            <input type="text" id="vend-empresa-search" class="input" placeholder="Digite 2+ letras para buscar empresa..." autocomplete="off">
+                            <span class="search-icon"><i class="fas fa-building"></i></span>
+                            <div id="vend-empresa-suggestions" class="autocomplete-list"></div>
+                        </div>
+                        <div id="vend-empresas-list" class="cidades-list">
+                            <span class="cidades-empty">Nenhuma empresa vinculada ainda.</span>
+                        </div>
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label>Empresas vinculadas</label>
-                    <div class="cidade-search-wrapper" id="vend-empresa-wrapper">
-                        <input type="text" id="vend-empresa-search" class="input" placeholder="Digite 2+ letras para buscar empresa..." autocomplete="off">
-                        <span class="search-icon"><i class="fas fa-building"></i></span>
-                        <div id="vend-empresa-suggestions" class="autocomplete-list"></div>
-                    </div>
-                    <div id="vend-empresas-list" class="cidades-list">
-                        <span class="cidades-empty">Nenhuma empresa vinculada ainda.</span>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label>DDDs vinculados</label>
-                    <div class="cidade-search-wrapper">
-                        <input type="text" id="vend-ddd-search" class="input" placeholder="Digite o DDD (ex: 51, 54)..." autocomplete="off" maxlength="3" inputmode="numeric">
-                        <span class="search-icon"><i class="fas fa-search"></i></span>
-                        <div id="vend-ddd-suggestions" class="autocomplete-list"></div>
-                    </div>
-                    <div id="vend-ddds-list" class="cidades-list">
-                        <span class="cidades-empty">Nenhum DDD vinculado ainda.</span>
+                <div class="vmodal-panel" id="vpanel-ddd">
+                    <div class="form-group">
+                        <label>DDDs vinculados</label>
+                        <div class="cidade-search-wrapper">
+                            <input type="text" id="vend-ddd-search" class="input" placeholder="Digite o DDD (ex: 51, 54)..." autocomplete="off" maxlength="3" inputmode="numeric">
+                            <span class="search-icon"><i class="fas fa-search"></i></span>
+                            <div id="vend-ddd-suggestions" class="autocomplete-list"></div>
+                        </div>
+                        <div id="vend-ddds-list" class="cidades-list">
+                            <span class="cidades-empty">Nenhum DDD vinculado ainda.</span>
+                        </div>
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label>Cidades vinculadas (opcional — usado no mapa)</label>
-                    <div class="cidade-search-wrapper">
-                        <input type="text" id="vend-cidade-search" class="input" placeholder="Digite 2+ letras para buscar cidade..." autocomplete="off">
-                        <span class="search-icon"><i class="fas fa-search"></i></span>
-                        <div id="vend-cidade-suggestions" class="autocomplete-list"></div>
-                    </div>
-                    <!-- NOVO: Filtro de Cidades -->
-<div id="vend-cidades-filter-wrapper" style="display: none; margin-top: 12px; position: relative;">
-    <input type="text" id="vend-cidade-filter" class="input" placeholder="Filtrar cidades vinculadas..." style="height: 36px; font-size: 13px; padding-left: 36px;">
-    <i class="fas fa-filter" style="position: absolute; left: 12px; top: 11px; color: var(--text-secondary); font-size: 14px;"></i>
-</div>
+                <div class="vmodal-panel" id="vpanel-cidades">
+                    <div class="form-group">
+                        <label>Cidades vinculadas</label>
+                        <div class="cidade-search-wrapper">
+                            <input type="text" id="vend-cidade-search" class="input" placeholder="Digite 2+ letras para buscar cidade..." autocomplete="off">
+                            <span class="search-icon"><i class="fas fa-search"></i></span>
+                            <div id="vend-cidade-suggestions" class="autocomplete-list"></div>
+                        </div>
 
-<!-- Lista atualizada com limite de altura e scroll -->
-<div id="vend-cidades-list" class="cidades-list" style="height: 200px; max-height: 200px; overflow-y: auto;">
-    <span class="cidades-empty">Nenhuma cidade vinculada ainda.</span>
-</div>
+                        <div id="vend-cidades-list" class="cidades-list" style="margin-top: 15px;">
+                            <span class="cidades-empty">Nenhuma cidade vinculada ainda.</span>
+                        </div>
+                    </div>
                 </div>
             </form>
+            
             <div class="modal-footer">
                 <button type="button" class="btn-secondary" id="btn-cancel-vendedor">Cancelar</button>
                 <button type="submit" form="vendedorForm" class="btn-primary" id="btn-save-vendedor">Salvar vendedor</button>

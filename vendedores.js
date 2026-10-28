@@ -112,6 +112,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!vendedoresScreen) return console.warn('[vendedores] Tela não encontrada no DOM.');
 
+        // ✅ Lógica de troca de abas do modal
+        document.querySelectorAll('.vmodal-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.vmodal-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.vmodal-panel').forEach(p => p.classList.remove('active'));
+                
+                tab.classList.add('active');
+                const targetPanel = document.getElementById(`vpanel-${tab.dataset.vtab}`);
+                if (targetPanel) targetPanel.classList.add('active');
+            });
+        });
+
         // --- Estado ---
         let vendedores = [];
         let editingVendedorId = null;
@@ -134,6 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let empresasCarregando = false;
         let empresasPromise = null;
         let empresaDebounce = null;
+        let cidadesComDDD = null; // ✅ NOVO: Dicionário para buscar DDD das cidades
 
         // --- Helpers ---
         function formatarCPF(v) {
@@ -172,7 +185,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // ============================================================
         // DROPDOWN DE CORES
         // ============================================================
-                const CORES_DISPONIVEIS = [
+        const CORES_DISPONIVEIS = [
             { hex: '#2463eb', nome: 'Azul Padrão' }, { hex: '#1d4ed8', nome: 'Azul Escuro' },
             { hex: '#3b82f6', nome: 'Azul Claro' }, { hex: '#0ea5e9', nome: 'Céu' },
             { hex: '#06b6d4', nome: 'Ciano' }, { hex: '#14b8a6', nome: 'Teal' },
@@ -443,6 +456,26 @@ document.addEventListener('DOMContentLoaded', () => {
             return dddsPromise;
         }
 
+        // ✅ NOVO: Mapeia todas as cidades para seus DDDs e UFs
+        async function carregarMapaCidadesDDD() {
+            if (cidadesComDDD) return cidadesComDDD;
+            const mapa = new Map();
+            try {
+                const ddds = await carregarListaDdds();
+                await Promise.all(ddds.map(async d => {
+                    try {
+                        const res = await apiGet(`${API_URL}/ddds/${d.ddd}/municipios`);
+                        const lista = Array.isArray(res) ? res : (res && Array.isArray(res.dados)) ? res.dados : [];
+                        lista.forEach(m => {
+                            mapa.set(String(m.codigoIbge || m.codigo), { ddd: String(d.ddd), uf: d.descricao || '' });
+                        });
+                    } catch (e) {}
+                }));
+            } catch (e) {}
+            cidadesComDDD = mapa;
+            return mapa;
+        }
+
         function buscarDdds(termo) {
             if (!dddsDisponiveis || !termo) return [];
             const t = String(termo).replace(/\D/g, '');
@@ -466,25 +499,24 @@ document.addEventListener('DOMContentLoaded', () => {
             currentVendedorDdds.push({ ddd: String(ddd.ddd), descricao: ddd.descricao || '' });
             renderVendedorDdds();
             
-            // ✅ NOVO: Auto-popular cidades do DDD
             try {
                 const res = await apiGet(`${API_URL}/ddds/${ddd.ddd}/municipios`);
                 const lista = Array.isArray(res) ? res : (res && Array.isArray(res.dados)) ? res.dados : [];
-                if (!municipiosLista) await carregarListaMunicipios(); // Garante a lista global para pegar o código IBGE
+                if (!municipiosLista) await carregarListaMunicipios();
                 
                 let novasCidades = 0;
                 for (const m of lista) {
                     let cod = m.codigoIbge || m.codigo;
                     const nome = m.municipio || m.nome;
                     
-                    // Fallback: tenta achar o IBGE na lista geral pelo nome
                     if (!cod && municipiosLista) {
                         const found = municipiosLista.find(x => normalizar(x.nome) === normalizar(nome));
                         if (found) cod = found.codigoIbge;
                     }
                     
                     if (cod && !currentVendedorCidades.some(c => c.codigoIbge === String(cod))) {
-                        currentVendedorCidades.push({ codigoIbge: String(cod), nome: nome, uf: m.uf || ddd.descricao || '' });
+                        // ✅ Adicionado o campo 'ddd' no objeto da cidade
+                        currentVendedorCidades.push({ codigoIbge: String(cod), nome: nome, uf: m.uf || ddd.descricao || '', ddd: ddd.ddd });
                         novasCidades++;
                     }
                 }
@@ -562,32 +594,20 @@ document.addEventListener('DOMContentLoaded', () => {
         function renderVendedorCidades() {
             if (!vendCidadesList) return;
             
-            const filterWrapper = document.getElementById('vend-cidades-filter-wrapper');
-            const filterInput = document.getElementById('vend-cidade-filter');
-            
             if (!currentVendedorCidades.length) { 
                 vendCidadesList.innerHTML = '<span class="cidades-empty">Nenhuma cidade vinculada ainda.</span>'; 
-                if (filterWrapper) filterWrapper.style.display = 'none';
                 return; 
             }
             
-            // ✅ NOVO: Mostra o filtro se tiver cidades
-            if (filterWrapper) filterWrapper.style.display = 'block';
-            const termo = filterInput ? normalizar(filterInput.value) : '';
-            
-            const cidadesFiltradas = currentVendedorCidades.filter(c => normalizar(c.nome).includes(termo));
-            
-            if (!cidadesFiltradas.length) {
-                vendCidadesList.innerHTML = '<span class="cidades-empty">Nenhuma cidade encontrada com este filtro.</span>';
-                return;
-            }
-            
-            vendCidadesList.innerHTML = cidadesFiltradas.map((c) => {
-                const originalIndex = currentVendedorCidades.findIndex(x => x.codigoIbge === c.codigoIbge);
-                return `<span class="cidade-chip" data-index="${originalIndex}">
+            vendCidadesList.innerHTML = currentVendedorCidades.map((c, i) => {
+                const dddStr = c.ddd ? `(${c.ddd})` : '';
+                const ufStr = c.uf ? c.uf.toUpperCase() : '';
+                const infoExtra = [dddStr, ufStr].filter(Boolean).join(' - ');
+
+                return `<span class="cidade-chip" data-index="${i}">
                     <span class="chip-nome">${c.nome}</span>
-                    <span class="chip-uf">${c.uf || ''}</span>
-                    <button type="button" class="chip-remove" data-index="${originalIndex}" title="Remover"><i class="fas fa-times"></i></button>
+                    ${infoExtra ? `<span class="chip-uf" style="background: rgba(36, 99, 235, 0.1); color: #1d4ed8; font-size: 10px; font-weight: 700; margin-left: 4px;">${infoExtra}</span>` : ''}
+                    <button type="button" class="chip-remove" data-index="${i}" title="Remover"><i class="fas fa-times"></i></button>
                 </span>`;
             }).join('');
             
@@ -603,7 +623,8 @@ document.addEventListener('DOMContentLoaded', () => {
         function adicionarCidade(m) {
             if (!m) return;
             if (currentVendedorCidades.some(c => c.codigoIbge === m.codigoIbge)) return showWarning('Esta cidade já está vinculada.');
-            currentVendedorCidades.push({ codigoIbge: m.codigoIbge, nome: m.nome, uf: m.uf || '' });
+            // ✅ Adicionado o campo 'ddd'
+            currentVendedorCidades.push({ codigoIbge: m.codigoIbge, nome: m.nome, uf: m.uf || '', ddd: m.ddd || '' });
             renderVendedorCidades();
         }
 
@@ -633,12 +654,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (vendEmpresaSearch && !e.target.closest('#vend-empresa-wrapper')) vendEmpresaSugg?.classList.remove('active');
         });
 
-        // ✅ Evento de filtro das cidades no modal
-        const vendCidadeFilter = document.getElementById('vend-cidade-filter');
-        if (vendCidadeFilter) {
-            vendCidadeFilter.addEventListener('input', renderVendedorCidades);
-        }
-
         // ============================================================
         // CARREGAR VENDEDORES E RENDERIZAR TABELA
         // ============================================================
@@ -651,13 +666,12 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (e) { vendedores = []; renderVendedorTable(); }
         }
 
-                function normalizarVendedor(v) {
+        function normalizarVendedor(v) {
             const usuarioId = v.usuarioId ?? v.loginId ?? (Array.isArray(v.loginIds) ? v.loginIds[0] : null);
             const empresaIds = Array.isArray(v.empresaIds) ? v.empresaIds.map(Number) : [];
             const empresasObj = Array.isArray(v.empresas) ? v.empresas : [];
             const ativo = v.situacao !== 'I' && v.situacao !== 'X' && v.situacao !== 'B';
             
-            // ✅ CORREÇÃO: Conta as empresas olhando para as duas formas possíveis (lista de IDs ou lista de objetos)
             const countEmpresas = empresasObj.length > 0 ? empresasObj.length : empresaIds.length;
 
             return {
@@ -675,7 +689,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 empresas: empresasObj,
                 cidades: Array.isArray(v.cidades) ? v.cidades : [], 
                 ddds: Array.isArray(v.ddds) ? v.ddds : [], 
-                empresasCount: countEmpresas, // ✅ Agora envia o número correto
+                empresasCount: countEmpresas,
                 regiao: v.regiao || ''
             };
         }
@@ -715,13 +729,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // ============================================================
         // FORM E EDIÇÃO
         // ============================================================
-                        function resetVendedorForm() {
+        function resetVendedorForm() {
             editingVendedorId = null;
             if (vendNome) vendNome.value = ''; if (vendTipoPessoa) vendTipoPessoa.value = ''; if (vendCpfCnpj) { vendCpfCnpj.value = ''; vendCpfCnpj.maxLength = 14; } if (vendEmail) vendEmail.value = ''; if (vendFone) vendFone.value = '';
             
-            // ✅ Descobre qual é a primeira cor disponível
             const usadas = coresEmUso();
-            let corSugerida = '#2463eb'; // Fallback
+            let corSugerida = '#2463eb'; 
             for (const c of CORES_DISPONIVEIS) {
                 if (!usadas.has(c.hex.toLowerCase())) {
                     corSugerida = c.hex;
@@ -736,16 +749,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (btnSaveVendedor) btnSaveVendedor.innerText = 'Salvar vendedor';
             currentVendedorCidades = []; currentVendedorDdds = []; currentVendedorUsuario = null; currentVendedorEmpresas = []; originalVendedorEmpresas = [];
             
-            // ✅ CORRIGIDO AQUI (Sugg em vez de Sugestao)
             if (vendCidadeSearch) vendCidadeSearch.value = ''; if (vendCidadeSugg) { vendCidadeSugg.classList.remove('active'); vendCidadeSugg.innerHTML = ''; }
             if (vendDddSearch) vendDddSearch.value = ''; if (vendDddSugg) { vendDddSugg.classList.remove('active'); vendDddSugg.innerHTML = ''; }
             if (vendUsuarioSearch) vendUsuarioSearch.value = ''; if (vendUsuarioSugg) { vendUsuarioSugg.classList.remove('active'); vendUsuarioSugg.innerHTML = ''; }
             if (vendEmpresaSearch) vendEmpresaSearch.value = ''; if (vendEmpresaSugg) { vendEmpresaSugg.classList.remove('active'); vendEmpresaSugg.innerHTML = ''; }
             
-            const filterInput = document.getElementById('vend-cidade-filter');
-            if (filterInput) filterInput.value = '';
-            
             renderVendedorCidades(); renderVendedorDdds(); renderUsuarioSelecionado(); renderEmpresasSelecionadas();
+
+            document.querySelector('.vmodal-tab[data-vtab="dados"]')?.click();
         }
 
         async function editarVendedor(id) {
@@ -756,13 +767,32 @@ document.addEventListener('DOMContentLoaded', () => {
             aplicarCorSelecionada(v.cor || '#2463eb');
             const titleEl = document.getElementById('vendedor-modal-title'); if (titleEl) titleEl.innerText = 'Editar vendedor';
             if (btnSaveVendedor) btnSaveVendedor.innerText = 'Atualizar vendedor';
-            await carregarListaMunicipios().catch(() => {}); await carregarListaDdds().catch(() => {}); await carregarListaEmpresas().catch(() => {});
+            
+            // ✅ Aguarda carregar todas as bases necessárias (incluindo o mapa de DDDs das cidades)
+            await Promise.all([
+                carregarListaMunicipios().catch(() => {}),
+                carregarListaDdds().catch(() => {}),
+                carregarListaEmpresas().catch(() => {}),
+                carregarMapaCidadesDDD().catch(() => {})
+            ]);
             
             const rawCidades = Array.isArray(v.cidades) ? v.cidades : [];
             currentVendedorCidades = rawCidades.map(c => {
                 const cod = typeof c === 'object' ? (c.codigoIbge || c.codigo) : c;
                 const m = (municipiosLista || []).find(x => String(x.codigoIbge) === String(cod));
-                return m ? { ...m } : { codigoIbge: String(cod), nome: `Cidade ${cod}`, uf: '' };
+                const info = (cidadesComDDD && cidadesComDDD.get(String(cod))) || { ddd: '', uf: '' };
+
+                // ✅ Tenta pegar o DDD do objeto, da lista de municipios, ou do mapa global
+                const dddFinal = (typeof c === 'object' && c.ddd) ? c.ddd : (m?.ddd || info.ddd || '');
+                const ufFinal = (typeof c === 'object' && c.uf) ? c.uf : (m?.uf || info.uf || '');
+                const nomeFinal = m ? m.nome : (typeof c === 'object' && c.nome ? c.nome : `Cidade ${cod}`);
+
+                return {
+                    codigoIbge: String(cod),
+                    nome: nomeFinal,
+                    uf: ufFinal,
+                    ddd: dddFinal
+                };
             });
 
             const rawDdds = Array.isArray(v.ddds) ? v.ddds : [];
@@ -788,10 +818,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentVendedorUsuario = u ? { ...u } : { id: v.usuarioId, nome: `Usuário #${v.usuarioId}`, email: '', cpf: '' };
             } else { currentVendedorUsuario = null; }
 
-            const filterInput = document.getElementById('vend-cidade-filter');
-            if (filterInput) filterInput.value = '';
-
             renderVendedorCidades(); renderVendedorDdds(); renderUsuarioSelecionado(); renderEmpresasSelecionadas(); renderColorOptions();
+            
+            document.querySelector('.vmodal-tab[data-vtab="dados"]')?.click();
+
             vendedorModal.style.display = 'flex';
         }
 
@@ -842,7 +872,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     resetVendedorForm();
                     await carregarVendedores();
 
-                    // ✅ Recarrega os dados do mapa (para atualizar a cor e as cidades)
                     if (window.AppCore && window.AppCore.recarregarMapaDados) {
                         window.AppCore.recarregarMapaDados().catch(console.warn);
                     }

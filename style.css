@@ -27,7 +27,7 @@ body.dark-mode {
 body { background: var(--bg-body); color: var(--text-main); }
 
 /* ============================================================
-   SIDEBAR (NOVA ESTRUTURA COM LOGO E BOTÃO HAMBURGUER)
+   SIDEBAR
    ============================================================ */
 .sidebar { 
     position: fixed; 
@@ -37,7 +37,7 @@ body { background: var(--bg-body); color: var(--text-main); }
     width: 220px; 
     background: linear-gradient(180deg, #071a3d 0%, #061b48 100%); 
     color: white; 
-    padding: 15px 16px 16px; /* Ajustado para o cabeçalho */
+    padding: 15px 16px 16px;
     z-index: 9999; 
     display: flex; 
     flex-direction: column; 
@@ -46,7 +46,6 @@ body { background: var(--bg-body); color: var(--text-main); }
     overflow: visible; 
 }
 
-/* ✅ NOVO CABEÇALHO DA SIDEBAR */
 .sidebar-header {
     display: flex;
     align-items: center;
@@ -94,7 +93,6 @@ body { background: var(--bg-body); color: var(--text-main); }
     margin-top: 2px;
 }
 
-/* BOTÃO HAMBURGUER (Agora flex, não absoluto) */
 .sidebar-toggle { 
     background: rgba(255,255,255,0.1); 
     border: none; 
@@ -113,15 +111,10 @@ body { background: var(--bg-body); color: var(--text-main); }
 }
 .sidebar-toggle:hover { background: rgba(255,255,255,0.25); color: #fff; transform: scale(1.1); }
 
-/* Ocultar logo quando colapsada */
-.sidebar.collapsed { 
-    width: 75px; 
-    padding: 15px 8px 16px; 
-}
+.sidebar.collapsed { width: 75px; padding: 15px 8px 16px; }
 .sidebar.collapsed .sidebar-header { justify-content: center; }
 .sidebar.collapsed .sidebar-brand { display: none; }
 
-/* SCROLL DO MENU */
 .sidebar-menu-scroll {
     width: 100%;
     flex: 1;
@@ -222,7 +215,6 @@ body { background: var(--bg-body); color: var(--text-main); }
 }
 .user-chevron { font-size: 12px; color: #8998b5; margin-left: auto; transition: transform 0.3s ease; }
 
-/* ✅ EMPRESA MINI NO PERFIL */
 .user-empresa-mini {
     font-size: 10px;
     color: #60a5fa;
@@ -240,11 +232,9 @@ body { background: var(--bg-body); color: var(--text-main); }
     opacity: 0.8;
 }
 
-/* Sidebar Colapsada - Usuário */
 .sidebar.collapsed .sidebar-user-btn { justify-content: center; padding: 8px 0; }
 .sidebar.collapsed .user-info-mini, .sidebar.collapsed .user-chevron { display: none; }
 
-/* Popover do Usuário */
 .sidebar-user-popover {
     position: absolute;
     bottom: 0;
@@ -280,7 +270,6 @@ body { background: var(--bg-body); color: var(--text-main); }
 .popover-section { margin-bottom: 12px; }
 .popover-label { display: block; font-size: 11px; font-weight: 600; color: #8998b5; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
 
-/* Toggle de Tema */
 .theme-toggle-group {
     display: flex;
     background: #1e293b;
@@ -330,7 +319,7 @@ body { background: var(--bg-body); color: var(--text-main); }
 .popover-item.text-danger { color: #ef4444; }
 .popover-item.text-danger:hover { background: rgba(239, 68, 68, 0.1); }
 
-/* ================== SELETOR DE EMPRESA DENTRO DO POPOVER ================== */
+/* ================== SELETOR DE EMPRESA ================== */
 .sidebar-user-popover .company-selector {
     background: transparent;
     border: none;
@@ -375,28 +364,23 @@ body { background: var(--bg-body); color: var(--text-main); }
     transition: transform 0.2s ease;
 }
 
-/* Gira a setinha para a direita quando aberto */
 .sidebar-user-popover .company-selector-inner .custom-select.open .custom-select-trigger i {
     transform: rotate(-90deg) !important;
 }
 
-/* Dropdown menu (abre paralelo para o lado direito com scroll) */
 .sidebar-user-popover .company-selector-inner .custom-select-options {
     background: #0f172a;
     border: 1px solid #334155;
     border-radius: 10px;
     box-shadow: 10px 0 30px rgba(0, 0, 0, 0.6);
     padding: 6px;
-    
     top: 0 !important; 
     bottom: auto !important;
     left: calc(100% + 8px) !important; 
     right: auto !important; 
     width: 250px; 
-    
     max-height: 160px; 
     overflow-y: auto;
-    
     animation: fadeInRight 0.15s ease !important;
 }
 
@@ -438,11 +422,84 @@ body { background: var(--bg-body); color: var(--text-main); }
 .status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #13b879; margin-right: 6px; }
 .header-right { display: flex; align-items: center; gap: 16px; flex-shrink: 0; }
 
-.competencia-header { display: flex; align-items: center; gap: 8px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 4px 12px; box-shadow: 0 2px 5px rgba(0,0,0,.03); }
-.competencia-header .calendar { font-size: 14px; color: #2463eb; }
-body.dark-mode .competencia-header .calendar { color: #60a5fa; }
-.competencia-header .competencia-text strong { display: block; font-size: 9px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
-.competencia-header .competencia-text span { display: block; font-size: 12px; color: var(--text-main); font-weight: 700; line-height: 1.2; }
+/* ============================================================
+   CABEÇALHO: EMPRESA GRANDE E COMPETÊNCIA PEQUENA
+   ============================================================ */
+
+/* 1. EMPRESA ATIVA (Bem grande e destacada) */
+.empresa-ativa-header {
+    display: flex;
+    align-items: center;
+    gap: 12px; 
+    background: #eff6ff;
+    border: 2px solid #bfdbfe;
+    border-radius: 10px;
+    padding: 8px 16px;
+    box-shadow: 0 4px 10px rgba(36, 99, 235, 0.1);
+    color: #1e40af;
+    font-size: 16px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    max-width: 350px; 
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    animation: fadeInRight 0.3s ease;
+}
+
+.empresa-ativa-header i { 
+    font-size: 22px; 
+    color: #2463eb; 
+}
+
+body.dark-mode .empresa-ativa-header {
+    background: #1e3a5f;
+    border-color: #3b82f6;
+    color: #93c5fd;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+body.dark-mode .empresa-ativa-header i { 
+    color: #60a5fa; 
+}
+
+
+/* 2. COMPETÊNCIA (Restaurando para o tamanho pequeno e caixinha) */
+.competencia-header { 
+    display: flex; 
+    align-items: center; 
+    gap: 8px; 
+    background: var(--bg-card); 
+    border: 1px solid var(--border-color); 
+    border-radius: 8px; 
+    padding: 4px 12px; 
+    box-shadow: 0 2px 5px rgba(0,0,0,.03); 
+}
+
+.competencia-header .calendar { 
+    font-size: 14px; 
+    color: #2463eb; 
+}
+
+body.dark-mode .competencia-header .calendar { 
+    color: #60a5fa; 
+}
+
+.competencia-header .competencia-text strong { 
+    display: block; 
+    font-size: 9px; 
+    color: var(--text-secondary); 
+    text-transform: uppercase; 
+    letter-spacing: 0.5px; 
+}
+
+.competencia-header .competencia-text span { 
+    display: block; 
+    font-size: 12px; 
+    color: var(--text-main); 
+    font-weight: 700; 
+    line-height: 1.2; 
+}
 
 /* ================== CARDS KPI ================== */
 .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 24px; }
@@ -1050,4 +1107,24 @@ body.dark-mode .vendedor-stat-color { box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
 }
 .custom-tooltip-conflict::before {
     border-top-color: #fbbf24 !important; 
+}
+
+/* ============================================================
+   CORREÇÃO DO DROPDOWN NO MODAL DE SELEÇÃO DE EMPRESA
+   ============================================================ */
+#empresa-select-modal .modal-content {
+    overflow: visible !important; /* Deixa o dropdown escapar da caixa do modal */
+    height: auto !important;
+    min-height: 380px; /* Deixa o modal um pouco mais alto */
+    padding-bottom: 30px;
+}
+
+/* Garante que o menu do dropdown fique acima de qualquer outro elemento da tela */
+#empresa-select-modal .custom-select-options {
+    z-index: 2147483001 !important; 
+}
+
+/* Dá um respiro extra entre o select e o botão */
+#empresa-select-modal .form-group {
+    margin-bottom: 20px;
 }
