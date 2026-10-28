@@ -64,7 +64,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             await Promise.all(Array.from({ length: Math.min(limite, itens.length) }, worker));
         }
 
-        // ✅ NOVO HELPER DE DATA (Correção do Erro)
+        // ✅ HELPER DE DATA
         function formatarData(isoString) {
             if (!isoString) return '—';
             try {
@@ -168,7 +168,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (respostaSessao.ok) { try { const json = await respostaSessao.json(); sessaoCache = json?.dados ?? json; } catch (e) {} }
         } catch (erro) {}
 
-        // Preenche os dados do usuário no popover
         if (sessaoCache?.usuario) {
             const nome = sessaoCache.usuario.nome || 'Usuário';
             const email = sessaoCache.usuario.email || '—';
@@ -189,7 +188,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (elEmailPopover) elEmailPopover.textContent = email;
         }
 
-        // Abrir/Fechar Popover do Usuário
         const userWrapper = document.getElementById('sidebar-user-wrapper');
         const userBtn = document.getElementById('sidebar-user-btn');
         if (userBtn) {
@@ -204,7 +202,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
         });
 
-        // Lógica do Botão de Tema (Toggle Claro/Escuro)
         const btnLight = document.getElementById('theme-btn-light');
         const btnDark = document.getElementById('theme-btn-dark');
 
@@ -232,7 +229,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             atualizarToggleTema(true);
         });
 
-        // Lógica do Botão Sair
         const btnLogout = document.getElementById('btn-logout');
         if (btnLogout) {
             btnLogout.addEventListener('click', function () {
@@ -308,11 +304,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         const btnClassifyX           = document.getElementById('btn-classify-x');
         const detClassificacao       = document.getElementById('det-classificacao');
 
-        // ✅ VARIÁVEIS DA IA
         const iaDataModal = document.getElementById('ia-data-modal');
         const iaDataEmpresa = document.getElementById('ia-data-empresa');
         const iaDataContent = document.getElementById('ia-data-content');
         const globalLoading = document.getElementById('global-loading');
+        const btnCopiarIA = document.getElementById('btn-copiar-ia');
+        let currentIAData = null; 
 
         // ============================================================
         // DADOS
@@ -642,14 +639,33 @@ document.addEventListener('DOMContentLoaded', async function() {
             const cache = cacheGet(CACHE.SEGMENTOS);
             if (cache) { segmentData = cache.segmentData || []; segmentoCnaeLinks = cache.segmentoCnaeLinks || []; updateSegmentFilter(); renderSegmentTable(); populateLinkSelect(); return; }
             try {
-                const data = await apiGet(`${API_URL}/segmentos`);
-                segmentData = data.map(i => ({ id: i.codigo, nome: i.descricao })); segmentoCnaeLinks = [];
+                const res = await apiGet(`${API_URL}/segmentos`);
+                // ✅ CORREÇÃO: Trata retorno direto ou envelopado (dados, registros, content, itens)
+                const data = Array.isArray(res) ? res : (res?.dados || res?.registros || res?.content || res?.itens || []);
+                
+                segmentData = data.map(i => ({ id: i.codigo ?? i.id, nome: i.descricao ?? i.nome })); 
+                segmentoCnaeLinks = [];
                 const cnaesVistos = new Set(allCnaesCache.map(x => String(x.codigo).trim()));
+                
                 await executarEmLotesComPausa(segmentData, 3, 20, async (seg) => {
-                    try { const cnaes = await apiGet(`${API_URL}/segmentos/${seg.id}/cnaes`); cnaes.forEach(c => { if (!segmentoCnaeLinks.some(l => l.segmentoId === seg.id && l.cnaeCodigo === c.codigo)) segmentoCnaeLinks.push({ segmentoId: seg.id, cnaeCodigo: c.codigo }); const cv = String(c.codigo).trim(); if (!cnaesVistos.has(cv)) { cnaesVistos.add(cv); allCnaesCache.push({ codigo: cv, descricao: c.descricao || '', full: c.descricao ? `${cv} - ${c.descricao}` : cv }); } }); } catch (e) {}
+                    try { 
+                        const resCnaes = await apiGet(`${API_URL}/segmentos/${seg.id}/cnaes`); 
+                        const cnaes = Array.isArray(resCnaes) ? resCnaes : (resCnaes?.dados || resCnaes?.registros || resCnaes?.content || resCnaes?.itens || []);
+                        cnaes.forEach(c => { 
+                            if (!segmentoCnaeLinks.some(l => l.segmentoId === seg.id && l.cnaeCodigo === c.codigo)) segmentoCnaeLinks.push({ segmentoId: seg.id, cnaeCodigo: c.codigo }); 
+                            const cv = String(c.codigo).trim(); 
+                            if (!cnaesVistos.has(cv)) { 
+                                cnaesVistos.add(cv); 
+                                allCnaesCache.push({ codigo: cv, descricao: c.descricao || '', full: c.descricao ? `${cv} - ${c.descricao}` : cv }); 
+                            } 
+                        }); 
+                    } catch (e) {}
                 });
                 updateSegmentFilter(); renderSegmentTable(); populateLinkSelect(); cacheSet(CACHE.SEGMENTOS, { segmentData, segmentoCnaeLinks }); cacheSet(CACHE.CNAES, allCnaesCache);
-            } catch (e) { if (filterSegmento) { filterSegmento.innerHTML = '<option value="">Todos</option>'; refreshCustomSelect(filterSegmento); } }
+            } catch (e) { 
+                console.error('Erro ao carregar segmentos:', e);
+                if (filterSegmento) { filterSegmento.innerHTML = '<option value="">Todos</option>'; refreshCustomSelect(filterSegmento); } 
+            }
         }
 
         async function buscarCnaes(filtro) {
@@ -845,14 +861,18 @@ document.addEventListener('DOMContentLoaded', async function() {
                     
                 } catch (err) {
                     console.error('[IA] Erro:', err);
-                    showWarning('Erro ao buscar dados com IA: ' + (err.message || 'Tente novamente mais tarde.'), 'Erro');
+                    if (err.message && (err.message.includes('502') || err.message.includes('504') || err.message.includes('Gateway'))) {
+                        showWarning('O serviço de IA demorou muito para responder ou está temporariamente indisponível. Tente novamente em alguns instantes.', 'Erro no Serviço');
+                    } else {
+                        showWarning('Erro ao buscar dados com IA: ' + (err.message || 'Tente novamente mais tarde.'), 'Erro');
+                    }
                 } finally {
                     if (globalLoading) globalLoading.style.display = 'none';
                 }
             });
         }
 
-                function renderIAData(data) {
+        function renderIAData(data) {
             if (!iaDataContent || !iaDataModal) return;
 
             const res = data.resultado || {};
@@ -862,7 +882,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             let html = '';
             let temDados = false;
 
-            // --- 1. Contatos e Redes ---
             let htmlContatos = '';
             if (res.site) htmlContatos += `<div class="ia-item"><span>Site</span><strong><a href="${res.site}" target="_blank" rel="noopener">${res.site}</a></strong></div>`;
             if (res.linkedin) htmlContatos += `<div class="ia-item"><span>LinkedIn</span><strong><a href="${res.linkedin}" target="_blank">Acessar Perfil</a></strong></div>`;
@@ -883,7 +902,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                 </div>`;
             }
 
-            // --- 2. Endereço ---
             if (res.enderecoAtualizado) {
                 temDados = true;
                 html += `<div class="ia-section">
@@ -892,7 +910,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                 </div>`;
             }
 
-            // --- 3. Descrição e Info ---
             if (res.descricaoEmpresa || res.informacoesAdicionais?.length) {
                 temDados = true;
                 html += `<div class="ia-section">
@@ -906,17 +923,70 @@ document.addEventListener('DOMContentLoaded', async function() {
                 html += `</div>`;
             }
 
-            // --- 4. Empty State (Nenhum dado encontrado) ---
             if (!temDados) {
                 html = `<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; text-align:center; padding: 40px; color: var(--text-secondary);">
                     <i class="fas fa-search-minus" style="font-size: 60px; color: #94a3b8; margin-bottom: 20px;"></i>
                     <h3 style="font-size: 18px; color: var(--text-main); margin-bottom: 8px;">Nenhum dado adicional encontrado</h3>
                     <p style="font-size: 14px; max-width: 400px; line-height: 1.5;">A Inteligência Artificial não encontrou novos contatos, sites ou informações públicas para esta empresa.</p>
                 </div>`;
+                if (btnCopiarIA) btnCopiarIA.style.display = 'none'; 
+            } else {
+                if (btnCopiarIA) btnCopiarIA.style.display = 'inline-flex'; 
             }
 
+            currentIAData = data; 
             iaDataContent.innerHTML = html;
             iaDataModal.style.display = 'flex';
+        }
+
+        async function copiarDadosIA() {
+            if (!currentIAData) return;
+
+            const data = currentIAData;
+            const res = data.resultado || {};
+            
+            let texto = `🏢 *DADOS ENRIQUECIDOS POR IA*\n`;
+            texto += `Empresa: ${data.razaoSocial || '-'}\n`;
+            texto += `CNPJ: ${data.cnpj || '-'}\n`;
+            texto += `Consultado em: ${formatarData(data.consultadoEm)}\n\n`;
+
+            if (res.site || res.linkedin || res.instagram || res.facebook) {
+                texto += `--- 🌐 PRESENÇA DIGITAL ---\n`;
+                if (res.site) texto += `Site: ${res.site}\n`;
+                if (res.linkedin) texto += `LinkedIn: ${res.linkedin}\n`;
+                if (res.instagram) texto += `Instagram: ${res.instagram}\n`;
+                if (res.facebook) texto += `Facebook: ${res.facebook}\n`;
+                texto += `\n`;
+            }
+
+            if (res.telefones?.length || res.emails?.length || res.whatsapps?.length) {
+                texto += `--- 📞 CONTATOS ---\n`;
+                if (res.telefones?.length) texto += `Telefones: ${res.telefones.join(', ')}\n`;
+                if (res.whatsapps?.length) texto += `WhatsApp: ${res.whatsapps.join(', ')}\n`;
+                if (res.emails?.length) texto += `E-mails: ${res.emails.join(', ')}\n`;
+                texto += `\n`;
+            }
+
+            if (res.enderecoAtualizado) {
+                texto += `--- 📍 ENDEREÇO ---\n`;
+                texto += `${res.enderecoAtualizado}\n\n`;
+            }
+
+            if (res.descricaoEmpresa || res.informacoesAdicionais?.length) {
+                texto += `--- 📝 SOBRE A EMPRESA ---\n`;
+                if (res.descricaoEmpresa) texto += `${res.descricaoEmpresa}\n`;
+                if (res.informacoesAdicionais?.length) {
+                    res.informacoesAdicionais.forEach(info => { texto += `- ${info}\n`; });
+                }
+            }
+
+            try {
+                await navigator.clipboard.writeText(texto);
+                showWarning('Dados copiados para a área de transferência!', 'Sucesso');
+            } catch (err) {
+                console.error('Erro ao copiar:', err);
+                showWarning('Não foi possível copiar automaticamente. Tente selecionar o texto manualmente.', 'Atenção');
+            }
         }
 
         // ============================================================
@@ -1001,12 +1071,22 @@ document.addEventListener('DOMContentLoaded', async function() {
         function renderLinkedCnaes() { linkedCnaeList.innerHTML = ''; if (!currentLinkedCnaes.length) { linkedCnaeList.innerHTML = 'Nenhum CNAE vinculado.'; return; } currentLinkedCnaes.forEach((c, i) => { const d = document.createElement('div'); d.classList.add('linked-item'); d.innerHTML = `<span>${c.codigo} - ${c.descricao}</span><button onclick="removerCNAE(${i})"><i class="fas fa-times"></i></button>`; linkedCnaeList.appendChild(d); }); }
         window.removerCNAE = function(i) { currentLinkedCnaes.splice(i, 1); renderLinkedCnaes(); populateLinkSelect(); setDirty(true); };
         
+        // ✅ CORREÇÃO: Removido o 'confirmModal.style.display = none;' e melhorado o tratamento de erro
         document.getElementById('segmentoForm').addEventListener('submit', async function(e) {
             e.preventDefault(); const nome = segmentNome.value.trim(); if (!nome) { showWarning('Informe o nome do segmento.'); return; }
             try {
                 let segId = editingSegmentId;
-                if (editingSegmentId !== null) { await apiPut(`${API_URL}/segmentos/${editingSegmentId}`, { descricao: nome }); const s = segmentData.find(x => x.id === editingSegmentId); if (s) s.nome = nome; }
-                else { const novo = await apiPost(`${API_URL}/segmentos`, { descricao: nome }); segId = novo.codigo; segmentData.push({ id: segId, nome }); }
+                if (editingSegmentId !== null) { 
+                    await apiPut(`${API_URL}/segmentos/${editingSegmentId}`, { descricao: nome }); 
+                    const s = segmentData.find(x => x.id === editingSegmentId); 
+                    if (s) s.nome = nome; 
+                }
+                else { 
+                    const novo = await apiPost(`${API_URL}/segmentos`, { descricao: nome }); 
+                    segId = novo.codigo || novo.id; 
+                    segmentData.push({ id: segId, nome }); 
+                }
+                
                 if (segId) {
                     const atual = currentLinkedCnaes.map(c => c.codigo); const orig = originalLinkedCnaes.map(c => c.codigo);
                     for (const c of orig) if (!atual.includes(c)) { try { await apiDelete(`${API_URL}/segmentos/${segId}/cnaes/${c}`); } catch (e) {} }
@@ -1016,15 +1096,18 @@ document.addEventListener('DOMContentLoaded', async function() {
                 setDirty(false); originalLinkedCnaes = [...currentLinkedCnaes]; resetSegmentForm(); localStorage.removeItem(CACHE.SEGMENTOS.key); segmentData = []; segmentoCnaeLinks = [];
                 
                 showWarning('Segmento salvo com sucesso!', 'Sucesso');
-                confirmModal.style.display = 'none';
 
                 carregarSegmentos().then(() => {
                     updateSegmentFilter();
                     renderSegmentTable(segmentSearch.value);
                 });
 
-            } catch (e) { showWarning('Erro ao salvar segmento.'); }
+            } catch (err) { 
+                console.error('Erro ao salvar segmento:', err);
+                showWarning('Erro ao salvar segmento: ' + (err.message || 'Verifique os dados.'), 'Erro'); 
+            }
         });
+        
         if (btnCancelSegment) btnCancelSegment.addEventListener('click', () => resetSegmentForm());
         segmentSearch.addEventListener('input', function() { renderSegmentTable(this.value); });
         
@@ -1068,6 +1151,9 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         document.getElementById('close-ia-data-modal')?.addEventListener('click', () => iaDataModal.style.display = 'none');
         iaDataModal?.addEventListener('click', function(e) { if (e.target === this) iaDataModal.style.display = 'none'; });
+        if (btnCopiarIA) {
+            btnCopiarIA.addEventListener('click', copiarDadosIA);
+        }
 
         function setIconConfirmacao(titulo) {
             const iconWrapper = document.getElementById('confirm-icon-wrapper');

@@ -547,7 +547,6 @@
             <p>Para acessar o sistema, escolha com qual empresa você deseja trabalhar agora.</p>
             
             <div class="form-group" style="text-align: left; margin-top: 20px;">
-                <!-- Deixamos o select limpo, o script.js cria a estrutura visual sozinho -->
                 <select id="empresa-select-obrigatoria" class="input">
                     <option value="">— Escolha uma empresa —</option>
                 </select>
@@ -754,7 +753,12 @@
             <div class="modal-scroll-area" id="ia-data-content" style="padding-right: 15px;">
                 <!-- O conteúdo será injetado pelo JavaScript -->
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer" style="justify-content: space-between;">
+                <!-- ✅ BOTÃO DE COPIAR -->
+                <button class="btn-secondary" id="btn-copiar-ia" style="display: none; border-color: #2463eb; color: #2463eb;">
+                    <i class="fas fa-copy"></i> Copiar Dados
+                </button>
+                
                 <button class="btn-primary" onclick="document.getElementById('ia-data-modal').style.display='none'">Fechar</button>
             </div>
         </div>
