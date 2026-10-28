@@ -374,13 +374,16 @@ body { background: var(--bg-body); color: var(--text-main); }
     border-radius: 10px;
     box-shadow: 10px 0 30px rgba(0, 0, 0, 0.6);
     padding: 6px;
+    
     top: 0 !important; 
     bottom: auto !important;
     left: calc(100% + 8px) !important; 
     right: auto !important; 
     width: 250px; 
+    
     max-height: 160px; 
     overflow-y: auto;
+    
     animation: fadeInRight 0.15s ease !important;
 }
 
@@ -422,24 +425,20 @@ body { background: var(--bg-body); color: var(--text-main); }
 .status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #13b879; margin-right: 6px; }
 .header-right { display: flex; align-items: center; gap: 16px; flex-shrink: 0; }
 
-/* ============================================================
-   CABEÇALHO: EMPRESA GRANDE E COMPETÊNCIA PEQUENA
-   ============================================================ */
-
-/* 1. EMPRESA ATIVA (Bem grande e destacada) */
+/* ✅ EMPRESA ATIVA NO CABEÇALHO (GRANDE) */
 .empresa-ativa-header {
     display: flex;
     align-items: center;
     gap: 12px; 
     background: #eff6ff;
-    border: 2px solid #bfdbfe;
+    border: 2px solid #bfdbfe; 
     border-radius: 10px;
     padding: 8px 16px;
     box-shadow: 0 4px 10px rgba(36, 99, 235, 0.1);
     color: #1e40af;
     font-size: 16px;
     font-weight: 800;
-    text-transform: uppercase;
+    text-transform: uppercase; 
     letter-spacing: 0.5px;
     max-width: 350px; 
     white-space: nowrap;
@@ -447,59 +446,21 @@ body { background: var(--bg-body); color: var(--text-main); }
     text-overflow: ellipsis;
     animation: fadeInRight 0.3s ease;
 }
-
-.empresa-ativa-header i { 
-    font-size: 22px; 
-    color: #2463eb; 
-}
-
+.empresa-ativa-header i { font-size: 22px; color: #2463eb; }
 body.dark-mode .empresa-ativa-header {
     background: #1e3a5f;
     border-color: #3b82f6;
     color: #93c5fd;
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
 }
-body.dark-mode .empresa-ativa-header i { 
-    color: #60a5fa; 
-}
+body.dark-mode .empresa-ativa-header i { color: #60a5fa; }
 
-
-/* 2. COMPETÊNCIA (Restaurando para o tamanho pequeno e caixinha) */
-.competencia-header { 
-    display: flex; 
-    align-items: center; 
-    gap: 8px; 
-    background: var(--bg-card); 
-    border: 1px solid var(--border-color); 
-    border-radius: 8px; 
-    padding: 4px 12px; 
-    box-shadow: 0 2px 5px rgba(0,0,0,.03); 
-}
-
-.competencia-header .calendar { 
-    font-size: 14px; 
-    color: #2463eb; 
-}
-
-body.dark-mode .competencia-header .calendar { 
-    color: #60a5fa; 
-}
-
-.competencia-header .competencia-text strong { 
-    display: block; 
-    font-size: 9px; 
-    color: var(--text-secondary); 
-    text-transform: uppercase; 
-    letter-spacing: 0.5px; 
-}
-
-.competencia-header .competencia-text span { 
-    display: block; 
-    font-size: 12px; 
-    color: var(--text-main); 
-    font-weight: 700; 
-    line-height: 1.2; 
-}
+/* ✅ COMPETÊNCIA (PEQUENA E ORIGINAL) */
+.competencia-header { display: flex; align-items: center; gap: 8px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 4px 12px; box-shadow: 0 2px 5px rgba(0,0,0,.03); }
+.competencia-header .calendar { font-size: 14px; color: #2463eb; }
+body.dark-mode .competencia-header .calendar { color: #60a5fa; }
+.competencia-header .competencia-text strong { display: block; font-size: 9px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+.competencia-header .competencia-text span { display: block; font-size: 12px; color: var(--text-main); font-weight: 700; line-height: 1.2; }
 
 /* ================== CARDS KPI ================== */
 .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 24px; }
@@ -1113,18 +1074,119 @@ body.dark-mode .vendedor-stat-color { box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
    CORREÇÃO DO DROPDOWN NO MODAL DE SELEÇÃO DE EMPRESA
    ============================================================ */
 #empresa-select-modal .modal-content {
-    overflow: visible !important; /* Deixa o dropdown escapar da caixa do modal */
+    overflow: visible !important; 
     height: auto !important;
-    min-height: 380px; /* Deixa o modal um pouco mais alto */
+    min-height: 380px; 
     padding-bottom: 30px;
 }
-
-/* Garante que o menu do dropdown fique acima de qualquer outro elemento da tela */
 #empresa-select-modal .custom-select-options {
     z-index: 2147483001 !important; 
 }
-
-/* Dá um respiro extra entre o select e o botão */
 #empresa-select-modal .form-group {
     margin-bottom: 20px;
+}
+
+/* ============================================================
+   ESTILOS DO MODAL DE DADOS COM IA
+   ============================================================ */
+@keyframes pulseBar {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(200%); }
+}
+
+.ia-section {
+    background: var(--bg-body);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.ia-section h4 {
+    font-size: 14px;
+    color: var(--text-main);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 8px;
+}
+
+.ia-section h4 i {
+    color: #2463eb;
+}
+
+.ia-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.ia-item {
+    font-size: 13px;
+    color: var(--text-secondary);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ia-item strong {
+    color: var(--text-main);
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.ia-item a {
+    color: #2463eb;
+    text-decoration: none;
+}
+
+.ia-item a:hover {
+    text-decoration: underline;
+}
+
+.ia-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.ia-list li {
+    background: #eff6ff;
+    color: #1e40af;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+body.dark-mode .ia-list li {
+    background: #1e3a5f;
+    color: #60a5fa;
+}
+
+.ia-description {
+    font-size: 14px;
+    color: var(--text-main);
+    line-height: 1.6;
+    margin-top: 10px;
+}
+
+.ia-additional-list {
+    padding-left: 20px;
+    margin: 10px 0 0 0;
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+body.dark-mode .ia-section {
+    background: rgba(0, 0, 0, 0.2);
 }
