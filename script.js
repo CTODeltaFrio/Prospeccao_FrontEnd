@@ -372,6 +372,53 @@ document.addEventListener('DOMContentLoaded', async function() {
                 if (r.status === 403) { contextoCache = { administradorGlobal: false, empresas: [], funcionalidades: [], semAcesso: true }; atualizarSeletorEmpresa(); return contextoCache; }
                 if (!r.ok) return null;
                 const json = await r.json(); const ctx = json?.dados ?? json;
+                
+                // ✅ Define o contexto temporariamente para verificar se é admin
+                contextoCache = ctx;
+                const isAdmin = isAdminGlobal();
+
+                // ✅ FILTRO: Se o usuário logado for um vendedor E NÃO for admin, limitar as empresas às vinculadas a ele
+                if (!isAdmin) {
+                    try {
+                        const sessaoResp = await fetch(`${API_URL}/sessao`, { method: 'GET', credentials: 'include', headers: { 'Accept': 'application/json' } });
+                        if (sessaoResp.ok) {
+                            const sessaoJson = await sessaoResp.json();
+                            const usuarioId = sessaoJson?.dados?.usuario?.id || sessaoJson?.usuario?.id;
+                            
+                            if (usuarioId) {
+                                const vResp = await fetch(`${API_URL}/prospeccao/vendedores`, { method: 'GET', credentials: 'include', headers: { 'Accept': 'application/json' } });
+                                if (vResp.ok) {
+                                    const vJson = await vResp.json();
+                                    const listaVend = Array.isArray(vJson) ? vJson : (vJson?.dados || vJson?.registros || vJson?.vendedores || vJson?.itens || []);
+                                    
+                                    const vendedor = listaVend.find(v => 
+                                        String(v.usuarioId) === String(usuarioId) || 
+                                        String(v.loginId) === String(usuarioId) || 
+                                        (Array.isArray(v.loginIds) && v.loginIds.map(String).includes(String(usuarioId)))
+                                    );
+                                    
+                                    if (vendedor) {
+                                        let empIds = vendedor.empresaIds || [];
+                                        if (Array.isArray(vendedor.empresas) && vendedor.empresas.length > 0) {
+                                            empIds = vendedor.empresas.map(e => e.empresaId || e.id);
+                                        }
+                                        
+                                        if (empIds.length > 0 && ctx.empresas) {
+                                            const filtradas = ctx.empresas.filter(e => empIds.map(String).includes(String(e.id)));
+                                            if (filtradas.length > 0) {
+                                                ctx.empresas = filtradas;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } catch (errFiltro) {
+                        console.warn('[Contexto] Falha ao tentar filtrar empresas pelo vendedor:', errFiltro);
+                    }
+                }
+
+                // Atualiza o cache com o contexto possivelmente filtrado
                 contextoCache = ctx;
                 const ativo = obterEmpresaAtivaId(); const ids = (ctx?.empresas || []).map(e => String(e.id));
                 if (ativo && !ids.includes(String(ativo))) definirEmpresaAtivaId(null);
@@ -917,9 +964,9 @@ document.addEventListener('DOMContentLoaded', async function() {
 
             cnpjAtivoCRM = cnpj;
             
-            // ✅ Preenche automaticamente os campos ocultos com os dados da empresa
-            document.getElementById('det-crm-nome').value = c.nomeFantasia || c.razaoSocial || '';
-            document.getElementById('det-crm-cargo').value = ''; // Cargo não é necessário
+            // ✅ Preenche o Nome e Cargo vazios, e os demais ocultos com os dados da empresa
+            document.getElementById('det-crm-nome').value = '';
+            document.getElementById('det-crm-cargo').value = '';
             document.getElementById('det-crm-telefone').value = c.telefone1 || c.telefone2 || '';
             document.getElementById('det-crm-email').value = c.email || '';
             document.getElementById('det-crm-observacao').value = '';
@@ -1105,16 +1152,17 @@ document.addEventListener('DOMContentLoaded', async function() {
                 const empresaId = obterEmpresaAtivaId();
                 if (!empresaId) return showWarning('Nenhuma empresa ativa selecionada.', 'Atenção');
                 
-                // Pega os valores auto-preenchidos (campos ocultos)
+                // Pega os valores
                 let nome = document.getElementById('det-crm-nome')?.value.trim() || null;
+                let cargo = document.getElementById('det-crm-cargo')?.value.trim() || null;
                 let telefone = document.getElementById('det-crm-telefone')?.value.trim() || null;
                 let email = document.getElementById('det-crm-email')?.value.trim() || null;
                 let observacao = document.getElementById('det-crm-observacao')?.value.trim() || null;
 
-                // Não envia cargo, pois não é necessário
-                
-                // Validações básicas de tamanho
-                if (nome && nome.length > 200) return showWarning('Nome deve ter até 200 caracteres.', 'Atenção');
+                // Validações básicas
+                if (!nome) return showWarning('Por favor, informe o nome da pessoa que atende na empresa.', 'Atenção');
+                if (nome.length > 200) return showWarning('Nome deve ter até 200 caracteres.', 'Atenção');
+                if (cargo && cargo.length > 100) return showWarning('Cargo deve ter até 100 caracteres.', 'Atenção');
                 if (telefone && telefone.length > 40) return showWarning('Telefone deve ter até 40 caracteres.', 'Atenção');
                 if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return showWarning('E-mail inválido.', 'Atenção');
                 if (observacao && observacao.length > 2000) return showWarning('Observação deve ter até 2000 caracteres.', 'Atenção');
@@ -1125,10 +1173,11 @@ document.addEventListener('DOMContentLoaded', async function() {
 
                 const payload = {
                     vendedorId,
-                    idempotencyKey: getOrCreateIdempotencyKey(cnpjAtivoCRM)
+                    idempotencyKey: getOrCreateIdempotencyKey(cnpjAtivoCRM),
+                    nome
                 };
                 
-                if (nome) payload.nome = nome;
+                if (cargo) payload.cargo = cargo;
                 if (telefone) payload.telefone = telefone;
                 if (email) payload.email = email;
                 if (observacao) payload.observacao = observacao;
@@ -1159,11 +1208,19 @@ document.addEventListener('DOMContentLoaded', async function() {
                     }
                 } catch (err) {
                     console.error('[CRM] Erro:', err);
-                    // Se deu erro de rede, mantemos a chave para tentar novamente
+                    
+                    // ✅ TRATAMENTO ESPECÍFICO DE ERROS DO CRM
                     if (err.status === 409) {
                         showWarning('Este lead já foi enviado ou está em processamento.', 'Atenção');
                         resetIdempotencia();
-                    } else {
+                    } 
+                    else if (err.codigo === 'autor_sem_perfil_ecossistema' || (err.message && err.message.includes('Ecossistema'))) {
+                        showWarning(
+                            'Não foi possível enviar o lead. O seu e-mail de acesso ao Prospect não está vinculado ao Ecossistema da empresa. Por favor, entre em contato com o administrador para solicitar a vinculação.', 
+                            'Atenção'
+                        );
+                    } 
+                    else {
                         showWarning('Erro ao enviar: ' + (err.message || 'Tente novamente'), 'Erro');
                     }
                 } finally {
