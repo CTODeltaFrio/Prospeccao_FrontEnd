@@ -564,14 +564,15 @@ document.addEventListener('DOMContentLoaded', async function() {
             const cache = cacheGet(CACHE.SEGMENTOS);
             if (cache) { segmentData = cache.segmentData || []; segmentoCnaeLinks = cache.segmentoCnaeLinks || []; updateSegmentFilter(); renderSegmentTable(); populateLinkSelect(); return; }
             try {
-                const res = await apiGet(`${API_URL}/segmentos`);
+                // ✅ CORREÇÃO: Usar o endpoint de prospecção
+                const res = await apiGet(`${API_URL}/prospeccao/segmentos`);
                 const data = Array.isArray(res) ? res : (res?.dados || res?.registros || res?.content || res?.itens || []);
                 segmentData = data.map(i => ({ id: i.codigo ?? i.id, nome: i.descricao ?? i.nome })); 
                 segmentoCnaeLinks = [];
                 const cnaesVistos = new Set(allCnaesCache.map(x => String(x.codigo).trim()));
                 await executarEmLotesComPausa(segmentData, 3, 20, async (seg) => {
                     try { 
-                        const resCnaes = await apiGet(`${API_URL}/segmentos/${seg.id}/cnaes`); 
+                        const resCnaes = await apiGet(`${API_URL}/prospeccao/segmentos/${seg.id}/cnaes`); 
                         const cnaes = Array.isArray(resCnaes) ? resCnaes : (resCnaes?.dados || resCnaes?.registros || resCnaes?.content || resCnaes?.itens || []);
                         cnaes.forEach(c => { 
                             if (!segmentoCnaeLinks.some(l => l.segmentoId === seg.id && l.cnaeCodigo === c.codigo)) segmentoCnaeLinks.push({ segmentoId: seg.id, cnaeCodigo: c.codigo }); 
@@ -1039,20 +1040,20 @@ document.addEventListener('DOMContentLoaded', async function() {
             try {
                 let segId = editingSegmentId;
                 if (editingSegmentId !== null) { 
-                    await apiPut(`${API_URL}/segmentos/${editingSegmentId}`, { descricao: nome }); 
+                    await apiPut(`${API_URL}/prospeccao/segmentos/${editingSegmentId}`, { descricao: nome }); 
                     const s = segmentData.find(x => x.id === editingSegmentId); 
                     if (s) s.nome = nome; 
                 }
                 else { 
-                    const novo = await apiPost(`${API_URL}/segmentos`, { descricao: nome }); 
+                    const novo = await apiPost(`${API_URL}/prospeccao/segmentos`, { descricao: nome }); 
                     segId = novo.codigo || novo.id; 
                     segmentData.push({ id: segId, nome }); 
                 }
                 
                 if (segId) {
                     const atual = currentLinkedCnaes.map(c => c.codigo); const orig = originalLinkedCnaes.map(c => c.codigo);
-                    for (const c of orig) if (!atual.includes(c)) { try { await apiDelete(`${API_URL}/segmentos/${segId}/cnaes/${c}`); } catch (e) {} }
-                    for (const c of currentLinkedCnaes) { if (orig.includes(c.codigo)) continue; try { await apiPost(`${API_URL}/segmentos/${segId}/cnaes`, { cnae: c.codigo }); } catch (e) {} }
+                    for (const c of orig) if (!atual.includes(c)) { try { await apiDelete(`${API_URL}/prospeccao/segmentos/${segId}/cnaes/${c}`); } catch (e) {} }
+                    for (const c of currentLinkedCnaes) { if (orig.includes(c.codigo)) continue; try { await apiPost(`${API_URL}/prospeccao/segmentos/${segId}/cnaes`, { cnae: c.codigo }); } catch (e) {} }
                 }
                 
                 setDirty(false); originalLinkedCnaes = [...currentLinkedCnaes]; resetSegmentForm(); localStorage.removeItem(CACHE.SEGMENTOS.key); segmentData = []; segmentoCnaeLinks = [];
@@ -1076,7 +1077,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         async function editarSegmento(id) {
             const seg = segmentData.find(s => s.id === id); if (!seg) return;
             editingSegmentId = id; segmentNome.value = seg.nome; btnSaveSegment.innerText = 'Atualizar segmento'; btnSaveSegment.classList.add('editing-btn'); btnCancelSegment.style.display = 'inline-block'; formTitle.innerText = 'Editar segmento'; segmentFormCard.classList.add('editing-mode');
-            try { const cnaes = await apiGet(`${API_URL}/segmentos/${id}/cnaes`); const list = []; for (const c of cnaes) { let full = allCnaesCache.find(x => x.codigo === c.codigo); if (!full) { full = await buscarDetalhesCnae(c.codigo); if (full) allCnaesCache.push(full); else full = { codigo: c.codigo, descricao: 'CNAE não encontrado', full: c.codigo }; } list.push(full); } currentLinkedCnaes = list; originalLinkedCnaes = [...list]; renderLinkedCnaes(); populateLinkSelect(); }
+            try { const cnaes = await apiGet(`${API_URL}/prospeccao/segmentos/${id}/cnaes`); const list = []; for (const c of cnaes) { let full = allCnaesCache.find(x => x.codigo === c.codigo); if (!full) { full = await buscarDetalhesCnae(c.codigo); if (full) allCnaesCache.push(full); else full = { codigo: c.codigo, descricao: 'CNAE não encontrado', full: c.codigo }; } list.push(full); } currentLinkedCnaes = list; originalLinkedCnaes = [...list]; renderLinkedCnaes(); populateLinkSelect(); }
             catch (e) { currentLinkedCnaes = []; originalLinkedCnaes = []; renderLinkedCnaes(); populateLinkSelect(); }
             setDirty(true);
         }
@@ -1085,11 +1086,11 @@ document.addEventListener('DOMContentLoaded', async function() {
             const seg = segmentData.find(s => s.id === id); if (!seg) { showWarning('Segmento não encontrado.'); return; }
             showConfirm('Excluir Segmento', `Tem certeza que deseja excluir "${seg.nome}"?`, async function() {
                 try {
-                    const cnaes = await apiGet(`${API_URL}/segmentos/${id}/cnaes`);
+                    const cnaes = await apiGet(`${API_URL}/prospeccao/segmentos/${id}/cnaes`);
                     for (const c of cnaes) {
-                        try { await apiDelete(`${API_URL}/segmentos/${id}/cnaes/${c.codigo}`); } catch(err) {}
+                        try { await apiDelete(`${API_URL}/prospeccao/segmentos/${id}/cnaes/${c.codigo}`); } catch(err) {}
                     }
-                    await apiDelete(`${API_URL}/segmentos/${id}`);
+                    await apiDelete(`${API_URL}/prospeccao/segmentos/${id}`);
                     
                     segmentData = segmentData.filter(s => s.id !== id);
                     segmentoCnaeLinks = segmentoCnaeLinks.filter(l => l.segmentoId !== id);
