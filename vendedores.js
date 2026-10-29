@@ -449,8 +449,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (t.length < 2) { vendEmpresaSugg?.classList.remove('active'); if (vendEmpresaSugg) vendEmpresaSugg.innerHTML = ''; return; }
                 empresaDebounce = setTimeout(async () => { await carregarListaEmpresas(); renderSugestoesEmpresas(buscarEmpresas(t)); }, 200);
             });
-            vendEmpresaSearch.addEventListener('focus', async () => { await carregarListaEmpresas(); if (!empresasLista || empresasLista.length === 0) { renderSugestoesEmpresas([]); return; } const t = vendEmpresaSearch.value.trim(); if (t.length === 0) renderSugestoesEmpresas(empresasLista.slice(0, 20)); else if (t.length >= 2) renderSugestoesEmpresas(buscarEmpresas(t)); });
-        }
+                        vendEmpresaSearch.addEventListener('focus', async () => { 
+                await carregarListaEmpresas(); 
+                const t = vendEmpresaSearch.value.trim(); 
+                // ✅ Só mostra a lista se o usuário já tiver digitado pelo menos 2 letras
+                if (t.length >= 2) {
+                    renderSugestoesEmpresas(buscarEmpresas(t)); 
+                } else {
+                    vendEmpresaSugg.classList.remove('active');
+                    vendEmpresaSugg.innerHTML = '';
+                }
+            });}
 
         // ============================================================
         // DDDs e CIDADES

@@ -4,9 +4,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     const API_URL = '/api';
     const API_MAPAS = '/api/mapas';
 
-    // ============================================================
-    // ✅ APPCORE FALLBACK
-    // ============================================================
     const criarAppCoreFallback = () => ({
         apiGet: async () => { throw new Error('AppCore não inicializado'); },
         apiPost: async () => { throw new Error('AppCore não inicializado'); },
@@ -20,7 +17,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         showConfirm: (t, m, cb) => { if (confirm(m)) cb(); },
         refreshCustomSelect: () => {}, formatarTelefone: (ddd, num) => num || '-',
         extrairErroResposta: (json, http) => ({ codigo: json?.codigo ?? null, mensagem: json?.mensagem || json?.message || `HTTP ${http || '?'}`, traceId: json?.traceId || '' }),
-        extrairErro: (err) => ({ codigo: null, mensagem: String(err), traceId: '' }),
         API_URL: '/api',
         getMapInstance: () => null, getVendedores: () => [], carregarVendedoresMapa: async () => [],
         getContexto: () => null, getEmpresaAtivaId: () => null, setEmpresaAtivaId: () => {}, carregarContexto: async () => null,
@@ -30,9 +26,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     window.AppCore.__isFallback = true;
 
     try {
-        // ============================================================
-        // CACHE E HELPERS
-        // ============================================================
         const CACHE = {
             UFS: { key: 'deltafrio_ufs_v2', ttl: 24 * 60 * 60 * 1000 },
             DDDS: { key: 'deltafrio_ddds_v2', ttl: 24 * 60 * 60 * 1000 },
@@ -64,7 +57,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             await Promise.all(Array.from({ length: Math.min(limite, itens.length) }, worker));
         }
 
-        // ✅ HELPER DE DATA
         function formatarData(isoString) {
             if (!isoString) return '—';
             try {
@@ -74,13 +66,19 @@ document.addEventListener('DOMContentLoaded', async function() {
             } catch (e) { return isoString; }
         }
 
-        // ============================================================
-        // VENDEDORES DO MAPA
-        // ============================================================
         const CORES_VENDEDORES = ['#2463eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#14b8a6', '#a855f7', '#0ea5e9', '#dc2626', '#22c55e', '#eab308', '#64748b'];
         let vendedoresMapa = [];
         let vendedoresMapaCarregados = false;
         let vendedoresMapaPromise = null;
+        
+        // ✅ Variáveis para o CRM
+        let cnpjAtivoCRM = null; 
+        let idempotencyKeyAtual = null;
+        let cnpjIdempotenciaAtual = null;
+        let envioEmAndamento = false;
+        let pollingTimeout = null;
+        let tentativasPolling = 0;
+        const MAX_POLLING = 20; // 20 * 3s = 60s
 
         async function carregarVendedoresMapa() {
             if (vendedoresMapaCarregados) return vendedoresMapa;
@@ -89,20 +87,14 @@ document.addEventListener('DOMContentLoaded', async function() {
             vendedoresMapaPromise = (async () => {
                 try {
                     const envelope = await apiGetEnvelope(`${API_URL}/prospeccao/vendedores`);
-                    const listaOriginal = Array.isArray(envelope) ? envelope 
-                        : (envelope && Array.isArray(envelope.dados)) ? envelope.dados 
-                        : (envelope && Array.isArray(envelope.registros)) ? envelope.registros 
-                        : (envelope && Array.isArray(envelope.vendedores)) ? envelope.vendedores 
-                        : (envelope && Array.isArray(envelope.itens)) ? envelope.itens : [];
+                    const listaOriginal = Array.isArray(envelope) ? envelope : (envelope && Array.isArray(envelope.dados)) ? envelope.dados : (envelope && Array.isArray(envelope.registros)) ? envelope.registros : (envelope && Array.isArray(envelope.vendedores)) ? envelope.vendedores : (envelope && Array.isArray(envelope.itens)) ? envelope.itens : [];
 
                     vendedoresMapa = await Promise.all(listaOriginal.map(async (v, i) => {
                         let cobertura = null;
                         try {
                             const respCob = await apiGet(`${API_URL}/prospeccao/vendedores/${v.id}/cobertura`);
                             cobertura = respCob?.dados ?? respCob;
-                        } catch (e) {
-                            console.warn(`[mapa] Falha ao buscar cobertura do vendedor ${v.id}`, e);
-                        }
+                        } catch (e) {}
 
                         const cidadesDiretas = (cobertura?.cidadesDiretas || []).map(String);
                         const municipios = (cobertura?.municipios || []).map(m => ({
@@ -158,9 +150,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             return ativos;
         }
 
-        // ============================================================
-        // AUTENTICAÇÃO E MODO ESCURO
-        // ============================================================
         let sessaoCache = null;
         try {
             const respostaSessao = await fetch(`${API_URL}/sessao`, { method: 'GET', credentials: 'include', headers: { 'Accept': 'application/json' } });
@@ -172,14 +161,12 @@ document.addEventListener('DOMContentLoaded', async function() {
             const nome = sessaoCache.usuario.nome || 'Usuário';
             const email = sessaoCache.usuario.email || '—';
             const iniciais = nome.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
-            
             const elAvatar = document.getElementById('user-avatar');
             const elNameMini = document.getElementById('user-name-mini');
             const elEmailMini = document.getElementById('user-email-mini');
             const elAvatarPopover = document.getElementById('user-avatar-popover');
             const elNamePopover = document.getElementById('user-name-popover');
             const elEmailPopover = document.getElementById('user-email-popover');
-            
             if (elAvatar) elAvatar.textContent = iniciais;
             if (elNameMini) elNameMini.textContent = nome.split(' ')[0];
             if (elEmailMini) elEmailMini.textContent = email;
@@ -191,50 +178,27 @@ document.addEventListener('DOMContentLoaded', async function() {
         const userWrapper = document.getElementById('sidebar-user-wrapper');
         const userBtn = document.getElementById('sidebar-user-btn');
         if (userBtn) {
-            userBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                userWrapper.classList.toggle('open');
-            });
+            userBtn.addEventListener('click', (e) => { e.stopPropagation(); userWrapper.classList.toggle('open'); });
         }
         document.addEventListener('click', (e) => {
-            if (userWrapper && !userWrapper.contains(e.target)) {
-                userWrapper.classList.remove('open');
-            }
+            if (userWrapper && !userWrapper.contains(e.target)) userWrapper.classList.remove('open');
         });
 
         const btnLight = document.getElementById('theme-btn-light');
         const btnDark = document.getElementById('theme-btn-dark');
-
         function atualizarToggleTema(isDark) {
             if (btnLight) btnLight.classList.toggle('active', !isDark);
             if (btnDark) btnDark.classList.toggle('active', isDark);
         }
-
-        if (localStorage.getItem('darkMode') === 'true') { 
-            document.body.classList.add('dark-mode'); 
-            atualizarToggleTema(true);
-        } else {
-            atualizarToggleTema(false);
-        }
-
-        if (btnLight) btnLight.addEventListener('click', () => {
-            document.body.classList.remove('dark-mode');
-            localStorage.setItem('darkMode', 'false');
-            atualizarToggleTema(false);
-        });
-
-        if (btnDark) btnDark.addEventListener('click', () => {
-            document.body.classList.add('dark-mode');
-            localStorage.setItem('darkMode', 'true');
-            atualizarToggleTema(true);
-        });
+        if (localStorage.getItem('darkMode') === 'true') { document.body.classList.add('dark-mode'); atualizarToggleTema(true); } else { atualizarToggleTema(false); }
+        if (btnLight) btnLight.addEventListener('click', () => { document.body.classList.remove('dark-mode'); localStorage.setItem('darkMode', 'false'); atualizarToggleTema(false); });
+        if (btnDark) btnDark.addEventListener('click', () => { document.body.classList.add('dark-mode'); localStorage.setItem('darkMode', 'true'); atualizarToggleTema(true); });
 
         const btnLogout = document.getElementById('btn-logout');
         if (btnLogout) {
             btnLogout.addEventListener('click', function () {
                 showConfirm('Sair do sistema', 'Deseja realmente sair?', async function() {
-                    btnLogout.disabled = true; 
-                    btnLogout.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saindo...';
+                    btnLogout.disabled = true; btnLogout.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saindo...';
                     try { 
                         const csrf = document.cookie.split('; ').find(c => c.startsWith('login_delta_csrf=')); 
                         const csrfValor = csrf ? decodeURIComponent(csrf.split('=')[1]) : ''; 
@@ -245,9 +209,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             });
         }
 
-        // ============================================================
-        // SIDEBAR E ELEMENTOS
-        // ============================================================
         const sidebar = document.getElementById('sidebar');
         const sidebarToggle = document.getElementById('sidebar-toggle');
         if (sidebarToggle) sidebarToggle.addEventListener('click', () => sidebar.classList.toggle('collapsed'));
@@ -309,11 +270,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         const iaDataContent = document.getElementById('ia-data-content');
         const globalLoading = document.getElementById('global-loading');
         const btnCopiarIA = document.getElementById('btn-copiar-ia');
+        const globalLoadingTitle = document.querySelector('#global-loading h2');
+        const globalLoadingDesc = document.querySelector('#global-loading p');
         let currentIAData = null; 
 
-        // ============================================================
-        // DADOS
-        // ============================================================
         let editingSegmentId = null;
         let currentLinkedCnaes = [];
         let originalLinkedCnaes = [];
@@ -335,18 +295,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         let isDirty = false;
         function setDirty(v) { isDirty = v; }
 
-        // ============================================================
-        // CONTEXTO + EMPRESA ATIVA
-        // ============================================================
         let contextoCache = null;
         let empresaAtivaId = null; 
 
         function obterEmpresaAtivaId() {
             if (empresaAtivaId) return empresaAtivaId;
-            if (contextoCache?.empresas?.length === 1) { 
-                empresaAtivaId = String(contextoCache.empresas[0].id); 
-                return empresaAtivaId; 
-            }
+            if (contextoCache?.empresas?.length === 1) { empresaAtivaId = String(contextoCache.empresas[0].id); return empresaAtivaId; }
             return null;
         }
 
@@ -358,53 +312,22 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         function atualizarSeletorEmpresa() {
             if (!companySelector || !companySelectorWrapper) return;
-            
             const empresas = contextoCache?.empresas || [];
             const elEmpresaMini = document.getElementById('user-empresa-mini');
-
-            if (!empresas.length) { 
-                companySelectorWrapper.style.display = 'none'; 
-                if (elEmpresaMini) elEmpresaMini.style.display = 'none';
-                return; 
-            }
-            
+            if (!empresas.length) { companySelectorWrapper.style.display = 'none'; if (elEmpresaMini) elEmpresaMini.style.display = 'none'; return; }
             companySelectorWrapper.style.display = 'block';
             const ativo = obterEmpresaAtivaId();
             companySelector.innerHTML = '';
-            
-            if (!ativo) { 
-                const opt = document.createElement('option'); 
-                opt.value = ''; 
-                opt.textContent = '— Selecione —'; 
-                companySelector.appendChild(opt); 
-            }
-            
-            empresas.forEach(e => { 
-                const opt = document.createElement('option'); 
-                opt.value = String(e.id); 
-                opt.textContent = e.nome || e.nomeFantasia || e.razaoSocial || `#${e.id}`; 
-                companySelector.appendChild(opt); 
-            });
-            
+            if (!ativo) { const opt = document.createElement('option'); opt.value = ''; opt.textContent = '— Selecione —'; companySelector.appendChild(opt); }
+            empresas.forEach(e => { const opt = document.createElement('option'); opt.value = String(e.id); opt.textContent = e.nome || e.nomeFantasia || e.razaoSocial || `#${e.id}`; companySelector.appendChild(opt); });
             if (ativo) companySelector.value = ativo;
-            
             refreshCustomSelect(companySelector);
-
             if (elEmpresaMini) {
                 if (ativo) {
                     const emp = empresas.find(e => String(e.id) === String(ativo));
-                    if (emp) {
-                        const nomeEmp = emp.nome || emp.nomeFantasia || emp.razaoSocial || 'Empresa';
-                        elEmpresaMini.innerHTML = `<i class="fas fa-building"></i> ${nomeEmp}`;
-                        elEmpresaMini.style.display = 'flex';
-                    } else {
-                        elEmpresaMini.innerHTML = `<i class="fas fa-building"></i> Selecione uma empresa`;
-                        elEmpresaMini.style.display = 'flex';
-                    }
-                } else {
-                    elEmpresaMini.innerHTML = `<i class="fas fa-building"></i> Selecione uma empresa`;
-                    elEmpresaMini.style.display = 'flex';
-                }
+                    if (emp) { const nomeEmp = emp.nome || emp.nomeFantasia || emp.razaoSocial || 'Empresa'; elEmpresaMini.innerHTML = `<i class="fas fa-building"></i> ${nomeEmp}`; elEmpresaMini.style.display = 'flex'; } 
+                    else { elEmpresaMini.innerHTML = `<i class="fas fa-building"></i> Selecione uma empresa`; elEmpresaMini.style.display = 'flex'; }
+                } else { elEmpresaMini.innerHTML = `<i class="fas fa-building"></i> Selecione uma empresa`; elEmpresaMini.style.display = 'flex'; }
             }
         }
 
@@ -412,14 +335,9 @@ document.addEventListener('DOMContentLoaded', async function() {
             const box = document.getElementById('header-empresa-ativa');
             const nomeEl = document.getElementById('header-empresa-nome');
             if (!box || !nomeEl) return;
-
             if (id && contextoCache?.empresas) {
                 const emp = contextoCache.empresas.find(e => String(e.id) === String(id));
-                if (emp) {
-                    nomeEl.textContent = emp.nome || emp.nomeFantasia || emp.razaoSocial || `#${emp.id}`;
-                    box.style.display = 'flex';
-                    return;
-                }
+                if (emp) { nomeEl.textContent = emp.nome || emp.nomeFantasia || emp.razaoSocial || `#${emp.id}`; box.style.display = 'flex'; return; }
             }
             box.style.display = 'none';
         }
@@ -429,43 +347,22 @@ document.addEventListener('DOMContentLoaded', async function() {
             const select = document.getElementById('empresa-select-obrigatoria');
             const btn = document.getElementById('btn-confirmar-empresa');
             if (!modal || !select || !btn) return;
-
             const empresas = contextoCache?.empresas || [];
             if (empresas.length === 0) return;
-
             if (empresas.length === 1) {
                 const idUnico = empresas[0].id;
-                if (obterEmpresaAtivaId() !== String(idUnico)) {
-                    definirEmpresaAtivaId(idUnico);
-                }
+                if (obterEmpresaAtivaId() !== String(idUnico)) definirEmpresaAtivaId(idUnico);
                 modal.style.display = 'none';
             } else {
                 if (!obterEmpresaAtivaId()) {
                     select.innerHTML = '<option value="">— Escolha uma empresa —</option>';
-                    empresas.forEach(e => {
-                        const opt = document.createElement('option');
-                        opt.value = String(e.id);
-                        opt.textContent = e.nome || e.nomeFantasia || e.razaoSocial || `#${e.id}`;
-                        select.appendChild(opt);
-                    });
-
+                    empresas.forEach(e => { const opt = document.createElement('option'); opt.value = String(e.id); opt.textContent = e.nome || e.nomeFantasia || e.razaoSocial || `#${e.id}`; select.appendChild(opt); });
                     btn.disabled = true;
                     select.onchange = () => { btn.disabled = !select.value; };
-                    btn.onclick = () => {
-                        if (select.value) {
-                            definirEmpresaAtivaId(select.value);
-                            modal.style.display = 'none';
-                        }
-                    };
-
-                    if (window.AppCore && window.AppCore.refreshCustomSelect) {
-                        setTimeout(() => window.AppCore.refreshCustomSelect(select), 100);
-                    }
-
+                    btn.onclick = () => { if (select.value) { definirEmpresaAtivaId(select.value); modal.style.display = 'none'; } };
+                    if (window.AppCore && window.AppCore.refreshCustomSelect) setTimeout(() => window.AppCore.refreshCustomSelect(select), 100);
                     modal.style.display = 'flex';
-                } else {
-                    modal.style.display = 'none';
-                }
+                } else { modal.style.display = 'none'; }
             }
         }
 
@@ -478,11 +375,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 contextoCache = ctx;
                 const ativo = obterEmpresaAtivaId(); const ids = (ctx?.empresas || []).map(e => String(e.id));
                 if (ativo && !ids.includes(String(ativo))) definirEmpresaAtivaId(null);
-                
-                atualizarSeletorEmpresa();
-                atualizarHeaderEmpresa(obterEmpresaAtivaId()); 
-                verificarSelecaoObrigatoria(); 
-                
+                atualizarSeletorEmpresa(); atualizarHeaderEmpresa(obterEmpresaAtivaId()); verificarSelecaoObrigatoria(); 
                 return ctx;
             } catch (e) { return null; }
         }
@@ -496,9 +389,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             });
         }
 
-        // ============================================================
-        // GUARDRAILS DE ADMIN
-        // ============================================================
         const FUNC_MENUS = { 'ADMINISTRAR_VENDEDORES': ['menu-vendedores'], 'ADMINISTRAR_SEGMENTOS': ['menu-segmentos'], 'CONSULTAR_MAPAS': ['menu-mapa'] };
         const ADMIN_MENU_IDS = ['gestao-menu-title', 'menu-segmentos', 'menu-vendedores', 'menu-mapa'];
 
@@ -529,9 +419,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (emTelaAdmin) showScreen('main');
         }
 
-        // ============================================================
-        // ERRO UNIFICADO E NAVEGAÇÃO
-        // ============================================================
         function extrairErroResposta(json, httpStatus) {
             if (!json) return { codigo: null, mensagem: `HTTP ${httpStatus || '?'}`, traceId: '' };
             if (json.codigo != null || (json.mensagem && !json.erros && !json.retorno)) return { codigo: json.codigo ?? null, mensagem: json.mensagem || 'Erro', traceId: json.traceId || '' };
@@ -563,9 +450,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         function normalizarTexto(t) { return t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
         function obterCsrf() { const m = document.cookie.split('; ').find(c => c.startsWith('login_delta_csrf=')); return m ? decodeURIComponent(m.split('=')[1]) : ''; }
 
-        // ============================================================
-        // API
-        // ============================================================
         async function apiGet(url) {
             const r = await fetch(url, { method: 'GET', credentials: 'include', headers: { 'Accept': 'application/json' } });
             const t = await r.text(); if (!t) return {};
@@ -580,8 +464,8 @@ document.addEventListener('DOMContentLoaded', async function() {
             const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' }; const csrf = obterCsrf(); if (csrf) headers['X-CSRF-Token'] = csrf;
             const r = await fetch(url, { method: 'POST', credentials: 'include', headers, body: JSON.stringify(body) });
             const t = await r.text(); let json; try { json = t ? JSON.parse(t) : {}; } catch (e) { json = {}; }
-            if (!r.ok) { const e = extrairErroResposta(json, r.status); const err = new Error(e.mensagem); err.codigo = e.codigo; err.traceId = e.traceId; throw err; }
-            return json;
+            if (!r.ok) { const e = extrairErroResposta(json, r.status); const err = new Error(e.mensagem); err.codigo = e.codigo; err.traceId = e.traceId; err.status = r.status; throw err; }
+            return { status: r.status, dados: json?.dados ?? json };
         }
 
         async function apiPut(url, body) {
@@ -604,9 +488,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             return null;
         }
 
-        // ============================================================
-        // CARREGAMENTOS AUXILIARES
-        // ============================================================
         async function carregarUFs() {
             const cache = cacheGet(CACHE.UFS);
             if (cache) { ufData = cache; filterUf.innerHTML = '<option value="">Todos</option>' + ufData.map(u => `<option value="${u.sigla}">${u.sigla}</option>`).join(''); refreshCustomSelect(filterUf); return; }
@@ -631,22 +512,16 @@ document.addEventListener('DOMContentLoaded', async function() {
             return null;
         }
 
-        // ============================================================
-        // SEGMENTOS
-        // ============================================================
         async function carregarSegmentos() {
             if (segmentData.length > 0) { updateSegmentFilter(); renderSegmentTable(); return; }
             const cache = cacheGet(CACHE.SEGMENTOS);
             if (cache) { segmentData = cache.segmentData || []; segmentoCnaeLinks = cache.segmentoCnaeLinks || []; updateSegmentFilter(); renderSegmentTable(); populateLinkSelect(); return; }
             try {
                 const res = await apiGet(`${API_URL}/segmentos`);
-                // ✅ CORREÇÃO: Trata retorno direto ou envelopado (dados, registros, content, itens)
                 const data = Array.isArray(res) ? res : (res?.dados || res?.registros || res?.content || res?.itens || []);
-                
                 segmentData = data.map(i => ({ id: i.codigo ?? i.id, nome: i.descricao ?? i.nome })); 
                 segmentoCnaeLinks = [];
                 const cnaesVistos = new Set(allCnaesCache.map(x => String(x.codigo).trim()));
-                
                 await executarEmLotesComPausa(segmentData, 3, 20, async (seg) => {
                     try { 
                         const resCnaes = await apiGet(`${API_URL}/segmentos/${seg.id}/cnaes`); 
@@ -654,18 +529,12 @@ document.addEventListener('DOMContentLoaded', async function() {
                         cnaes.forEach(c => { 
                             if (!segmentoCnaeLinks.some(l => l.segmentoId === seg.id && l.cnaeCodigo === c.codigo)) segmentoCnaeLinks.push({ segmentoId: seg.id, cnaeCodigo: c.codigo }); 
                             const cv = String(c.codigo).trim(); 
-                            if (!cnaesVistos.has(cv)) { 
-                                cnaesVistos.add(cv); 
-                                allCnaesCache.push({ codigo: cv, descricao: c.descricao || '', full: c.descricao ? `${cv} - ${c.descricao}` : cv }); 
-                            } 
+                            if (!cnaesVistos.has(cv)) { cnaesVistos.add(cv); allCnaesCache.push({ codigo: cv, descricao: c.descricao || '', full: c.descricao ? `${cv} - ${c.descricao}` : cv }); } 
                         }); 
                     } catch (e) {}
                 });
                 updateSegmentFilter(); renderSegmentTable(); populateLinkSelect(); cacheSet(CACHE.SEGMENTOS, { segmentData, segmentoCnaeLinks }); cacheSet(CACHE.CNAES, allCnaesCache);
-            } catch (e) { 
-                console.error('Erro ao carregar segmentos:', e);
-                if (filterSegmento) { filterSegmento.innerHTML = '<option value="">Todos</option>'; refreshCustomSelect(filterSegmento); } 
-            }
+            } catch (e) { if (filterSegmento) { filterSegmento.innerHTML = '<option value="">Todos</option>'; refreshCustomSelect(filterSegmento); } }
         }
 
         async function buscarCnaes(filtro) {
@@ -689,9 +558,6 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         async function carregarSituacoesCadastrais() { try { const d = await apiGet(`${API_URL}/situacoes-cadastrais`); return d.map(i => `${i.codigoDescricao}`); } catch (e) { return ['ATIVA', 'BAIXADA', 'SUSPENSA']; } }
 
-        // ============================================================
-        // IGNORADOS
-        // ============================================================
         async function carregarIgnorados() {
             if (ignoradosCarregados) return;
             const empresaId = obterEmpresaAtivaId();
@@ -711,9 +577,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             } catch (e) { ignorados = []; ignoradosFiltrados = []; ignoradosCarregados = true; renderIgnoradosTable(); const tb = document.getElementById('ignorados-table-body'); if (tb) tb.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:#dc2626;">Erro ao carregar ignorados: ${e?.message || 'erro desconhecido'}</td></tr>`; }
         }
 
-        // ============================================================
-        // CUSTOM SELECT, TEL E TABELAS AUXILIARES
-        // ============================================================
         function initializeCustomSelects() {
             document.querySelectorAll('select.input').forEach(select => {
                 if (select.closest('.custom-select')) return;
@@ -842,9 +705,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             } finally { btn.disabled = false; btn.innerHTML = origB; pesquisaController = null; }
         }
 
-        // ============================================================
-        // INTEGRAÇÃO COM A IA
-        // ============================================================
         async function solicitarDadosIA(cnpj) {
             showConfirm('Aviso de Espera', 'A busca de dados com Inteligência Artificial pode demorar até 2 minutos e o sistema ficará bloqueado durante o processo. Deseja continuar?', async () => {
                 const empresaId = obterEmpresaAtivaId();
@@ -854,11 +714,9 @@ document.addEventListener('DOMContentLoaded', async function() {
 
                 try {
                     const url = `${API_URL}/prospeccao/estabelecimentos/${encodeURIComponent(cnpj)}/enriquecimento?empresaId=${encodeURIComponent(empresaId)}`;
-                    const json = await apiPost(url, {}); 
-                    
-                    const dados = json?.dados ?? json;
+                    const resp = await apiPost(url, {}); 
+                    const dados = resp?.dados ?? resp;
                     renderIAData(dados);
-                    
                 } catch (err) {
                     console.error('[IA] Erro:', err);
                     if (err.message && (err.message.includes('502') || err.message.includes('504') || err.message.includes('Gateway'))) {
@@ -934,6 +792,16 @@ document.addEventListener('DOMContentLoaded', async function() {
                 if (btnCopiarIA) btnCopiarIA.style.display = 'inline-flex'; 
             }
 
+            // ✅ Atualiza os campos ocultos do CRM se a IA encontrou dados melhores
+            if (res.telefones && res.telefones.length > 0) {
+                const inputTel = document.getElementById('det-crm-telefone');
+                if (inputTel && !inputTel.value) inputTel.value = res.telefones[0]; // Só sobrescreve se estiver vazio
+            }
+            if (res.emails && res.emails.length > 0) {
+                const inputEmail = document.getElementById('det-crm-email');
+                if (inputEmail && !inputEmail.value) inputEmail.value = res.emails[0];
+            }
+
             currentIAData = data; 
             iaDataContent.innerHTML = html;
             iaDataModal.style.display = 'flex';
@@ -990,8 +858,47 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
 
         // ============================================================
-        // DETALHES DO ESTABELECIMENTO
+        // CRM: CARREGAR VENDEDORES NO MODAL
         // ============================================================
+        async function carregarVendedoresNoModal() {
+            const select = document.getElementById('det-vendedor-select');
+            if (!select) return;
+
+            select.innerHTML = '<option value="">— Carregando vendedores... —</option>';
+            
+            const empresaId = obterEmpresaAtivaId();
+            if (!empresaId) {
+                select.innerHTML = '<option value="">— Selecione uma empresa ativa —</option>';
+                if (typeof refreshCustomSelect === 'function') refreshCustomSelect(select);
+                return;
+            }
+
+            try {
+                const url = `${API_URL}/prospeccao/leads-crm/vendedores?empresaId=${encodeURIComponent(empresaId)}&pagina=1&tamanhoPagina=100`;
+                const response = await apiGet(url);
+                const lista = response?.registros || [];
+
+                select.innerHTML = '<option value="">— Selecione um vendedor —</option>';
+                
+                if (lista.length === 0) {
+                    select.innerHTML = '<option value="">— Nenhum vendedor cadastrado —</option>';
+                } else {
+                    lista.forEach(v => {
+                        const opt = document.createElement('option');
+                        opt.value = v.id; 
+                        opt.textContent = v.nome;
+                        select.appendChild(opt);
+                    });
+                }
+
+                if (typeof refreshCustomSelect === 'function') refreshCustomSelect(select);
+            } catch (e) {
+                console.error('Erro ao carregar vendedores:', e);
+                select.innerHTML = '<option value="">— Erro ao carregar —</option>';
+                if (typeof refreshCustomSelect === 'function') refreshCustomSelect(select);
+            }
+        }
+
         function openDetailsModal(cnpj, isIgn = false) {
             const list = isIgn ? ignorados : registros; const c = list.find(i => i.cnpj === cnpj); if (!c) return;
             const nomeExibicao = c.nomeFantasia || c.razaoSocial || 'sem nome'; const cnpjExibicao = c.cnpjFormatado || c.cnpj || '';
@@ -1008,10 +915,19 @@ document.addEventListener('DOMContentLoaded', async function() {
                 btnClassifyX.disabled = false;
             }
 
+            cnpjAtivoCRM = cnpj;
+            
+            // ✅ Preenche automaticamente os campos ocultos com os dados da empresa
+            document.getElementById('det-crm-nome').value = c.nomeFantasia || c.razaoSocial || '';
+            document.getElementById('det-crm-cargo').value = ''; // Cargo não é necessário
+            document.getElementById('det-crm-telefone').value = c.telefone1 || c.telefone2 || '';
+            document.getElementById('det-crm-email').value = c.email || '';
+            document.getElementById('det-crm-observacao').value = '';
+            
+            carregarVendedoresNoModal();
+
             const btnIA = document.getElementById('btn-dados-ia');
-            if (btnIA) {
-                btnIA.onclick = () => solicitarDadosIA(cnpj);
-            }
+            if (btnIA) btnIA.onclick = () => solicitarDadosIA(cnpj);
             
             detailsModal.style.display = 'flex';
         }
@@ -1071,7 +987,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         function renderLinkedCnaes() { linkedCnaeList.innerHTML = ''; if (!currentLinkedCnaes.length) { linkedCnaeList.innerHTML = 'Nenhum CNAE vinculado.'; return; } currentLinkedCnaes.forEach((c, i) => { const d = document.createElement('div'); d.classList.add('linked-item'); d.innerHTML = `<span>${c.codigo} - ${c.descricao}</span><button onclick="removerCNAE(${i})"><i class="fas fa-times"></i></button>`; linkedCnaeList.appendChild(d); }); }
         window.removerCNAE = function(i) { currentLinkedCnaes.splice(i, 1); renderLinkedCnaes(); populateLinkSelect(); setDirty(true); };
         
-        // ✅ CORREÇÃO: Removido o 'confirmModal.style.display = none;' e melhorado o tratamento de erro
         document.getElementById('segmentoForm').addEventListener('submit', async function(e) {
             e.preventDefault(); const nome = segmentNome.value.trim(); if (!nome) { showWarning('Informe o nome do segmento.'); return; }
             try {
@@ -1151,65 +1066,186 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         document.getElementById('close-ia-data-modal')?.addEventListener('click', () => iaDataModal.style.display = 'none');
         iaDataModal?.addEventListener('click', function(e) { if (e.target === this) iaDataModal.style.display = 'none'; });
-        if (btnCopiarIA) {
-            btnCopiarIA.addEventListener('click', copiarDadosIA);
+        if (btnCopiarIA) btnCopiarIA.addEventListener('click', copiarDadosIA);
+
+        // ============================================================
+        // REGISTRO CRM (Envio e Polling)
+        // ============================================================
+        function gerarIdempotencyKey() {
+            if (crypto && typeof crypto.randomUUID === 'function') {
+                return crypto.randomUUID();
+            }
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
+        function getOrCreateIdempotencyKey(cnpj) {
+            if (cnpjIdempotenciaAtual === cnpj && idempotencyKeyAtual) return idempotencyKeyAtual;
+            cnpjIdempotenciaAtual = cnpj;
+            idempotencyKeyAtual = gerarIdempotencyKey();
+            return idempotencyKeyAtual;
+        }
+
+        function resetIdempotencia() {
+            cnpjIdempotenciaAtual = null;
+            idempotencyKeyAtual = null;
+        }
+
+        const btnRegistroCRM = document.getElementById('btn-registro-crm');
+        if (btnRegistroCRM) {
+            btnRegistroCRM.addEventListener('click', async () => {
+                if (envioEmAndamento) return;
+
+                const vendedorIdStr = document.getElementById('det-vendedor-select')?.value;
+                if (!vendedorIdStr) return showWarning('Por favor, selecione um vendedor no topo da tela.', 'Atenção');
+                const vendedorId = parseInt(vendedorIdStr, 10);
+
+                const empresaId = obterEmpresaAtivaId();
+                if (!empresaId) return showWarning('Nenhuma empresa ativa selecionada.', 'Atenção');
+                
+                // Pega os valores auto-preenchidos (campos ocultos)
+                let nome = document.getElementById('det-crm-nome')?.value.trim() || null;
+                let telefone = document.getElementById('det-crm-telefone')?.value.trim() || null;
+                let email = document.getElementById('det-crm-email')?.value.trim() || null;
+                let observacao = document.getElementById('det-crm-observacao')?.value.trim() || null;
+
+                // Não envia cargo, pois não é necessário
+                
+                // Validações básicas de tamanho
+                if (nome && nome.length > 200) return showWarning('Nome deve ter até 200 caracteres.', 'Atenção');
+                if (telefone && telefone.length > 40) return showWarning('Telefone deve ter até 40 caracteres.', 'Atenção');
+                if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return showWarning('E-mail inválido.', 'Atenção');
+                if (observacao && observacao.length > 2000) return showWarning('Observação deve ter até 2000 caracteres.', 'Atenção');
+
+                // Se e-mail estiver vazio, não enviar "" e sim null
+                if (email === '') email = null;
+                if (telefone === '') telefone = null;
+
+                const payload = {
+                    vendedorId,
+                    idempotencyKey: getOrCreateIdempotencyKey(cnpjAtivoCRM)
+                };
+                
+                if (nome) payload.nome = nome;
+                if (telefone) payload.telefone = telefone;
+                if (email) payload.email = email;
+                if (observacao) payload.observacao = observacao;
+
+                const originalText = btnRegistroCRM.innerHTML;
+                btnRegistroCRM.disabled = true;
+                btnRegistroCRM.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+                envioEmAndamento = true;
+
+                try {
+                    const url = `${API_URL}/prospeccao/leads-crm/${encodeURIComponent(cnpjAtivoCRM)}/envios?empresaId=${encodeURIComponent(empresaId)}`;
+                    
+                    const response = await apiPost(url, payload);
+                    const estado = response.dados?.estado;
+                    const operacaoId = response.dados?.operacaoId;
+
+                    if (estado === 'pendente') {
+                        // Inicia polling
+                        mostrarProcessamentoCRM(operacaoId);
+                    } else if (estado === 'concluida') {
+                        resetIdempotencia();
+                        detailsModal.style.display = 'none';
+                        showWarning('Lead enviado e concluído com sucesso!', 'Sucesso');
+                        // Recarrega a lista principal (o registro que virou C sairá)
+                        pesquisarProspeccao(); 
+                    } else {
+                        throw new Error('Estado desconhecido: ' + estado);
+                    }
+                } catch (err) {
+                    console.error('[CRM] Erro:', err);
+                    // Se deu erro de rede, mantemos a chave para tentar novamente
+                    if (err.status === 409) {
+                        showWarning('Este lead já foi enviado ou está em processamento.', 'Atenção');
+                        resetIdempotencia();
+                    } else {
+                        showWarning('Erro ao enviar: ' + (err.message || 'Tente novamente'), 'Erro');
+                    }
+                } finally {
+                    btnRegistroCRM.disabled = false;
+                    btnRegistroCRM.innerHTML = originalText;
+                    envioEmAndamento = false;
+                }
+            });
+        }
+
+        function mostrarProcessamentoCRM(operacaoId) {
+            if (!operacaoId) return;
+            detailsModal.style.display = 'none'; // Fecha o modal de detalhes
+            
+            if (globalLoadingTitle) globalLoadingTitle.innerText = 'Envio em processamento';
+            if (globalLoadingDesc) globalLoadingDesc.innerText = 'O lead está sendo processado no CRM. Por favor, aguarde.';
+            if (globalLoading) globalLoading.style.display = 'flex';
+
+            tentativasPolling = 0;
+            if (pollingTimeout) clearTimeout(pollingTimeout);
+            
+            verificarStatusOperacao(operacaoId);
+        }
+
+        async function verificarStatusOperacao(operacaoId) {
+            const empresaId = obterEmpresaAtivaId();
+            if (!empresaId) {
+                if (globalLoading) globalLoading.style.display = 'none';
+                resetIdempotencia();
+                return;
+            }
+
+            if (tentativasPolling >= MAX_POLLING) {
+                if (globalLoading) globalLoading.style.display = 'none';
+                showWarning('O processamento está demorando mais que o esperado. Você pode verificar novamente mais tarde.', 'Aviso');
+                resetIdempotencia();
+                return;
+            }
+
+            tentativasPolling++;
+
+            try {
+                const url = `${API_URL}/prospeccao/leads-crm/operacoes/${encodeURIComponent(operacaoId)}?empresaId=${encodeURIComponent(empresaId)}`;
+                const response = await apiGet(url);
+                const estado = response?.dados?.estado || response?.estado;
+
+                if (estado === 'concluida') {
+                    if (globalLoading) globalLoading.style.display = 'none';
+                    resetIdempotencia();
+                    showWarning('Lead enviado com sucesso!', 'Sucesso');
+                    pesquisarProspeccao(); // Atualiza a lista
+                    return;
+                } else if (estado === 'falha') {
+                    if (globalLoading) globalLoading.style.display = 'none';
+                    resetIdempotencia();
+                    showWarning('Houve uma falha técnica permanente. Por favor, contate o administrador.', 'Erro');
+                    return;
+                }
+
+                // Ainda pendente, agenda próxima tentativa
+                pollingTimeout = setTimeout(() => verificarStatusOperacao(operacaoId), 3000);
+            } catch (e) {
+                console.error('Erro no polling:', e);
+                // Tenta novamente até o limite
+                pollingTimeout = setTimeout(() => verificarStatusOperacao(operacaoId), 3000);
+            }
         }
 
         function setIconConfirmacao(titulo) {
             const iconWrapper = document.getElementById('confirm-icon-wrapper');
             const iconI = document.getElementById('confirm-icon-i');
             if (!iconWrapper || !iconI) return;
-
             const t = String(titulo).toLowerCase();
-            
             iconWrapper.classList.remove('success', 'error', 'warning');
-
-            if (t.includes('sucesso')) {
-                iconWrapper.classList.add('success');
-                iconI.className = 'fas fa-check-circle';
-            } else if (t.includes('erro') || t.includes('falha') || t.includes('negado') || t.includes('atenção')) {
-                iconWrapper.classList.add('error');
-                iconI.className = 'fas fa-times-circle';
-            } else {
-                iconWrapper.classList.add('warning');
-                iconI.className = 'fas fa-exclamation-triangle';
-            }
+            if (t.includes('sucesso')) { iconWrapper.classList.add('success'); iconI.className = 'fas fa-check-circle'; }
+            else if (t.includes('erro') || t.includes('falha') || t.includes('negado') || t.includes('atenção')) { iconWrapper.classList.add('error'); iconI.className = 'fas fa-times-circle'; }
+            else { iconWrapper.classList.add('warning'); iconI.className = 'fas fa-exclamation-triangle'; }
         }
 
-        function showConfirm(t, m, cb) { 
-            setIconConfirmacao(t);
-            confirmTitle.innerText = t; 
-            confirmMessage.innerText = m; 
-            btnConfirmOk.innerText = 'Confirmar'; 
-            btnConfirmCancel.innerText = 'Cancelar'; 
-            btnConfirmDiscard.style.display = 'none'; 
-            confirmCallback = cb; 
-            btnConfirmCancel.style.display = 'inline-block'; 
-            confirmModal.style.display = 'flex'; 
-        }
-
-        function showWarning(m, t = 'Aviso') { 
-            setIconConfirmacao(t);
-            confirmTitle.innerText = t; 
-            confirmMessage.innerText = m; 
-            btnConfirmOk.innerText = 'OK'; 
-            btnConfirmCancel.style.display = 'none'; 
-            btnConfirmDiscard.style.display = 'none'; 
-            confirmCallback = null; 
-            confirmModal.style.display = 'flex'; 
-        }
-
-        function showUnsavedChangesModal(m, onSave, onDiscard) { 
-            setIconConfirmacao('Alterações não salvas');
-            confirmTitle.innerText = 'Alterações não salvas'; 
-            confirmMessage.innerText = m; 
-            btnConfirmOk.innerText = 'Salvar'; 
-            btnConfirmCancel.innerText = 'Cancelar'; 
-            btnConfirmDiscard.style.display = 'inline-block'; 
-            confirmCallback = onSave; 
-            confirmModal.style.display = 'flex'; 
-            btnConfirmDiscard.onclick = function() { if (onDiscard) onDiscard(); confirmModal.style.display = 'none'; btnConfirmDiscard.style.display = 'none'; btnConfirmCancel.style.display = 'inline-block'; btnConfirmOk.innerText = 'Confirmar'; confirmCallback = null; restoreActiveMenuItem(); }; 
-        }
+        function showConfirm(t, m, cb) { setIconConfirmacao(t); confirmTitle.innerText = t; confirmMessage.innerText = m; btnConfirmOk.innerText = 'Confirmar'; btnConfirmCancel.innerText = 'Cancelar'; btnConfirmDiscard.style.display = 'none'; confirmCallback = cb; btnConfirmCancel.style.display = 'inline-block'; confirmModal.style.display = 'flex'; }
+        function showWarning(m, t = 'Aviso') { setIconConfirmacao(t); confirmTitle.innerText = t; confirmMessage.innerText = m; btnConfirmOk.innerText = 'OK'; btnConfirmCancel.style.display = 'none'; btnConfirmDiscard.style.display = 'none'; confirmCallback = null; confirmModal.style.display = 'flex'; }
+        function showUnsavedChangesModal(m, onSave, onDiscard) { setIconConfirmacao('Alterações não salvas'); confirmTitle.innerText = 'Alterações não salvas'; confirmMessage.innerText = m; btnConfirmOk.innerText = 'Salvar'; btnConfirmCancel.innerText = 'Cancelar'; btnConfirmDiscard.style.display = 'inline-block'; confirmCallback = onSave; confirmModal.style.display = 'flex'; btnConfirmDiscard.onclick = function() { if (onDiscard) onDiscard(); confirmModal.style.display = 'none'; btnConfirmDiscard.style.display = 'none'; btnConfirmCancel.style.display = 'inline-block'; btnConfirmOk.innerText = 'Confirmar'; confirmCallback = null; restoreActiveMenuItem(); }; }
 
         btnConfirmOk.addEventListener('click', function() { if (confirmCallback) { const cb = confirmCallback; confirmCallback = null; cb(); } confirmModal.style.display = 'none'; btnConfirmCancel.style.display = 'inline-block'; btnConfirmOk.innerText = 'Confirmar'; btnConfirmDiscard.style.display = 'none'; restoreActiveMenuItem(); });
         btnConfirmCancel.addEventListener('click', function() { confirmModal.style.display = 'none'; confirmCallback = null; btnConfirmDiscard.style.display = 'none'; restoreActiveMenuItem(); });
@@ -1304,9 +1340,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             } catch (e) { console.error('❌ Erro no boot:', e); }
         })();
 
-        // ============================================================
-        // MAPA
-        // ============================================================
         window.mapFilters = { uf: null };
         let terraLayer = null, stateLayer = null, municipiosLayer = null;
         const vendedoresLayers = {};
@@ -1345,132 +1378,62 @@ document.addEventListener('DOMContentLoaded', async function() {
         function garantirPadraoZebrado(map, cores) {
             const container = map.getRenderer({ options: {} })._container;
             let defs = container.querySelector('defs');
-            if (!defs) {
-                defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-                container.appendChild(defs);
-            }
-
+            if (!defs) { defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs'); container.appendChild(defs); }
             const coresLimpa = cores.map(c => c.replace('#', '')).join('-');
             const id = `zebra-${coresLimpa}`;
-
             if (!defs.querySelector(`#${id}`)) {
                 const pattern = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
-                pattern.setAttribute('id', id);
-                pattern.setAttribute('width', '24');
-                pattern.setAttribute('height', '24');
-                pattern.setAttribute('patternUnits', 'userSpaceOnUse');
-                pattern.setAttribute('patternTransform', 'rotate(45)');
-
-                const numCores = cores.length;
-                const larguraListra = 24 / numCores;
-
-                cores.forEach((cor, i) => {
-                    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-                    rect.setAttribute('width', larguraListra.toString());
-                    rect.setAttribute('height', '24');
-                    rect.setAttribute('x', (i * larguraListra).toString());
-                    rect.setAttribute('fill', cor);
-                    pattern.appendChild(rect);
-                });
-
+                pattern.setAttribute('id', id); pattern.setAttribute('width', '24'); pattern.setAttribute('height', '24'); pattern.setAttribute('patternUnits', 'userSpaceOnUse'); pattern.setAttribute('patternTransform', 'rotate(45)');
+                const numCores = cores.length; const larguraListra = 24 / numCores;
+                cores.forEach((cor, i) => { const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect'); rect.setAttribute('width', larguraListra.toString()); rect.setAttribute('height', '24'); rect.setAttribute('x', (i * larguraListra).toString()); rect.setAttribute('fill', cor); pattern.appendChild(rect); });
                 defs.appendChild(pattern);
             }
             return id;
         }
 
         function atualizarEstiloFeature(l, v, map) {
-            const f = l.feature;
-            const props = f.properties || {};
+            const f = l.feature; const props = f.properties || {};
             const cod = String(props.codigoIbge || props.codigo || '').trim();
             if (!cod) return;
-
             const ativos = getVendedoresAtivosDaCidade(cod);
             const estaAtivo = ativos.some(a => a.vendedor.id === v.id);
-
-            if (!estaAtivo) {
-                l.setStyle({ opacity: 0, fillOpacity: 0 }); 
-                return;
-            }
-
-            let style = getVendedorStyle(v);
-            let tooltipClass = 'vendedor-tooltip custom-tooltip';
-
+            if (!estaAtivo) { l.setStyle({ opacity: 0, fillOpacity: 0 }); return; }
+            let style = getVendedorStyle(v); let tooltipClass = 'vendedor-tooltip custom-tooltip';
             if (ativos.length > 1) {
                 const cores = ativos.map(a => a.vendedor.cor);
                 const patternId = garantirPadraoZebrado(map, cores);
-                style = {
-                    color: '#64748b',
-                    weight: 1.5,
-                    fillColor: `url(#${patternId})`,
-                    fillOpacity: 1
-                };
+                style = { color: '#64748b', weight: 1.5, fillColor: `url(#${patternId})`, fillOpacity: 1 };
                 tooltipClass = 'vendedor-tooltip custom-tooltip custom-tooltip-conflict';
             }
-
             l.setStyle(style);
-
             const nomeCidade = props.nome || props.municipio || 'Cidade';
             let tooltipTexto = '';
-            
             if (ativos.length > 1) {
                 tooltipTexto += `<div style="font-size: 20px; font-weight: 700; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 6px;">${nomeCidade}</div>`;
                 tooltipTexto += `<div style="color: #fbbf24; font-size: 16px; font-weight: bold; margin-bottom: 10px;">⚠️ Sobreposição de Área</div>`;
-                ativos.forEach(item => {
-                    const label = item.origem === 'manual' ? 'Cidade Direta' : `DDD`;
-                    tooltipTexto += `<div style="font-size: 15px; margin-bottom: 6px;">• <strong>${item.vendedor.nome}</strong> <span style="color:#94a3b8; font-size: 13px;">(${label})</span></div>`;
-                });
+                ativos.forEach(item => { const label = item.origem === 'manual' ? 'Cidade Direta' : `DDD`; tooltipTexto += `<div style="font-size: 15px; margin-bottom: 6px;">• <strong>${item.vendedor.nome}</strong> <span style="color:#94a3b8; font-size: 13px;">(${label})</span></div>`; });
             } else {
                 tooltipTexto += `<div style="font-size: 18px; font-weight: 700; margin-bottom: 6px;">${nomeCidade}</div>`;
                 tooltipTexto += `<div style="font-size: 14px;">Vendedor: <strong>${v.nome}</strong></div>`;
             }
-
             l.unbindTooltip();
-            l.bindTooltip(tooltipTexto, { 
-                direction: 'top', 
-                offset: [0, -12], 
-                className: tooltipClass,
-                opacity: 1 
-            });
+            l.bindTooltip(tooltipTexto, { direction: 'top', offset: [0, -12], className: tooltipClass, opacity: 1 });
         }
 
         function criarCamadaVendedor(g, v) {
             if (!g || !g.features) return null;
-
-            const features = g.features.filter(f => {
-                const cod = String(f.properties?.codigoIbge || f.properties?.codigo || '').trim();
-                if (!cod) return false;
-                return v.cidades.some(c => c.codigoIbge === cod);
-            });
-            
+            const features = g.features.filter(f => { const cod = String(f.properties?.codigoIbge || f.properties?.codigo || '').trim(); return v.cidades.some(c => c.codigoIbge === cod); });
             if (!features.length) return null;
-            
             return L.geoJSON({ type: 'FeatureCollection', features }, {
                 onEachFeature: (f, l) => {
                     atualizarEstiloFeature(l, v, window.mapInstance);
-                    
                     l.on('mouseover', function() { 
-                        if (window.mapInstance) {
-                            window.mapInstance.eachLayer(function(layer) {
-                                if (layer.closeTooltip && layer !== this) layer.closeTooltip();
-                            });
-                        }
-                        const props = l.feature.properties || {};
-                        const cod = String(props.codigoIbge || props.codigo || '').trim();
-                        const ativos = getVendedoresAtivosDaCidade(cod);
-                        
-                        if (ativos.length > 1) {
-                            this.setStyle({ weight: 3, color: '#ffffff' }); 
-                        } else {
-                            this.setStyle(getVendedorHoverStyle(v)); 
-                        }
-                        this.bringToFront(); 
-                        this.openTooltip(); 
+                        if (window.mapInstance) window.mapInstance.eachLayer(function(layer) { if (layer.closeTooltip && layer !== this) layer.closeTooltip(); });
+                        const ativos = getVendedoresAtivosDaCidade(String(l.feature.properties?.codigoIbge || l.feature.properties?.codigo || '').trim());
+                        if (ativos.length > 1) this.setStyle({ weight: 3, color: '#ffffff' }); else this.setStyle(getVendedorHoverStyle(v)); 
+                        this.bringToFront(); this.openTooltip(); 
                     });
-                    
-                    l.on('mouseout', function() { 
-                        atualizarEstiloFeature(l, v, window.mapInstance);
-                        this.closeTooltip(); 
-                    });
+                    l.on('mouseout', function() { atualizarEstiloFeature(l, v, window.mapInstance); this.closeTooltip(); });
                 }
             });
         }
@@ -1478,17 +1441,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         function atualizarEstilosVisiveis() {
             if (!window.mapInstance) return;
             Object.keys(vendedoresLayers).forEach(id => {
-                const layer = vendedoresLayers[id];
-                if (!layer || !layer.eachLayer) return;
-
-                const v = vendedoresMapa.find(x => x.id === id);
-                if (!v) return;
-
-                if (window.mapInstance.hasLayer(layer)) {
-                    layer.eachLayer(l => {
-                        atualizarEstiloFeature(l, v, window.mapInstance);
-                    });
-                }
+                const layer = vendedoresLayers[id]; if (!layer || !layer.eachLayer) return;
+                const v = vendedoresMapa.find(x => x.id === id); if (!v) return;
+                if (window.mapInstance.hasLayer(layer)) layer.eachLayer(l => atualizarEstiloFeature(l, v, window.mapInstance));
             });
         }
 
@@ -1502,26 +1457,14 @@ document.addEventListener('DOMContentLoaded', async function() {
             const container = document.getElementById('vendedores-stats'); if (!container || !map) return;
             let html = '';
             vendedoresMapa.forEach(v => {
-                const qtd = v.quantidadeMunicipios || 0;
-                const pf = Number(v.populacaoTotal || 0).toLocaleString('pt-BR');
-                
+                const qtd = v.quantidadeMunicipios || 0; const pf = Number(v.populacaoTotal || 0).toLocaleString('pt-BR');
                 html += `<label class="vendedor-stat" data-vendedor="${v.id}" style="--vendedor-cor:${v.cor};"><input type="checkbox" class="vendedor-stat-checkbox" data-vendedor="${v.id}"><div class="vendedor-stat-body"><div class="vendedor-stat-header"><span class="vendedor-stat-color" style="background:${v.cor};"></span><span class="vendedor-stat-nome">${v.nome}</span></div><div class="vendedor-stat-numbers"><div class="vendedor-stat-num"><strong>${qtd}</strong><small>cidades</small></div><div class="vendedor-stat-num"><strong>${pf}</strong><small>pessoas</small></div></div></div></label>`;
             });
             container.innerHTML = html;
             container.querySelectorAll('.vendedor-stat-checkbox').forEach(cb => {
                 cb.addEventListener('change', function(e) {
-                    e.stopPropagation(); 
-                    const card = this.closest('.vendedor-stat'); 
-                    const layer = vendedoresLayers[this.dataset.vendedor];
-                    
-                    if (this.checked) { 
-                        card.classList.add('active'); 
-                        if (layer) layer.addTo(map); 
-                    } else { 
-                        card.classList.remove('active'); 
-                        if (layer) map.removeLayer(layer); 
-                    }
-                    
+                    e.stopPropagation(); const card = this.closest('.vendedor-stat'); const layer = vendedoresLayers[this.dataset.vendedor];
+                    if (this.checked) { card.classList.add('active'); if (layer) layer.addTo(map); } else { card.classList.remove('active'); if (layer) map.removeLayer(layer); }
                     atualizarEstilosVisiveis();
                 });
             });
@@ -1549,55 +1492,25 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         window.recarregarMapaDados = async function() {
             if (!window.mapInstance) return;
-            vendedoresMapaCarregados = false;
-            vendedoresMapa = [];
-            Object.keys(vendedoresLayers).forEach(id => {
-                if (vendedoresLayers[id]) window.mapInstance.removeLayer(vendedoresLayers[id]);
-                delete vendedoresLayers[id];
-            });
+            vendedoresMapaCarregados = false; vendedoresMapa = [];
+            Object.keys(vendedoresLayers).forEach(id => { if (vendedoresLayers[id]) window.mapInstance.removeLayer(vendedoresLayers[id]); delete vendedoresLayers[id]; });
             await carregarVendedoresMapa();
             const mun = await carregarMunicipiosGeoJSON();
             if (mun && window.mapInstance) {
                 vendedoresMapa.forEach(v => {
                     const layer = criarCamadaVendedor(mun, v);
-                    if (layer) {
-                        vendedoresLayers[v.id] = layer;
-                        const cb = document.querySelector(`.vendedor-stat-checkbox[data-vendedor="${v.id}"]`);
-                        if (cb && cb.checked) layer.addTo(window.mapInstance);
-                    }
+                    if (layer) { vendedoresLayers[v.id] = layer; const cb = document.querySelector(`.vendedor-stat-checkbox[data-vendedor="${v.id}"]`); if (cb && cb.checked) layer.addTo(window.mapInstance); }
                 });
                 renderStatsVendedores(window.mapInstance);
             }
             atualizarEstilosVisiveis();
         };
 
-        window.limparCacheIgnoradosDebug = function () { limparCacheIgnorados(); console.log('🧹 Cache de ignorados limpo.'); };
-        window.recarregarIgnoradosDebug = function () { limparCacheIgnorados(); ignoradosCarregados = false; ignorados = []; ignoradosFiltrados = []; carregarIgnorados(); console.log('🔄 Ignorados recarregados.'); };
-        window.forcarAdmin = function () { const expiraEm = Date.now() + 30 * 60 * 1000; sessionStorage.setItem('deltafrio_force_admin', String(expiraEm)); console.log('✅ Admin forçado por 30 minutos. F5 para aplicar.'); };
-        window.removerForcarAdmin = function () { sessionStorage.removeItem('deltafrio_force_admin'); console.log('✅ Override removido. F5 para aplicar.'); };
-        window.verificarAdmin = function () { console.log('👤 Sessão:', sessaoCache?.usuario || '(não carregada)'); console.log('📋 Contexto:', contextoCache); console.log('🔑 administradorGlobal:', contextoCache?.administradorGlobal); console.log('🔑 semAcesso:', contextoCache?.semAcesso || false); console.log('🔑 funcionalidades:', contextoCache?.funcionalidades); };
-
         window.AppCore = {
-            apiGet, apiPost, apiPut, apiPatch: null, apiDelete,
-            apiGetEnvelope,
-            obterCsrf,
-            showScreen, setActiveMenuItem, registerScreen,
-            showWarning, showConfirm,
-            refreshCustomSelect, formatarTelefone,
-            extrairErroResposta,
-            API_URL,
-            getMapInstance: () => window.mapInstance,
-            getVendedores: () => vendedoresMapa,
-            carregarVendedoresMapa,
-            recarregarMapaDados: window.recarregarMapaDados,
-            getContexto: () => contextoCache,
-            getEmpresaAtivaId: () => obterEmpresaAtivaId(),
-            setEmpresaAtivaId: (id) => definirEmpresaAtivaId(id),
-            carregarContexto,
-            limparCacheIgnorados,
-            isAdminGlobal,
-            temFuncionalidade,
-            aplicarGuardrailsAdmin,
+            apiGet, apiPost, apiPut, apiPatch: null, apiDelete, apiGetEnvelope, obterCsrf, showScreen, setActiveMenuItem, registerScreen, showWarning, showConfirm, refreshCustomSelect, formatarTelefone, extrairErroResposta, API_URL,
+            getMapInstance: () => window.mapInstance, getVendedores: () => vendedoresMapa, carregarVendedoresMapa, recarregarMapaDados: window.recarregarMapaDados,
+            getContexto: () => contextoCache, getEmpresaAtivaId: () => obterEmpresaAtivaId(), setEmpresaAtivaId: (id) => definirEmpresaAtivaId(id), carregarContexto,
+            limparCacheIgnorados, isAdminGlobal, temFuncionalidade, aplicarGuardrailsAdmin,
         };
         console.log('✅ [AppCore] SDK completo disponível.');
 

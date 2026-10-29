@@ -598,9 +598,28 @@ body.dark-mode .btn-secondary:hover { background: #334155; border-color: #475569
 #segment-screen .table-responsive tbody tr { transition: background 0.2s ease; display: table; width: 100%; table-layout: fixed; }
 #segment-screen .table-responsive th, #segment-screen .table-responsive td { padding: 10px 12px; text-align: left; white-space: nowrap; }
 #segment-screen .table-responsive td:nth-child(2) { overflow: visible; }
-#segment-screen .table-responsive th:nth-child(1), #segment-screen .table-responsive td:nth-child(1) { width: 40%; }
-#segment-screen .table-responsive th:nth-child(2), #segment-screen .table-responsive td:nth-child(2) { width: 20%; }
-#segment-screen .table-responsive th:nth-child(3), #segment-screen .table-responsive td:nth-child(3) { width: 40%; }
+/* ✅ Ajuste de largura e alinhamento das colunas */
+#segment-screen .table-responsive th:nth-child(1), 
+#segment-screen .table-responsive td:nth-child(1) { width: 50%; }
+
+#segment-screen .table-responsive th:nth-child(2), 
+#segment-screen .table-responsive td:nth-child(2) { 
+    width: 15%; 
+    text-align: center !important; /* Centraliza o número */
+}
+
+#segment-screen .table-responsive th:nth-child(3), 
+#segment-screen .table-responsive td:nth-child(3) { 
+    width: 35%; 
+    text-align: center !important; /* Centraliza os botões */
+}
+
+#segment-screen .cell-actions {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+}
 .cnae-tooltip { position: relative; display: inline-block; cursor: help; z-index: 1; }
 .cnae-tooltip.open { z-index: 2147483647; }
 .tooltip-trigger { font-weight: 700; font-size: 16px; color: #2463eb; padding: 4px 10px; border-radius: 6px; background: #eff6ff; transition: all 0.2s; cursor: pointer; user-select: none; display: inline-block; }
@@ -633,8 +652,44 @@ body.dark-mode #segmentosTable .btn-delete:hover { background: #ef4444; color: #
 .generic-search-box { margin-bottom: 20px; flex-shrink: 0; position: relative; }
 .modal-header { flex-shrink: 0; margin-bottom: 20px; }
 .modal-footer { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 15px; }
-.close-modal { position: absolute; top: 15px; right: 20px; font-size: 28px; font-weight: bold; color: var(--text-secondary); cursor: pointer; transition: color 0.2s; }
-.close-modal:hover { color: var(--text-main); }
+/* ============================================================
+   BOTÃO DE FECHAR MODAL (ANIMAÇÃO GLOBAL)
+   ============================================================ */
+.close-modal { 
+    position: absolute; 
+    top: 15px; 
+    right: 20px; 
+    z-index: 9999;
+    display: inline-flex; 
+    align-items: center; 
+    justify-content: center;
+    width: 32px; 
+    height: 32px; 
+    border-radius: 50%;
+    background: var(--bg-card);
+    font-size: 28px; 
+    font-weight: bold; 
+    color: var(--text-secondary); 
+    cursor: pointer; 
+    line-height: 1;
+    transition: color 0.25s ease, background 0.25s ease, transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    user-select: none;
+}
+
+.close-modal:hover { 
+    background: rgba(239, 68, 68, 0.12);
+    color: #ef4444; 
+    animation: closeSpin 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.close-modal:active { 
+    transform: rotate(90deg) scale(0.9); 
+}
+
+@keyframes closeSpin {
+    0%   { transform: rotate(0)     scale(1); }
+    100% { transform: rotate(90deg) scale(1.15); }
+}
 .modal-header h2 { font-size: 20px; font-weight: 600; color: var(--text-main); margin-bottom: 5px; }
 .modal-header p { font-size: 13px; color: var(--text-secondary); }
 .principal-card { background: #f8fafc; border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
