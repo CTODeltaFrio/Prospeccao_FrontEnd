@@ -193,11 +193,11 @@
                 </div>
 
                 <div class="filter-row">
-                    <div class="field">
+                    <div class="field" id="field-uf">
                         <label>UF</label>
                         <select id="filter-uf" class="input"><option value="">Todos</option></select>
                     </div>
-                    <div class="field">
+                    <div class="field" id="field-ddd">
                         <label>DDD</label>
                         <select id="filter-ddd" class="input">
                             <option value="">Todos</option>
@@ -212,13 +212,13 @@
                 </div>
 
                 <div class="filter-row-bottom">
-                    <div class="field">
+                    <div class="field" id="field-segmento">
                         <label>Segmento</label>
                         <select id="filter-segmento" class="input">
                             <option value="">Todos</option>
                         </select>
                     </div>
-                    <div class="field" style="flex: 1.5;">
+                    <div class="field" id="field-cnae" style="flex: 1.5;">
                         <label>Buscar CNAE (c&oacute;digo ou descri&ccedil;&atilde;o)</label>
                         <div class="search-wrapper">
                             <input id="filter-cnae" class="input" type="text" placeholder="Digite ex: 1012103 ou frutas..." autocomplete="off">
@@ -481,11 +481,21 @@
                         </div>
                     </div>
 
+                    <!-- ✅ Observação do CRM (visível, com balão de ajuda) -->
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label for="det-crm-observacao" style="display: flex; align-items: center; gap: 6px;">
+                            Observação
+                            <span class="info-tooltip" data-tooltip="Anotações internas sobre o contato ou o lead. Visível apenas no sistema.">
+                                <i class="fas fa-info-circle"></i>
+                            </span>
+                        </label>
+                        <textarea id="det-crm-observacao" class="input" rows="2" placeholder="Ex: Prefere contato por WhatsApp no período da manhã..." maxlength="2000" style="resize: vertical; min-height: 60px; padding: 10px 12px; font-family: inherit; font-size: 13px;"></textarea>
+                    </div>
+
                     <!-- CAMPOS OCULTOS (PREENCHIDOS AUTOMATICAMENTE PELO JS) -->
                     <div style="display: none;">
                         <input type="text" id="det-crm-telefone" maxlength="40">
                         <input type="email" id="det-crm-email" maxlength="254">
-                        <input type="text" id="det-crm-observacao" maxlength="2000">
                     </div>
                 </div>
 

@@ -71,14 +71,13 @@ document.addEventListener('DOMContentLoaded', async function() {
         let vendedoresMapaCarregados = false;
         let vendedoresMapaPromise = null;
         
-        // ✅ Variáveis para o CRM
         let cnpjAtivoCRM = null; 
         let idempotencyKeyAtual = null;
         let cnpjIdempotenciaAtual = null;
         let envioEmAndamento = false;
         let pollingTimeout = null;
         let tentativasPolling = 0;
-        const MAX_POLLING = 20; // 20 * 3s = 60s
+        const MAX_POLLING = 20;
 
         async function carregarVendedoresMapa() {
             if (vendedoresMapaCarregados) return vendedoresMapa;
@@ -373,11 +372,9 @@ document.addEventListener('DOMContentLoaded', async function() {
                 if (!r.ok) return null;
                 const json = await r.json(); const ctx = json?.dados ?? json;
                 
-                // ✅ Define o contexto temporariamente para verificar se é admin
                 contextoCache = ctx;
                 const isAdmin = isAdminGlobal();
 
-                // ✅ FILTRO: Se o usuário logado for um vendedor E NÃO for admin, limitar as empresas às vinculadas a ele
                 if (!isAdmin) {
                     try {
                         const sessaoResp = await fetch(`${API_URL}/sessao`, { method: 'GET', credentials: 'include', headers: { 'Accept': 'application/json' } });
@@ -418,7 +415,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                     }
                 }
 
-                // Atualiza o cache com o contexto possivelmente filtrado
                 contextoCache = ctx;
                 const ativo = obterEmpresaAtivaId(); const ids = (ctx?.empresas || []).map(e => String(e.id));
                 if (ativo && !ids.includes(String(ativo))) definirEmpresaAtivaId(null);
@@ -431,7 +427,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             companySelector.addEventListener('change', function () {
                 const id = this.value || null; definirEmpresaAtivaId(id);
                 limparCacheIgnorados(); ignoradosCarregados = false; ignorados = []; ignoradosFiltrados = [];
-                if (registros.length) { currentPage = 1; historicoCursors = [null]; cursorAtual = null; registros = []; temMais = false; renderTable([]); }
+                if (registros.length) { currentPage = 1; historicoCursors = [null]; cursorAtual = null; registros = []; window.registros = registros; temMais = false; renderTable([]); }
                 if (ignoradosScreen.style.display === 'block') carregarIgnorados();
             });
         }
@@ -564,15 +560,14 @@ document.addEventListener('DOMContentLoaded', async function() {
             const cache = cacheGet(CACHE.SEGMENTOS);
             if (cache) { segmentData = cache.segmentData || []; segmentoCnaeLinks = cache.segmentoCnaeLinks || []; updateSegmentFilter(); renderSegmentTable(); populateLinkSelect(); return; }
             try {
-                // ✅ CORREÇÃO: Usar o endpoint de prospecção
-                const res = await apiGet(`${API_URL}/prospeccao/segmentos`);
+                const res = await apiGet(`${API_URL}/segmentos`);
                 const data = Array.isArray(res) ? res : (res?.dados || res?.registros || res?.content || res?.itens || []);
                 segmentData = data.map(i => ({ id: i.codigo ?? i.id, nome: i.descricao ?? i.nome })); 
                 segmentoCnaeLinks = [];
                 const cnaesVistos = new Set(allCnaesCache.map(x => String(x.codigo).trim()));
                 await executarEmLotesComPausa(segmentData, 3, 20, async (seg) => {
                     try { 
-                        const resCnaes = await apiGet(`${API_URL}/prospeccao/segmentos/${seg.id}/cnaes`); 
+                        const resCnaes = await apiGet(`${API_URL}/segmentos/${seg.id}/cnaes`); 
                         const cnaes = Array.isArray(resCnaes) ? resCnaes : (resCnaes?.dados || resCnaes?.registros || resCnaes?.content || resCnaes?.itens || []);
                         cnaes.forEach(c => { 
                             if (!segmentoCnaeLinks.some(l => l.segmentoId === seg.id && l.cnaeCodigo === c.codigo)) segmentoCnaeLinks.push({ segmentoId: seg.id, cnaeCodigo: c.codigo }); 
@@ -682,6 +677,37 @@ document.addEventListener('DOMContentLoaded', async function() {
             return d ? `(${d}) ${n}` : n;
         }
 
+        // ============================================================
+        // ✅ FILTROS COM ESPECIFICIDADE: DDD > UF, CNAE > Segmento
+        // ============================================================
+        function aplicarEstadoFiltros() {
+            const ddd  = filterDdd ? filterDdd.value : '';
+            const cnae = selectedCnaeCode;
+
+            const fieldUf  = document.getElementById('field-uf');
+            const fieldSeg = document.getElementById('field-segmento');
+
+            if (fieldUf) {
+                if (ddd) {
+                    fieldUf.classList.add('filter-ignored');
+                    fieldUf.title = 'Ignorado porque um DDD foi selecionado (DDD é mais específico).';
+                } else {
+                    fieldUf.classList.remove('filter-ignored');
+                    fieldUf.removeAttribute('title');
+                }
+            }
+
+            if (fieldSeg) {
+                if (cnae) {
+                    fieldSeg.classList.add('filter-ignored');
+                    fieldSeg.title = 'Ignorado porque um CNAE foi selecionado (CNAE é mais específico).';
+                } else {
+                    fieldSeg.classList.remove('filter-ignored');
+                    fieldSeg.removeAttribute('title');
+                }
+            }
+        }
+
         async function salvarStatus(cnpj, status) {
             const empresaId = obterEmpresaAtivaId();
             if (!empresaId) throw new Error('Selecione uma empresa ativa antes de classificar.');
@@ -729,13 +755,26 @@ document.addEventListener('DOMContentLoaded', async function() {
         let pesquisaController = null;
         async function pesquisarProspeccao(botao = null, cursor = null) {
             const btn = botao || btnSearch; const cursorEnv = (cursor !== undefined) ? cursor : cursorAtual;
-            const uf = filterUf.value.trim(); const ddd = filterDdd.value; const seg = filterSegmento.value;
-            let cnae = selectedCnaeCode; if (!cnae && filterCnaeInput.value.trim() !== '') { filterCnaeInput.value = ''; cnae = null; }
+            const uf = filterUf.value.trim(); 
+            const ddd = filterDdd.value; 
+            const seg = filterSegmento.value;
+            let cnae = selectedCnaeCode; 
+            if (!cnae && filterCnaeInput.value.trim() !== '') { filterCnaeInput.value = ''; cnae = null; }
             const esc = filterTipoCnae ? filterTipoCnae.value : 'PRINCIPAL';
-            const body = { uf: uf || null, ddd: uf ? null : (ddd || null), cnae: cnae || null, segmento: cnae ? null : (seg ? parseInt(seg) : null), escopoCnae: (cnae || seg) ? esc : null, ultimoCnpj: cursorEnv, limite: 50 };
-            
+
+            // ✅ Ordem de especificidade: DDD > UF | CNAE > Segmento
+            const body = {
+                uf: ddd ? null : (uf || null),
+                ddd: ddd || null,
+                cnae: cnae || null,
+                segmento: cnae ? null : (seg ? parseInt(seg) : null),
+                escopoCnae: (cnae || seg) ? esc : null,
+                ultimoCnpj: cursorEnv,
+                limite: 50
+            };
+
             if (!body.uf && !body.ddd && !body.segmento && !body.cnae) { showWarning("Informe pelo menos um filtro para realizar a pesquisa.", "Atenção"); return; }
-            
+
             const empresaId = obterEmpresaAtivaId();
             if (!empresaId) { showWarning("Selecione uma empresa ativa na barra lateral antes de pesquisar.", "Atenção"); return; }
 
@@ -746,7 +785,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 const r = await fetch(`${API_URL}/prospeccao/pesquisar?empresaId=${encodeURIComponent(empresaId)}`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body), signal: pesquisaController.signal });
                 const t = await r.text(); let json; try { json = t ? JSON.parse(t) : {}; } catch (e) {}
                 if (!r.ok) { const e = extrairErroResposta(json, r.status); const err = new Error(e.mensagem); err.codigo = e.codigo; err.traceId = e.traceId; throw err; }
-                const d = json?.dados ?? json; registros = d.registros || []; temMais = d.temMais || false; cursorAtual = d.ultimoCnpj || null; renderTable(registros);
+                const d = json?.dados ?? json; registros = d.registros || []; window.registros = registros; temMais = d.temMais || false; cursorAtual = d.ultimoCnpj || null; renderTable(registros);
             } catch (e) { 
                 if (e.name !== 'AbortError') { console.error(e); showWarning("Erro ao pesquisar: " + (e.message || 'Tente novamente mais tarde.'), "Erro"); } 
                 if (btn.classList.contains('page-btn')) pageIndicator.innerHTML = origP; 
@@ -840,10 +879,9 @@ document.addEventListener('DOMContentLoaded', async function() {
                 if (btnCopiarIA) btnCopiarIA.style.display = 'inline-flex'; 
             }
 
-            // ✅ Atualiza os campos ocultos do CRM se a IA encontrou dados melhores
             if (res.telefones && res.telefones.length > 0) {
                 const inputTel = document.getElementById('det-crm-telefone');
-                if (inputTel && !inputTel.value) inputTel.value = res.telefones[0]; // Só sobrescreve se estiver vazio
+                if (inputTel && !inputTel.value) inputTel.value = res.telefones[0];
             }
             if (res.emails && res.emails.length > 0) {
                 const inputEmail = document.getElementById('det-crm-email');
@@ -905,9 +943,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
         }
 
-        // ============================================================
-        // CRM: CARREGAR VENDEDORES NO MODAL
-        // ============================================================
         async function carregarVendedoresNoModal() {
             const select = document.getElementById('det-vendedor-select');
             if (!select) return;
@@ -947,37 +982,175 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
         }
 
+        // ============================================================
+        // PORTE EMPRESA (mapeamento de código RFB para descrição)
+        // ============================================================
+        const PORTE_MAP = {
+            '00': 'Não informado',
+            '01': 'Micro empresa',
+            '03': 'Empresa de pequeno porte',
+            '05': 'Demais'
+        };
+
+        // ============================================================
+        // BUSCAR E PREENCHER DETALHES DO BACKEND
+        // ============================================================
+        async function buscarEPreencherDetalhes(cnpj) {
+            const empresaId = obterEmpresaAtivaId();
+            const camposDetalhados = ['det-natureza','det-porte','det-capital','det-inicio','det-data-sit','det-cnae','det-logradouro','det-numero','det-complemento','det-bairro','det-cep'];
+
+            if (!empresaId) {
+                camposDetalhados.forEach(id => { const el = document.getElementById(id); if (el) el.innerText = '-'; });
+                return;
+            }
+
+            const cnpjLimpo = String(cnpj || '').replace(/\D/g, '');
+
+            try {
+                const url = `${API_URL}/prospeccao/estabelecimentos/${encodeURIComponent(cnpjLimpo)}?empresaId=${encodeURIComponent(empresaId)}`;
+                const resp = await apiGet(url);
+                const d = resp?.dados ?? resp;
+                if (!d || !d.cnpj) throw new Error('Resposta vazia do servidor');
+
+                const fmtData = (v) => {
+                    if (!v) return '-';
+                    const m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);
+                    if (!m) return String(v);
+                    return `${m[3]}/${m[2]}/${m[1]}`;
+                };
+                const fmtCep = (v) => {
+                    if (!v) return '-';
+                    const n = String(v).replace(/\D/g, '');
+                    if (n.length !== 8) return String(v);
+                    return `${n.slice(0,5)}-${n.slice(5)}`;
+                };
+
+                const nat = d.naturezaJuridica;
+                document.getElementById('det-natureza').innerText = nat ? 
+                    `${nat.codigo || ''}${nat.codigo && nat.descricao ? ' - ' : ''}${nat.descricao || ''}` : '-';
+
+                document.getElementById('det-porte').innerText = d.codigoPorte ? 
+                    (PORTE_MAP[d.codigoPorte] || `Código ${d.codigoPorte}`) : '-';
+
+                const capital = d.capitalSocial;
+                document.getElementById('det-capital').innerText = capital != null ? 
+                    `R$ ${Number(capital).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-';
+
+                document.getElementById('det-inicio').innerText   = fmtData(d.dataInicioAtividade);
+                document.getElementById('det-data-sit').innerText = fmtData(d.dataSituacaoCadastral);
+
+                const cnae = d.cnaePrincipal;
+                document.getElementById('det-cnae').innerText = cnae ? 
+                    `${cnae.codigo || ''}${cnae.codigo && cnae.descricao ? ' - ' : ''}${cnae.descricao || ''}` : '-';
+
+                const end = d.endereco || {};
+                document.getElementById('det-logradouro').innerText = end.logradouro ? 
+                    `${end.tipoLogradouro ? end.tipoLogradouro + ' ' : ''}${end.logradouro}` : '-';
+                document.getElementById('det-numero').innerText      = end.numero || '-';
+                document.getElementById('det-complemento').innerText = end.complemento || '-';
+                document.getElementById('det-bairro').innerText      = end.bairro || '-';
+                document.getElementById('det-cep').innerText         = fmtCep(end.cep);
+                
+                const mun = end.municipio || '-';
+                const uf = end.uf || '-';
+                document.getElementById('det-municipio').innerText = 
+                    (mun !== '-' && uf !== '-') ? `${mun} / ${uf}` : (mun !== '-' ? mun : uf);
+
+                const tels = Array.isArray(d.telefones) ? d.telefones : [];
+                document.getElementById('det-tel1').innerText = tels[0] ? `(${tels[0].ddd}) ${tels[0].numero}` : '-';
+                document.getElementById('det-tel2').innerText = tels[1] ? `(${tels[1].ddd}) ${tels[1].numero}` : '-';
+
+                document.getElementById('det-email').innerText = d.email || '-';
+
+                if (d.descricaoSituacaoCadastral) {
+                    const sit = document.getElementById('det-situacao');
+                    sit.innerText = String(d.descricaoSituacaoCadastral).toUpperCase();
+                }
+
+                if (d.identificadorMatrizFilial) {
+                    const tipo = document.getElementById('det-tipo');
+                    tipo.innerText = d.identificadorMatrizFilial === '1' ? 'MATRIZ' : 'FILIAL';
+                }
+
+                const telInput = document.getElementById('det-crm-telefone');
+                if (telInput && !telInput.value && tels[0]) telInput.value = `(${tels[0].ddd}) ${tels[0].numero}`;
+                const emailInput = document.getElementById('det-crm-email');
+                if (emailInput && !emailInput.value && d.email) emailInput.value = d.email;
+
+            } catch (e) {
+                console.warn('[Detalhes] Erro ao buscar dados completos:', e);
+                camposDetalhados.forEach(id => { const el = document.getElementById(id); if (el) el.innerText = '-'; });
+            }
+        }
+
+        // ============================================================
+        // ABRIR MODAL DE DETALHES (abre rápido + enriquece via API)
+        // ============================================================
         function openDetailsModal(cnpj, isIgn = false) {
-            const list = isIgn ? ignorados : registros; const c = list.find(i => i.cnpj === cnpj); if (!c) return;
-            const nomeExibicao = c.nomeFantasia || c.razaoSocial || 'sem nome'; const cnpjExibicao = c.cnpjFormatado || c.cnpj || '';
-            document.getElementById('det-cnpj').innerText = c.cnpjFormatado; document.getElementById('det-razao').innerText = c.razaoSocial || '-'; document.getElementById('det-fantasia').innerText = c.nomeFantasia || '-';
-            const sit = document.getElementById('det-situacao'); sit.innerText = 'ATIVA'; sit.className = 'badge badge-green'; document.getElementById('det-tipo').innerText = 'MATRIZ';
-            document.getElementById('det-natureza').innerText = '-'; document.getElementById('det-porte').innerText = '-'; document.getElementById('det-capital').innerText = '-'; document.getElementById('det-inicio').innerText = '-'; document.getElementById('det-data-sit').innerText = '-'; document.getElementById('det-cnae').innerText = '-'; document.getElementById('det-logradouro').innerText = '-'; document.getElementById('det-numero').innerText = '-'; document.getElementById('det-complemento').innerText = '-'; document.getElementById('det-bairro').innerText = '-'; document.getElementById('det-cep').innerText = '-'; document.getElementById('det-municipio').innerText = c.municipio || '-';
-            document.getElementById('det-tel1').innerText = formatarTelefone(c.ddd, c.telefone1); document.getElementById('det-tel2').innerText = formatarTelefone(c.ddd, c.telefone2); document.getElementById('det-email').innerText = c.email || '-';
+            const list = isIgn ? ignorados : registros;
+            const c = list.find(i => i.cnpj === cnpj);
+            if (!c) return;
+
+            const nomeExibicao = c.nomeFantasia || c.razaoSocial || 'sem nome';
+            const cnpjExibicao = c.cnpjFormatado || c.cnpj || '';
+
+            // 1) Preenche o básico imediatamente
+            document.getElementById('det-cnpj').innerText = cnpjExibicao;
+            document.getElementById('det-razao').innerText = c.razaoSocial || '-';
+            document.getElementById('det-fantasia').innerText = c.nomeFantasia || '-';
+
+            const sit = document.getElementById('det-situacao');
+            sit.innerText = 'ATIVA';
+            sit.className = 'badge badge-green';
+            document.getElementById('det-tipo').innerText = 'MATRIZ';
+
+            // Marca campos detalhados como "Carregando..."
+            ['det-natureza','det-porte','det-capital','det-inicio','det-data-sit','det-cnae',
+             'det-logradouro','det-numero','det-complemento','det-bairro','det-cep'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.innerText = 'Carregando…';
+            });
+            document.getElementById('det-municipio').innerText = c.municipio || '-';
+            document.getElementById('det-tel1').innerText = formatarTelefone(c.ddd, c.telefone1);
+            document.getElementById('det-tel2').innerText = formatarTelefone(c.ddd, c.telefone2);
+            document.getElementById('det-email').innerText = c.email || '-';
+
+            // 2) Classificação
             const statusAtual = c.status || (isIgn ? 'X' : null);
-            if (detClassificacao) detClassificacao.style.display = 'none'; 
+            if (detClassificacao) detClassificacao.style.display = 'none';
             if (btnClassifyX) {
                 btnClassifyX.classList.remove('btn-classify-x', 'btn-classify-activate');
-                if (statusAtual === 'X' || isIgn) { btnClassifyX.innerHTML = '<i class="fas fa-undo"></i> Ativar Cadastro'; btnClassifyX.classList.add('btn-classify-activate'); btnClassifyX.onclick = () => ativarCadastro(cnpj, nomeExibicao, cnpjExibicao); }
-                else { btnClassifyX.innerHTML = '<i class="fas fa-ban"></i> Ignorar Cadastro'; btnClassifyX.classList.add('btn-classify-x'); btnClassifyX.onclick = () => classificar(cnpj, 'X', statusAtual, nomeExibicao, cnpjExibicao); }
+                if (statusAtual === 'X' || isIgn) {
+                    btnClassifyX.innerHTML = '<i class="fas fa-undo"></i> Ativar Cadastro';
+                    btnClassifyX.classList.add('btn-classify-activate');
+                    btnClassifyX.onclick = () => ativarCadastro(cnpj, nomeExibicao, cnpjExibicao);
+                }
+                else {
+                    btnClassifyX.innerHTML = '<i class="fas fa-ban"></i> Ignorar Cadastro';
+                    btnClassifyX.classList.add('btn-classify-x');
+                    btnClassifyX.onclick = () => classificar(cnpj, 'X', statusAtual, nomeExibicao, cnpjExibicao);
+                }
                 btnClassifyX.disabled = false;
             }
 
+            // 3) CRM (observação agora é visível no HTML)
             cnpjAtivoCRM = cnpj;
-            
-            // ✅ Preenche o Nome e Cargo vazios, e os demais ocultos com os dados da empresa
             document.getElementById('det-crm-nome').value = '';
             document.getElementById('det-crm-cargo').value = '';
             document.getElementById('det-crm-telefone').value = c.telefone1 || c.telefone2 || '';
             document.getElementById('det-crm-email').value = c.email || '';
-            document.getElementById('det-crm-observacao').value = '';
-            
+            const obsEl = document.getElementById('det-crm-observacao');
+            if (obsEl) obsEl.value = '';
             carregarVendedoresNoModal();
 
             const btnIA = document.getElementById('btn-dados-ia');
             if (btnIA) btnIA.onclick = () => solicitarDadosIA(cnpj);
-            
+
+            // 4) Abre o modal já com o básico
             detailsModal.style.display = 'flex';
+
+            // 5) Dispara a busca dos detalhes completos (assíncrona)
+            buscarEPreencherDetalhes(cnpj);
         }
 
         async function classificar(cnpj, novoStatus, statusAtual, nome, cnpjFmt) {
@@ -1040,20 +1213,20 @@ document.addEventListener('DOMContentLoaded', async function() {
             try {
                 let segId = editingSegmentId;
                 if (editingSegmentId !== null) { 
-                    await apiPut(`${API_URL}/prospeccao/segmentos/${editingSegmentId}`, { descricao: nome }); 
+                    await apiPut(`${API_URL}/segmentos/${editingSegmentId}`, { descricao: nome }); 
                     const s = segmentData.find(x => x.id === editingSegmentId); 
                     if (s) s.nome = nome; 
                 }
                 else { 
-                    const novo = await apiPost(`${API_URL}/prospeccao/segmentos`, { descricao: nome }); 
+                    const novo = await apiPost(`${API_URL}/segmentos`, { descricao: nome }); 
                     segId = novo.codigo || novo.id; 
                     segmentData.push({ id: segId, nome }); 
                 }
                 
                 if (segId) {
                     const atual = currentLinkedCnaes.map(c => c.codigo); const orig = originalLinkedCnaes.map(c => c.codigo);
-                    for (const c of orig) if (!atual.includes(c)) { try { await apiDelete(`${API_URL}/prospeccao/segmentos/${segId}/cnaes/${c}`); } catch (e) {} }
-                    for (const c of currentLinkedCnaes) { if (orig.includes(c.codigo)) continue; try { await apiPost(`${API_URL}/prospeccao/segmentos/${segId}/cnaes`, { cnae: c.codigo }); } catch (e) {} }
+                    for (const c of orig) if (!atual.includes(c)) { try { await apiDelete(`${API_URL}/segmentos/${segId}/cnaes/${c}`); } catch (e) {} }
+                    for (const c of currentLinkedCnaes) { if (orig.includes(c.codigo)) continue; try { await apiPost(`${API_URL}/segmentos/${segId}/cnaes`, { cnae: c.codigo }); } catch (e) {} }
                 }
                 
                 setDirty(false); originalLinkedCnaes = [...currentLinkedCnaes]; resetSegmentForm(); localStorage.removeItem(CACHE.SEGMENTOS.key); segmentData = []; segmentoCnaeLinks = [];
@@ -1077,7 +1250,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         async function editarSegmento(id) {
             const seg = segmentData.find(s => s.id === id); if (!seg) return;
             editingSegmentId = id; segmentNome.value = seg.nome; btnSaveSegment.innerText = 'Atualizar segmento'; btnSaveSegment.classList.add('editing-btn'); btnCancelSegment.style.display = 'inline-block'; formTitle.innerText = 'Editar segmento'; segmentFormCard.classList.add('editing-mode');
-            try { const cnaes = await apiGet(`${API_URL}/prospeccao/segmentos/${id}/cnaes`); const list = []; for (const c of cnaes) { let full = allCnaesCache.find(x => x.codigo === c.codigo); if (!full) { full = await buscarDetalhesCnae(c.codigo); if (full) allCnaesCache.push(full); else full = { codigo: c.codigo, descricao: 'CNAE não encontrado', full: c.codigo }; } list.push(full); } currentLinkedCnaes = list; originalLinkedCnaes = [...list]; renderLinkedCnaes(); populateLinkSelect(); }
+            try { const cnaes = await apiGet(`${API_URL}/segmentos/${id}/cnaes`); const list = []; for (const c of cnaes) { let full = allCnaesCache.find(x => x.codigo === c.codigo); if (!full) { full = await buscarDetalhesCnae(c.codigo); if (full) allCnaesCache.push(full); else full = { codigo: c.codigo, descricao: 'CNAE não encontrado', full: c.codigo }; } list.push(full); } currentLinkedCnaes = list; originalLinkedCnaes = [...list]; renderLinkedCnaes(); populateLinkSelect(); }
             catch (e) { currentLinkedCnaes = []; originalLinkedCnaes = []; renderLinkedCnaes(); populateLinkSelect(); }
             setDirty(true);
         }
@@ -1086,11 +1259,11 @@ document.addEventListener('DOMContentLoaded', async function() {
             const seg = segmentData.find(s => s.id === id); if (!seg) { showWarning('Segmento não encontrado.'); return; }
             showConfirm('Excluir Segmento', `Tem certeza que deseja excluir "${seg.nome}"?`, async function() {
                 try {
-                    const cnaes = await apiGet(`${API_URL}/prospeccao/segmentos/${id}/cnaes`);
+                    const cnaes = await apiGet(`${API_URL}/segmentos/${id}/cnaes`);
                     for (const c of cnaes) {
-                        try { await apiDelete(`${API_URL}/prospeccao/segmentos/${id}/cnaes/${c.codigo}`); } catch(err) {}
+                        try { await apiDelete(`${API_URL}/segmentos/${id}/cnaes/${c.codigo}`); } catch(err) {}
                     }
-                    await apiDelete(`${API_URL}/prospeccao/segmentos/${id}`);
+                    await apiDelete(`${API_URL}/segmentos/${id}`);
                     
                     segmentData = segmentData.filter(s => s.id !== id);
                     segmentoCnaeLinks = segmentoCnaeLinks.filter(l => l.segmentoId !== id);
@@ -1116,9 +1289,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         iaDataModal?.addEventListener('click', function(e) { if (e.target === this) iaDataModal.style.display = 'none'; });
         if (btnCopiarIA) btnCopiarIA.addEventListener('click', copiarDadosIA);
 
-        // ============================================================
-        // REGISTRO CRM (Envio e Polling)
-        // ============================================================
         function gerarIdempotencyKey() {
             if (crypto && typeof crypto.randomUUID === 'function') {
                 return crypto.randomUUID();
@@ -1153,14 +1323,12 @@ document.addEventListener('DOMContentLoaded', async function() {
                 const empresaId = obterEmpresaAtivaId();
                 if (!empresaId) return showWarning('Nenhuma empresa ativa selecionada.', 'Atenção');
                 
-                // Pega os valores
                 let nome = document.getElementById('det-crm-nome')?.value.trim() || null;
                 let cargo = document.getElementById('det-crm-cargo')?.value.trim() || null;
                 let telefone = document.getElementById('det-crm-telefone')?.value.trim() || null;
                 let email = document.getElementById('det-crm-email')?.value.trim() || null;
                 let observacao = document.getElementById('det-crm-observacao')?.value.trim() || null;
 
-                // Validações básicas
                 if (!nome) return showWarning('Por favor, informe o nome da pessoa que atende na empresa.', 'Atenção');
                 if (nome.length > 200) return showWarning('Nome deve ter até 200 caracteres.', 'Atenção');
                 if (cargo && cargo.length > 100) return showWarning('Cargo deve ter até 100 caracteres.', 'Atenção');
@@ -1168,9 +1336,9 @@ document.addEventListener('DOMContentLoaded', async function() {
                 if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return showWarning('E-mail inválido.', 'Atenção');
                 if (observacao && observacao.length > 2000) return showWarning('Observação deve ter até 2000 caracteres.', 'Atenção');
 
-                // Se e-mail estiver vazio, não enviar "" e sim null
                 if (email === '') email = null;
                 if (telefone === '') telefone = null;
+                if (observacao === '') observacao = null;
 
                 const payload = {
                     vendedorId,
@@ -1196,13 +1364,11 @@ document.addEventListener('DOMContentLoaded', async function() {
                     const operacaoId = response.dados?.operacaoId;
 
                     if (estado === 'pendente') {
-                        // Inicia polling
                         mostrarProcessamentoCRM(operacaoId);
                     } else if (estado === 'concluida') {
                         resetIdempotencia();
                         detailsModal.style.display = 'none';
                         showWarning('Lead enviado e concluído com sucesso!', 'Sucesso');
-                        // Recarrega a lista principal (o registro que virou C sairá)
                         pesquisarProspeccao(); 
                     } else {
                         throw new Error('Estado desconhecido: ' + estado);
@@ -1210,7 +1376,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                 } catch (err) {
                     console.error('[CRM] Erro:', err);
                     
-                    // ✅ TRATAMENTO ESPECÍFICO DE ERROS DO CRM
                     if (err.status === 409) {
                         showWarning('Este lead já foi enviado ou está em processamento.', 'Atenção');
                         resetIdempotencia();
@@ -1234,7 +1399,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         function mostrarProcessamentoCRM(operacaoId) {
             if (!operacaoId) return;
-            detailsModal.style.display = 'none'; // Fecha o modal de detalhes
+            detailsModal.style.display = 'none';
             
             if (globalLoadingTitle) globalLoadingTitle.innerText = 'Envio em processamento';
             if (globalLoadingDesc) globalLoadingDesc.innerText = 'O lead está sendo processado no CRM. Por favor, aguarde.';
@@ -1272,7 +1437,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     if (globalLoading) globalLoading.style.display = 'none';
                     resetIdempotencia();
                     showWarning('Lead enviado com sucesso!', 'Sucesso');
-                    pesquisarProspeccao(); // Atualiza a lista
+                    pesquisarProspeccao();
                     return;
                 } else if (estado === 'falha') {
                     if (globalLoading) globalLoading.style.display = 'none';
@@ -1281,11 +1446,9 @@ document.addEventListener('DOMContentLoaded', async function() {
                     return;
                 }
 
-                // Ainda pendente, agenda próxima tentativa
                 pollingTimeout = setTimeout(() => verificarStatusOperacao(operacaoId), 3000);
             } catch (e) {
                 console.error('Erro no polling:', e);
-                // Tenta novamente até o limite
                 pollingTimeout = setTimeout(() => verificarStatusOperacao(operacaoId), 3000);
             }
         }
@@ -1311,12 +1474,17 @@ document.addEventListener('DOMContentLoaded', async function() {
         let debounceTimer;
         filterCnaeInput.addEventListener('input', function() {
             clearTimeout(debounceTimer); const t = this.value.trim();
-            if (!t) { cnaeSuggestions.classList.remove('active'); selectedCnaeCode = null; return; }
+            if (!t) { 
+                cnaeSuggestions.classList.remove('active'); 
+                selectedCnaeCode = null; 
+                aplicarEstadoFiltros(); 
+                return; 
+            }
             debounceTimer = setTimeout(async () => { const r = await buscarCnaes(t); renderSuggestions(r); }, 250);
         });
         function renderSuggestions(r) {
             cnaeSuggestions.innerHTML = ''; if (!r.length) { cnaeSuggestions.classList.remove('active'); return; }
-            r.forEach(i => { const d = document.createElement('div'); d.classList.add('autocomplete-item'); d.innerHTML = `<span class="code">${i.codigo}</span> <span class="desc">- ${i.descricao}</span>`; d.addEventListener('click', function() { filterCnaeInput.value = `${i.codigo} - ${i.descricao}`; selectedCnaeCode = i.codigo; cnaeSuggestions.classList.remove('active'); }); cnaeSuggestions.appendChild(d); });
+            r.forEach(i => { const d = document.createElement('div'); d.classList.add('autocomplete-item'); d.innerHTML = `<span class="code">${i.codigo}</span> <span class="desc">- ${i.descricao}</span>`; d.addEventListener('click', function() { filterCnaeInput.value = `${i.codigo} - ${i.descricao}`; selectedCnaeCode = i.codigo; cnaeSuggestions.classList.remove('active'); aplicarEstadoFiltros(); }); cnaeSuggestions.appendChild(d); });
             cnaeSuggestions.classList.add('active');
         }
         document.addEventListener('click', e => { if (!e.target.closest('.autocomplete-container')) cnaeSuggestions.classList.remove('active'); });
@@ -1340,9 +1508,9 @@ document.addEventListener('DOMContentLoaded', async function() {
             const isOk = e.target.classList.contains('card-btn') || e.target.closest('.card-btn'); if (!isOk) return;
             const i = parseInt(li.dataset.index); const item = currentItems[i]; genericModal.style.display = 'none';
             switch (currentGenericContext) {
-                case 'cnae': if (item?.codigo) { filterCnaeInput.value = item.full; selectedCnaeCode = item.codigo; cnaeSuggestions.classList.remove('active'); showScreen('main'); } break;
+                case 'cnae': if (item?.codigo) { filterCnaeInput.value = item.full; selectedCnaeCode = item.codigo; cnaeSuggestions.classList.remove('active'); aplicarEstadoFiltros(); showScreen('main'); } break;
                 case 'uf': if (item?.sigla) { filterUf.value = item.sigla; refreshCustomSelect(filterUf); showScreen('main'); } break;
-                case 'municipio': if (typeof item === 'string') { const idx = item.lastIndexOf(' - '); if (idx !== -1) { filterDdd.value = item.substring(idx + 3).trim(); refreshCustomSelect(filterDdd); if (filterMunicipio) { filterMunicipio.value = ''; refreshCustomSelect(filterMunicipio); } showScreen('main'); } } break;
+                case 'municipio': if (typeof item === 'string') { const idx = item.lastIndexOf(' - '); if (idx !== -1) { filterDdd.value = item.substring(idx + 3).trim(); refreshCustomSelect(filterDdd); aplicarEstadoFiltros(); if (filterMunicipio) { filterMunicipio.value = ''; refreshCustomSelect(filterMunicipio); } showScreen('main'); } } break;
                 default: showScreen('main');
             }
         });
@@ -1368,7 +1536,8 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (campoMunicipio) campoMunicipio.style.display = 'none';
             if (filterMunicipio) { filterMunicipio.innerHTML = '<option value="">Todos</option>'; refreshCustomSelect(filterMunicipio); }
             refreshCustomSelect(filterUf); refreshCustomSelect(filterDdd); refreshCustomSelect(filterSegmento); refreshCustomSelect(filterTipoCnae);
-            currentPage = 1; historicoCursors = [null]; cursorAtual = null; registros = []; temMais = false; renderTable([]);
+            currentPage = 1; historicoCursors = [null]; cursorAtual = null; registros = []; window.registros = registros; temMais = false; renderTable([]);
+            aplicarEstadoFiltros();
             if (window.mapInstance && typeof window.loadMapData === 'function') { window.mapFilters.uf = null; window.loadMapData(); }
         }
         function checkAndCollapseSidebar() { if (window.innerWidth >= 769 && window.innerWidth <= 1366) sidebar.classList.add('collapsed'); }
@@ -1378,8 +1547,14 @@ document.addEventListener('DOMContentLoaded', async function() {
         btnPrev.addEventListener('click', function() { if (currentPage > 1 && historicoCursors.length > 1) { historicoCursors.pop(); currentPage--; cursorAtual = historicoCursors[historicoCursors.length - 1]; pesquisarProspeccao(this, cursorAtual); } else showWarning('Você já está na primeira página.', 'Aviso'); });
         btnNext.addEventListener('click', function() { if (temMais) { historicoCursors.push(cursorAtual); currentPage++; pesquisarProspeccao(this, cursorAtual); } else showWarning('Você já está na última página.', 'Aviso'); });
 
+        // ✅ LISTENERS PARA APLICAR ESPECIFICIDADE DE FILTROS
+        if (filterUf)       filterUf.addEventListener('change', aplicarEstadoFiltros);
+        if (filterDdd)      filterDdd.addEventListener('change', aplicarEstadoFiltros);
+        if (filterSegmento) filterSegmento.addEventListener('change', aplicarEstadoFiltros);
+
         if (campoMunicipio) campoMunicipio.style.display = 'none';
         initializeCustomSelects();
+        aplicarEstadoFiltros();
         showScreen('main');
 
         (async function boot() {
