@@ -688,22 +688,28 @@ document.addEventListener('DOMContentLoaded', async function() {
             const fieldSeg = document.getElementById('field-segmento');
 
             if (fieldUf) {
+                const lbl = fieldUf.querySelector('label');
                 if (ddd) {
                     fieldUf.classList.add('filter-ignored');
                     fieldUf.title = 'Ignorado porque um DDD foi selecionado (DDD é mais específico).';
+                    if (lbl) lbl.setAttribute('data-warning', 'para usar UF, limpe o DDD');
                 } else {
                     fieldUf.classList.remove('filter-ignored');
                     fieldUf.removeAttribute('title');
+                    if (lbl) lbl.removeAttribute('data-warning');
                 }
             }
 
             if (fieldSeg) {
+                const lbl = fieldSeg.querySelector('label');
                 if (cnae) {
                     fieldSeg.classList.add('filter-ignored');
                     fieldSeg.title = 'Ignorado porque um CNAE foi selecionado (CNAE é mais específico).';
+                    if (lbl) lbl.setAttribute('data-warning', 'para usar Segmento, limpe o CNAE');
                 } else {
                     fieldSeg.classList.remove('filter-ignored');
                     fieldSeg.removeAttribute('title');
+                    if (lbl) lbl.removeAttribute('data-warning');
                 }
             }
         }

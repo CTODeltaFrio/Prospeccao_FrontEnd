@@ -1250,31 +1250,65 @@ body.dark-mode .ia-section {
    FILTROS — ESTADO "IGNORADO" (especificidade)
    ============================================================ */
 .field.filter-ignored {
-    opacity: 0.45;
     position: relative;
-    transition: opacity 0.2s ease;
 }
-.field.filter-ignored .input,
+
+.field.filter-ignored > label {
+    opacity: 0.45;
+}
+
+/* Aplica o cinza apenas no gatilho customizado (o que o usuário vê) */
 .field.filter-ignored .custom-select-trigger {
+    opacity: 0.6;
     background: #f1f5f9 !important;
     cursor: not-allowed;
 }
-body.dark-mode .field.filter-ignored .input,
-body.dark-mode .field.filter-ignored .custom-select-trigger {
+
+/* Garante que o select nativo (escondido por baixo) continue invisível */
+.field.filter-ignored .custom-select select {
+    opacity: 0 !important;
+}
+
+/* Para inputs de texto que não são custom select */
+.field.filter-ignored .input:not(.custom-select select) {
+    opacity: 0.6;
+    background: #f1f5f9 !important;
+    cursor: not-allowed;
+}
+
+/* Modo escuro */
+body.dark-mode .field.filter-ignored .custom-select-trigger,
+body.dark-mode .field.filter-ignored .input:not(.custom-select select) {
     background: #1a1f2e !important;
 }
+
+/* Selo "ignorado" com aviso dinâmico */
 .field.filter-ignored > label::after {
-    content: '· ignorado';
+    content: '· ignorado (' attr(data-warning) ')';
     font-size: 10px;
     color: #dc2626;
-    font-weight: 700;
+    font-weight: 600;
     letter-spacing: 0.3px;
     margin-left: 6px;
-    text-transform: uppercase;
+    text-transform: none; /* Deixa o aviso em minúsculo para não ficar gritante */
+    opacity: 1;
+    white-space: nowrap;
 }
+
 body.dark-mode .field.filter-ignored > label::after {
     color: #f87171;
 }
+
+/* Garante que o dropdown aberto fique SEMPRE opaco */
+.field.filter-ignored .custom-select.open .custom-select-options {
+    opacity: 1 !important;
+}
+
+.field.filter-ignored .custom-select-trigger,
+.field.filter-ignored .input {
+    pointer-events: none;
+}
+
 
 /* ============================================================
    TOOLTIP DE INFO (balão de observação)
