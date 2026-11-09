@@ -31,6 +31,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         console.log('✅ [vendedores] módulo inicializando...');
 
+        // ✅ TRAVA DE SEGURANÇA: Só carrega se for admin
+        if (!window.AppCore.isAdminGlobal() && !window.AppCore.temFuncionalidade('ADMINISTRAR_VENDEDORES')) {
+            console.log('[vendedores] Usuário comum. Módulo de vendedores ignorado.');
+            return;
+        }
+
         // ============================================================
         // ✅ WRAPPERS DINÂMICOS
         // ============================================================
@@ -388,7 +394,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         lista = ctx.empresas.map(e => ({ id: e.id ?? e.codigo, nome: e.nome || e.nomeFantasia || e.razaoSocial || `#${e.id}`, cnpj: e.cnpj || '' })).filter(e => e.id);
                     }
                 } catch (e) {}
-                if (lista.length === 0) {
+                
+                // ✅ Só tenta buscar na API se for admin (evita o erro 403)
+                if (lista.length === 0 && (window.AppCore.isAdminGlobal() || window.AppCore.temFuncionalidade('ADMINISTRAR_VENDEDORES'))) {
                     try {
                         const dados = await apiGetEnvelope(`${API_URL}/prospeccao/empresas`);
                         const arr = Array.isArray(dados) ? dados : (dados && Array.isArray(dados.registros)) ? dados.registros : (dados && Array.isArray(dados.itens)) ? dados.itens : (dados && Array.isArray(dados.empresas)) ? dados.empresas : (dados && Array.isArray(dados.content)) ? dados.content : [];
@@ -449,7 +457,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (t.length < 2) { vendEmpresaSugg?.classList.remove('active'); if (vendEmpresaSugg) vendEmpresaSugg.innerHTML = ''; return; }
                 empresaDebounce = setTimeout(async () => { await carregarListaEmpresas(); renderSugestoesEmpresas(buscarEmpresas(t)); }, 200);
             });
-                        vendEmpresaSearch.addEventListener('focus', async () => { 
+            vendEmpresaSearch.addEventListener('focus', async () => { 
                 await carregarListaEmpresas(); 
                 const t = vendEmpresaSearch.value.trim(); 
                 // ✅ Só mostra a lista se o usuário já tiver digitado pelo menos 2 letras
@@ -459,7 +467,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     vendEmpresaSugg.classList.remove('active');
                     vendEmpresaSugg.innerHTML = '';
                 }
-            });}
+            });
+        }
 
         // ============================================================
         // DDDs e CIDADES
@@ -631,7 +640,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const ufStr = (c.uf && c.uf.length === 2) ? c.uf.toUpperCase() : '';
                 const infoExtra = [dddStr, ufStr].filter(Boolean).join(' - ');
 
-                                return `<span class="cidade-chip" data-index="${i}">
+                return `<span class="cidade-chip" data-index="${i}">
                     <span class="chip-nome">${c.nome}</span>
                     ${infoExtra ? `<span class="chip-uf">${infoExtra}</span>` : ''}
                     <button type="button" class="chip-remove" data-index="${i}" title="Remover"><i class="fas fa-times"></i></button>

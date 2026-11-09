@@ -382,7 +382,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                             const sessaoJson = await sessaoResp.json();
                             const usuarioId = sessaoJson?.dados?.usuario?.id || sessaoJson?.usuario?.id;
                             
-                            if (usuarioId) {
+                            if (usuarioId && (isAdminGlobal() || temFuncionalidade('ADMINISTRAR_VENDEDORES'))) {
                                 const vResp = await fetch(`${API_URL}/prospeccao/vendedores`, { method: 'GET', credentials: 'include', headers: { 'Accept': 'application/json' } });
                                 if (vResp.ok) {
                                     const vJson = await vResp.json();
@@ -451,7 +451,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             return false;
         }
 
-                function aplicarGuardrailsAdmin() {
+        function aplicarGuardrailsAdmin() {
             let algumMenuAdminVisivel = false;
             for (const [func, ids] of Object.entries(FUNC_MENUS)) {
                 const permitido = temFuncionalidade(func); 
@@ -466,7 +466,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                                 (mapScreen.style.display === 'block' && !temFuncionalidade('CONSULTAR_MAPAS'));
             if (emTelaAdmin) showScreen('main');
 
-            // ✅ NOVO: Se o usuário não pode administrar segmentos, esconde o filtro de segmento da tela de pesquisa
             const fieldSeg = document.getElementById('field-segmento');
             if (fieldSeg) {
                 fieldSeg.style.display = temFuncionalidade('ADMINISTRAR_SEGMENTOS') ? '' : 'none';
@@ -544,8 +543,44 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         async function carregarUFs() {
             const cache = cacheGet(CACHE.UFS);
-            if (cache) { ufData = cache; filterUf.innerHTML = '<option value="">Todos</option>' + ufData.map(u => `<option value="${u.sigla}">${u.sigla}</option>`).join(''); refreshCustomSelect(filterUf); return; }
-            try { const data = await apiGet(`${API_URL}/ufs`); ufData = data.map(i => ({ sigla: i.uf, nome: i.nome })); filterUf.innerHTML = '<option value="">Todos</option>' + ufData.map(u => `<option value="${u.sigla}">${u.sigla}</option>`).join(''); refreshCustomSelect(filterUf); cacheSet(CACHE.UFS, ufData); } catch (e) {}
+            if (cache) { 
+                ufData = cache; 
+                filterUf.innerHTML = '<option value="">Todos</option>' + ufData.map(u => `<option value="${u.sigla}">${u.sigla}</option>`).join(''); 
+                refreshCustomSelect(filterUf); 
+                return; 
+            }
+            
+            try { 
+                const res = await apiGet(`${API_URL}/ufs`); 
+                
+                let data = [];
+                if (Array.isArray(res)) data = res;
+                else if (res && Array.isArray(res.dados)) data = res.dados;
+                else if (res && Array.isArray(res.registros)) data = res.registros;
+                else if (res && Array.isArray(res.content)) data = res.content;
+                else if (res && Array.isArray(res.itens)) data = res.itens;
+
+                if (data.length === 0) throw new Error('Lista vazia');
+
+                ufData = data.map(i => ({ sigla: i.uf || i.sigla, nome: i.nome || i.descricao || '' })).filter(u => u.sigla);
+                
+                filterUf.innerHTML = '<option value="">Todos</option>' + ufData.map(u => `<option value="${u.sigla}">${u.sigla}</option>`).join(''); 
+                refreshCustomSelect(filterUf); 
+                cacheSet(CACHE.UFS, ufData); 
+            } catch (e) {
+                console.warn('[UFs] Erro ao buscar da API. Usando fallback fixo:', e.message);
+                ufData = [
+                    {sigla:'AC', nome:'Acre'}, {sigla:'AL', nome:'Alagoas'}, {sigla:'AP', nome:'Amapá'}, {sigla:'AM', nome:'Amazonas'},
+                    {sigla:'BA', nome:'Bahia'}, {sigla:'CE', nome:'Ceará'}, {sigla:'DF', nome:'Distrito Federal'}, {sigla:'ES', nome:'Espírito Santo'},
+                    {sigla:'GO', nome:'Goiás'}, {sigla:'MA', nome:'Maranhão'}, {sigla:'MT', nome:'Mato Grosso'}, {sigla:'MS', nome:'Mato Grosso do Sul'},
+                    {sigla:'MG', nome:'Minas Gerais'}, {sigla:'PA', nome:'Pará'}, {sigla:'PB', nome:'Paraíba'}, {sigla:'PR', nome:'Paraná'},
+                    {sigla:'PE', nome:'Pernambuco'}, {sigla:'PI', nome:'Piauí'}, {sigla:'RJ', nome:'Rio de Janeiro'}, {sigla:'RN', nome:'Rio Grande do Norte'},
+                    {sigla:'RS', nome:'Rio Grande do Sul'}, {sigla:'RO', nome:'Rondônia'}, {sigla:'RR', nome:'Roraima'}, {sigla:'SC', nome:'Santa Catarina'},
+                    {sigla:'SP', nome:'São Paulo'}, {sigla:'SE', nome:'Sergipe'}, {sigla:'TO', nome:'Tocantins'}
+                ];
+                filterUf.innerHTML = '<option value="">Todos</option>' + ufData.map(u => `<option value="${u.sigla}">${u.sigla}</option>`).join(''); 
+                refreshCustomSelect(filterUf); 
+            }
         }
 
         async function carregarDDDs() {
@@ -804,9 +839,18 @@ document.addEventListener('DOMContentLoaded', async function() {
                 if (!r.ok) { const e = extrairErroResposta(json, r.status); const err = new Error(e.mensagem); err.codigo = e.codigo; err.traceId = e.traceId; throw err; }
                 const d = json?.dados ?? json; registros = d.registros || []; window.registros = registros; temMais = d.temMais || false; cursorAtual = d.ultimoCnpj || null; renderTable(registros);
             } catch (e) { 
-                if (e.name !== 'AbortError') { console.error(e); showWarning("Erro ao pesquisar: " + (e.message || 'Tente novamente mais tarde.'), "Erro"); } 
-                if (btn.classList.contains('page-btn')) pageIndicator.innerHTML = origP; 
-            } finally { btn.disabled = false; btn.innerHTML = origB; pesquisaController = null; }
+    if (e.name === 'AbortError') return; // Ignora se foi cancelado
+    
+    // ✅ TRATAMENTO ESPECÍFICO PARA TIMEOUT (504)
+    if (r && r.status === 504) {
+        showWarning("A busca por este DDD é muito ampla e o servidor demorou muito para responder. Tente buscar junto com um CNAE ou Segmento para filtrar mais!", "Tempo Esgotado");
+    } else {
+        console.error(e); 
+        showWarning("Erro ao pesquisar: " + (e.message || 'Tente novamente mais tarde.'), "Erro"); 
+    }
+    
+    if (btn.classList.contains('page-btn')) pageIndicator.innerHTML = origP; 
+} finally { btn.disabled = false; btn.innerHTML = origB; pesquisaController = null; }
         }
 
         async function solicitarDadosIA(cnpj) {
