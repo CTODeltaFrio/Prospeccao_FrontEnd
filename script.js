@@ -451,15 +451,26 @@ document.addEventListener('DOMContentLoaded', async function() {
             return false;
         }
 
-        function aplicarGuardrailsAdmin() {
+                function aplicarGuardrailsAdmin() {
             let algumMenuAdminVisivel = false;
             for (const [func, ids] of Object.entries(FUNC_MENUS)) {
-                const permitido = temFuncionalidade(func); if (permitido) algumMenuAdminVisivel = true;
+                const permitido = temFuncionalidade(func); 
+                if (permitido) algumMenuAdminVisivel = true;
                 ids.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = permitido ? '' : 'none'; });
             }
-            const titulo = document.getElementById('gestao-menu-title'); if (titulo) titulo.style.display = algumMenuAdminVisivel ? '' : 'none';
-            const emTelaAdmin = (segmentScreen.style.display === 'block' && !temFuncionalidade('ADMINISTRAR_SEGMENTOS')) || (vendedoresScreen?.style.display === 'block' && !temFuncionalidade('ADMINISTRAR_VENDEDORES')) || (mapScreen.style.display === 'block' && !temFuncionalidade('CONSULTAR_MAPAS'));
+            const titulo = document.getElementById('gestao-menu-title'); 
+            if (titulo) titulo.style.display = algumMenuAdminVisivel ? '' : 'none';
+            
+            const emTelaAdmin = (segmentScreen.style.display === 'block' && !temFuncionalidade('ADMINISTRAR_SEGMENTOS')) || 
+                                (vendedoresScreen?.style.display === 'block' && !temFuncionalidade('ADMINISTRAR_VENDEDORES')) || 
+                                (mapScreen.style.display === 'block' && !temFuncionalidade('CONSULTAR_MAPAS'));
             if (emTelaAdmin) showScreen('main');
+
+            // ✅ NOVO: Se o usuário não pode administrar segmentos, esconde o filtro de segmento da tela de pesquisa
+            const fieldSeg = document.getElementById('field-segmento');
+            if (fieldSeg) {
+                fieldSeg.style.display = temFuncionalidade('ADMINISTRAR_SEGMENTOS') ? '' : 'none';
+            }
         }
 
         function extrairErroResposta(json, httpStatus) {
