@@ -72,6 +72,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         let vendedoresMapaPromise = null;
         
         let cnpjAtivoCRM = null; 
+        let obsAutomaticaCRM = "";
         let idempotencyKeyAtual = null;
         let cnpjIdempotenciaAtual = null;
         let envioEmAndamento = false;
@@ -832,25 +833,59 @@ document.addEventListener('DOMContentLoaded', async function() {
 
             btn.disabled = true; const origB = btn.innerHTML; const origP = pageIndicator.innerHTML;
             if (btn.classList.contains('page-btn')) pageIndicator.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; else btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Carregando...';
-            if (pesquisaController) pesquisaController.abort(); pesquisaController = new AbortController();
+            
+            if (pesquisaController) pesquisaController.abort(); 
+            pesquisaController = new AbortController();
+            
+            // ✅ TIMEOUT DE SEGURANÇA: Cancela a busca se o servidor demorar mais de 30 segundos
+            const timeoutId = setTimeout(() => {
+                if (pesquisaController) pesquisaController.abort();
+                showWarning("A busca demorou muito e foi cancelada pelo servidor. Tente adicionar mais filtros (como CNAE) para refinar o resultado.", "Tempo Esgotado");
+                btn.disabled = false; 
+                btn.innerHTML = origB;
+                if (btn.classList.contains('page-btn')) pageIndicator.innerHTML = origP;
+            }, 30000); // 30 segundos
+
             try {
                 const r = await fetch(`${API_URL}/prospeccao/pesquisar?empresaId=${encodeURIComponent(empresaId)}`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body), signal: pesquisaController.signal });
+                
+                clearTimeout(timeoutId);
+                
                 const t = await r.text(); let json; try { json = t ? JSON.parse(t) : {}; } catch (e) {}
-                if (!r.ok) { const e = extrairErroResposta(json, r.status); const err = new Error(e.mensagem); err.codigo = e.codigo; err.traceId = e.traceId; throw err; }
-                const d = json?.dados ?? json; registros = d.registros || []; window.registros = registros; temMais = d.temMais || false; cursorAtual = d.ultimoCnpj || null; renderTable(registros);
+                if (!r.ok) { 
+                    const e = extrairErroResposta(json, r.status); 
+                    const err = new Error(e.mensagem); 
+                    err.codigo = e.codigo; 
+                    err.traceId = e.traceId; 
+                    err.status = r.status; 
+                    throw err; 
+                }
+                
+                const d = json?.dados ?? json; 
+                registros = d.registros || []; 
+                window.registros = registros; 
+                temMais = d.temMais || false; 
+                cursorAtual = d.ultimoCnpj || null; 
+                renderTable(registros);
+
             } catch (e) { 
-    if (e.name === 'AbortError') return; // Ignora se foi cancelado
-    
-    // ✅ TRATAMENTO ESPECÍFICO PARA TIMEOUT (504)
-    if (r && r.status === 504) {
-        showWarning("A busca por este DDD é muito ampla e o servidor demorou muito para responder. Tente buscar junto com um CNAE ou Segmento para filtrar mais!", "Tempo Esgotado");
-    } else {
-        console.error(e); 
-        showWarning("Erro ao pesquisar: " + (e.message || 'Tente novamente mais tarde.'), "Erro"); 
-    }
-    
-    if (btn.classList.contains('page-btn')) pageIndicator.innerHTML = origP; 
-} finally { btn.disabled = false; btn.innerHTML = origB; pesquisaController = null; }
+                clearTimeout(timeoutId);
+                
+                if (e.name === 'AbortError') {
+                    // O showWarning já foi exibido pelo setTimeout
+                } else if (e.status === 504 || (e.message && (e.message.includes('504') || e.message.includes('Gateway')))) {
+                    showWarning("A busca por este filtro é muito ampla e o servidor demorou muito para responder. Tente buscar junto com um CNAE ou Segmento para filtrar mais!", "Tempo Esgotado");
+                } else {
+                    console.error(e); 
+                    showWarning("Erro ao pesquisar: " + (e.message || 'Tente novamente mais tarde.'), "Erro"); 
+                }
+            } finally { 
+                if (btn.disabled) {
+                    btn.disabled = false; 
+                    btn.innerHTML = origB; 
+                    pesquisaController = null; 
+                }
+            }
         }
 
         async function solicitarDadosIA(cnpj) {
@@ -952,6 +987,19 @@ document.addEventListener('DOMContentLoaded', async function() {
             currentIAData = data; 
             iaDataContent.innerHTML = html;
             iaDataModal.style.display = 'flex';
+            
+            // ✅ NOVO: Preenche os campos de envio direto do CRM na tela de IA
+            const iaNome = document.getElementById('det-ia-crm-nome');
+            const iaVendedor = document.getElementById('det-ia-vendedor-select');
+            const originalNome = document.getElementById('det-crm-nome')?.value || '';
+            const originalVendedor = document.getElementById('det-vendedor-select')?.value || '';
+            
+            if (iaNome) iaNome.value = originalNome;
+            if (iaVendedor) {
+                iaVendedor.innerHTML = document.getElementById('det-vendedor-select')?.innerHTML || '<option value="">— Selecione —</option>';
+                iaVendedor.value = originalVendedor;
+                if (typeof refreshCustomSelect === 'function') refreshCustomSelect(iaVendedor);
+            }
         }
 
         async function copiarDadosIA() {
@@ -1133,10 +1181,28 @@ document.addEventListener('DOMContentLoaded', async function() {
                     tipo.innerText = d.identificadorMatrizFilial === '1' ? 'MATRIZ' : 'FILIAL';
                 }
 
+                // ✅ Preenche os campos ocultos do CRM (Telefone e E-mail principais)
                 const telInput = document.getElementById('det-crm-telefone');
                 if (telInput && !telInput.value && tels[0]) telInput.value = `(${tels[0].ddd}) ${tels[0].numero}`;
                 const emailInput = document.getElementById('det-crm-email');
                 if (emailInput && !emailInput.value && d.email) emailInput.value = d.email;
+
+                // ✅ NOVO: Guarda contatos adicionais na variável invisível
+                let extras = [];
+                if (tels.length > 1) {
+                    const outrosTels = tels.slice(1).map(t => `(${t.ddd}) ${t.numero}`).join(', ');
+                    extras.push(`Tel. Adicional: ${outrosTels}`);
+                }
+                const emails = Array.isArray(d.emails) ? d.emails : (d.email ? [d.email] : []);
+                if (emails.length > 1) {
+                    const outrosEmails = emails.slice(1).join(', ');
+                    extras.push(`E-mail Adicional: ${outrosEmails}`);
+                }
+                
+                // Salva na variável invisível em vez de mostrar na tela
+                if (extras.length > 0) {
+                    obsAutomaticaCRM += (obsAutomaticaCRM ? '<br><br>' : '') + extras.join('<br>');
+                }
 
             } catch (e) {
                 console.warn('[Detalhes] Erro ao buscar dados completos:', e);
@@ -1202,6 +1268,10 @@ document.addEventListener('DOMContentLoaded', async function() {
             document.getElementById('det-crm-email').value = c.email || '';
             const obsEl = document.getElementById('det-crm-observacao');
             if (obsEl) obsEl.value = '';
+
+            // ✅ LIMPA A VARIÁVEL INVISÍVEL AO ABRIR UMA NOVA EMPRESA
+            obsAutomaticaCRM = ""; 
+
             carregarVendedoresNoModal();
 
             const btnIA = document.getElementById('btn-dados-ia');
@@ -1347,6 +1417,57 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (confirmModal) confirmModal.addEventListener('click', function(e) { if (e.target === this) { confirmModal.style.display = 'none'; restoreActiveMenuItem(); } });
 
         document.getElementById('close-ia-data-modal')?.addEventListener('click', () => iaDataModal.style.display = 'none');
+        
+        // ✅ NOVO: Enviar dados da IA direto para o CRM
+        const btnEnviarCRMIA = document.getElementById('btn-enviar-crm-ia');
+        if (btnEnviarCRMIA) {
+            btnEnviarCRMIA.addEventListener('click', async () => {
+                // ✅ Verifica se preencheu no próprio modal da IA
+                const iaVendedor = document.getElementById('det-ia-vendedor-select')?.value;
+                const iaNome = document.getElementById('det-ia-crm-nome')?.value.trim();
+
+                if (!iaVendedor || !iaNome) {
+                    showWarning("Preencha o 'Vendedor' e o 'Nome do Contato' no topo desta tela para enviar ao CRM.", "Atenção");
+                    return;
+                }
+
+                if (!currentIAData || !currentIAData.resultado) {
+                    showWarning("Nenhum dado de IA disponível para enviar.", "Atenção");
+                    return;
+                }
+
+                // ✅ Sincroniza os dados preenchidos na IA com a tela de detalhes original
+                const selectOriginal = document.getElementById('det-vendedor-select');
+                if (selectOriginal) selectOriginal.value = iaVendedor;
+                const inputOriginal = document.getElementById('det-crm-nome');
+                if (inputOriginal) inputOriginal.value = iaNome;
+
+                // Formata os dados da IA para colocar na observação
+                const res = currentIAData.resultado;
+                let extraInfo = [];
+                if (res.site) extraInfo.push(`• Site: ${res.site}`);
+                if (res.instagram) extraInfo.push(`• Instagram: ${res.instagram}`);
+                if (res.linkedin) extraInfo.push(`• LinkedIn: ${res.linkedin}`);
+                if (res.facebook) extraInfo.push(`• Facebook: ${res.facebook}`);
+                if (res.telefones?.length) extraInfo.push(`• Telefones IA: ${res.telefones.join(', ')}`);
+                if (res.emails?.length) extraInfo.push(`• E-mails IA: ${res.emails.join(', ')}`);
+                if (res.whatsapps?.length) extraInfo.push(`• WhatsApp IA: ${res.whatsapps.join(', ')}`);
+                if (res.descricaoEmpresa) extraInfo.push(`• Sobre a Empresa: ${res.descricaoEmpresa}`);
+                if (res.informacoesAdicionais?.length) extraInfo.push(`• Info Adicional: ${res.informacoesAdicionais.join(' | ')}`);
+
+                const textoObservacao = extraInfo.join('<br>');
+obsAutomaticaCRM += (obsAutomaticaCRM ? '<br><br>' : '') + `--- DADOS DA IA ---<br>${textoObservacao}`;
+
+                // Fecha o modal da IA
+                iaDataModal.style.display = 'none';
+
+                // Dispara o botão original de envio do CRM
+                const btnRegistroCRM = document.getElementById('btn-registro-crm');
+                if (btnRegistroCRM) {
+                    btnRegistroCRM.click();
+                }
+            });
+        }
         iaDataModal?.addEventListener('click', function(e) { if (e.target === this) iaDataModal.style.display = 'none'; });
         if (btnCopiarIA) btnCopiarIA.addEventListener('click', copiarDadosIA);
 
@@ -1388,7 +1509,11 @@ document.addEventListener('DOMContentLoaded', async function() {
                 let cargo = document.getElementById('det-crm-cargo')?.value.trim() || null;
                 let telefone = document.getElementById('det-crm-telefone')?.value.trim() || null;
                 let email = document.getElementById('det-crm-email')?.value.trim() || null;
-                let observacao = document.getElementById('det-crm-observacao')?.value.trim() || null;
+                
+                // ✅ Pega o que o usuário digitou e junta com os dados invisíveis
+                let obsUsuario = document.getElementById('det-crm-observacao')?.value.trim() || "";
+                let observacaoFinal = [obsUsuario, obsAutomaticaCRM].filter(Boolean).join('<br><br>');
+                let observacao = observacaoFinal || null;
 
                 if (!nome) return showWarning('Por favor, informe o nome da pessoa que atende na empresa.', 'Atenção');
                 if (nome.length > 200) return showWarning('Nome deve ter até 200 caracteres.', 'Atenção');
