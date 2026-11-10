@@ -991,8 +991,11 @@ document.addEventListener('DOMContentLoaded', async function() {
             // ✅ NOVO: Preenche os campos de envio direto do CRM na tela de IA
             const iaNome = document.getElementById('det-ia-crm-nome');
             const iaVendedor = document.getElementById('det-ia-vendedor-select');
+            const iaObs = document.getElementById('det-ia-crm-observacao');
+            
             const originalNome = document.getElementById('det-crm-nome')?.value || '';
             const originalVendedor = document.getElementById('det-vendedor-select')?.value || '';
+            const originalObs = document.getElementById('det-crm-observacao')?.value.trim() || '';
             
             if (iaNome) iaNome.value = originalNome;
             if (iaVendedor) {
@@ -1000,6 +1003,26 @@ document.addEventListener('DOMContentLoaded', async function() {
                 iaVendedor.value = originalVendedor;
                 if (typeof refreshCustomSelect === 'function') refreshCustomSelect(iaVendedor);
             }
+
+            // ✅ NOVO: Monta o texto da IA e joga na caixa de observação junto com o que o usuário já tinha escrito
+            let extraInfo = [];
+            if (res.site) extraInfo.push(`• Site: ${res.site}`);
+            if (res.instagram) extraInfo.push(`• Instagram: ${res.instagram}`);
+            if (res.linkedin) extraInfo.push(`• LinkedIn: ${res.linkedin}`);
+            if (res.facebook) extraInfo.push(`• Facebook: ${res.facebook}`);
+            if (res.telefones?.length) extraInfo.push(`• Telefones IA: ${res.telefones.join(', ')}`);
+            if (res.emails?.length) extraInfo.push(`• E-mails IA: ${res.emails.join(', ')}`);
+            if (res.whatsapps?.length) extraInfo.push(`• WhatsApp IA: ${res.whatsapps.join(', ')}`);
+            if (res.descricaoEmpresa) extraInfo.push(`• Sobre a Empresa: ${res.descricaoEmpresa}`);
+            if (res.informacoesAdicionais?.length) extraInfo.push(`• Info Adicional: ${res.informacoesAdicionais.join(' | ')}`);
+            
+            const textoObservacao = extraInfo.join('\r\n');
+            
+            // Junta o que já tinha (incluindo a variável invisível) com os novos dados da IA
+            const obsBase = [originalObs, obsAutomaticaCRM].filter(Boolean).join('\r\n\r\n');
+            const textoCompleto = [obsBase, `--- DADOS DA IA ---\r\n${textoObservacao}`].filter(Boolean).join('\r\n\r\n');
+            
+            if (iaObs) iaObs.value = textoCompleto;
         }
 
         async function copiarDadosIA() {
@@ -1201,7 +1224,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 
                 // Salva na variável invisível em vez de mostrar na tela
                 if (extras.length > 0) {
-                    obsAutomaticaCRM += (obsAutomaticaCRM ? '<br><br>' : '') + extras.join('<br>');
+                    obsAutomaticaCRM += (obsAutomaticaCRM ? '\r\n\r\n' : '') + extras.join('\r\n');
                 }
 
             } catch (e) {
@@ -1425,38 +1448,25 @@ document.addEventListener('DOMContentLoaded', async function() {
                 // ✅ Verifica se preencheu no próprio modal da IA
                 const iaVendedor = document.getElementById('det-ia-vendedor-select')?.value;
                 const iaNome = document.getElementById('det-ia-crm-nome')?.value.trim();
+                const iaObs = document.getElementById('det-ia-crm-observacao')?.value.trim();
 
                 if (!iaVendedor || !iaNome) {
                     showWarning("Preencha o 'Vendedor' e o 'Nome do Contato' no topo desta tela para enviar ao CRM.", "Atenção");
                     return;
                 }
 
-                if (!currentIAData || !currentIAData.resultado) {
-                    showWarning("Nenhum dado de IA disponível para enviar.", "Atenção");
-                    return;
-                }
-
                 // ✅ Sincroniza os dados preenchidos na IA com a tela de detalhes original
                 const selectOriginal = document.getElementById('det-vendedor-select');
                 if (selectOriginal) selectOriginal.value = iaVendedor;
+                
                 const inputOriginal = document.getElementById('det-crm-nome');
                 if (inputOriginal) inputOriginal.value = iaNome;
+                
+                const obsOriginal = document.getElementById('det-crm-observacao');
+                if (obsOriginal) obsOriginal.value = iaObs;
 
-                // Formata os dados da IA para colocar na observação
-                const res = currentIAData.resultado;
-                let extraInfo = [];
-                if (res.site) extraInfo.push(`• Site: ${res.site}`);
-                if (res.instagram) extraInfo.push(`• Instagram: ${res.instagram}`);
-                if (res.linkedin) extraInfo.push(`• LinkedIn: ${res.linkedin}`);
-                if (res.facebook) extraInfo.push(`• Facebook: ${res.facebook}`);
-                if (res.telefones?.length) extraInfo.push(`• Telefones IA: ${res.telefones.join(', ')}`);
-                if (res.emails?.length) extraInfo.push(`• E-mails IA: ${res.emails.join(', ')}`);
-                if (res.whatsapps?.length) extraInfo.push(`• WhatsApp IA: ${res.whatsapps.join(', ')}`);
-                if (res.descricaoEmpresa) extraInfo.push(`• Sobre a Empresa: ${res.descricaoEmpresa}`);
-                if (res.informacoesAdicionais?.length) extraInfo.push(`• Info Adicional: ${res.informacoesAdicionais.join(' | ')}`);
-
-                const textoObservacao = extraInfo.join('<br>');
-obsAutomaticaCRM += (obsAutomaticaCRM ? '<br><br>' : '') + `--- DADOS DA IA ---<br>${textoObservacao}`;
+                // ✅ Limpa a variável invisível para não duplicar o texto no envio
+                obsAutomaticaCRM = "";
 
                 // Fecha o modal da IA
                 iaDataModal.style.display = 'none';
@@ -1512,7 +1522,7 @@ obsAutomaticaCRM += (obsAutomaticaCRM ? '<br><br>' : '') + `--- DADOS DA IA ---<
                 
                 // ✅ Pega o que o usuário digitou e junta com os dados invisíveis
                 let obsUsuario = document.getElementById('det-crm-observacao')?.value.trim() || "";
-                let observacaoFinal = [obsUsuario, obsAutomaticaCRM].filter(Boolean).join('<br><br>');
+                let observacaoFinal = [obsUsuario, obsAutomaticaCRM].filter(Boolean).join('\r\n\r\n');
                 let observacao = observacaoFinal || null;
 
                 if (!nome) return showWarning('Por favor, informe o nome da pessoa que atende na empresa.', 'Atenção');
