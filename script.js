@@ -984,21 +984,14 @@ document.addEventListener('DOMContentLoaded', async function() {
             iaDataContent.innerHTML = html;
             iaDataModal.style.display = 'flex';
             
-            // ✅ Preenche Vendedor e Nome
+            // ✅ Preenche apenas o Nome do Contato e a Observação
             const iaNome = document.getElementById('det-ia-crm-nome');
-            const iaVendedor = document.getElementById('det-ia-vendedor-select');
             const iaObs = document.getElementById('det-ia-crm-observacao');
             
             const originalNome = document.getElementById('det-crm-nome')?.value || '';
-            const originalVendedor = document.getElementById('det-vendedor-select')?.value || '';
             const originalObs = document.getElementById('det-crm-observacao')?.value.trim() || '';
             
             if (iaNome) iaNome.value = originalNome;
-            if (iaVendedor) {
-                iaVendedor.innerHTML = document.getElementById('det-vendedor-select')?.innerHTML || '<option value="">— Selecione —</option>';
-                iaVendedor.value = originalVendedor;
-                if (typeof refreshCustomSelect === 'function') refreshCustomSelect(iaVendedor);
-            }
 
             // ✅ A caixa de observação visual recebe APENAS o que o usuário digitou antes. Os dados da IA ficam invisíveis!
             if (iaObs) iaObs.value = originalObs;
@@ -1068,45 +1061,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             } catch (err) {
                 console.error('Erro ao copiar:', err);
                 showWarning('Não foi possível copiar automaticamente. Tente selecionar o texto manualmente.', 'Atenção');
-            }
-        }
-
-        async function carregarVendedoresNoModal() {
-            const select = document.getElementById('det-vendedor-select');
-            if (!select) return;
-
-            select.innerHTML = '<option value="">— Carregando vendedores... —</option>';
-            
-            const empresaId = obterEmpresaAtivaId();
-            if (!empresaId) {
-                select.innerHTML = '<option value="">— Selecione uma empresa ativa —</option>';
-                if (typeof refreshCustomSelect === 'function') refreshCustomSelect(select);
-                return;
-            }
-
-            try {
-                const url = `${API_URL}/prospeccao/leads-crm/vendedores?empresaId=${encodeURIComponent(empresaId)}&pagina=1&tamanhoPagina=100`;
-                const response = await apiGet(url);
-                const lista = response?.registros || [];
-
-                select.innerHTML = '<option value="">— Selecione um vendedor —</option>';
-                
-                if (lista.length === 0) {
-                    select.innerHTML = '<option value="">— Nenhum vendedor cadastrado —</option>';
-                } else {
-                    lista.forEach(v => {
-                        const opt = document.createElement('option');
-                        opt.value = v.id; 
-                        opt.textContent = v.nome;
-                        select.appendChild(opt);
-                    });
-                }
-
-                if (typeof refreshCustomSelect === 'function') refreshCustomSelect(select);
-            } catch (e) {
-                console.error('Erro ao carregar vendedores:', e);
-                select.innerHTML = '<option value="">— Erro ao carregar —</option>';
-                if (typeof refreshCustomSelect === 'function') refreshCustomSelect(select);
             }
         }
 
@@ -1288,8 +1242,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             obsAutomaticaCRM = ""; 
             obsIACRM = ""; 
 
-            carregarVendedoresNoModal();
-
             const btnIA = document.getElementById('btn-dados-ia');
             if (btnIA) btnIA.onclick = () => solicitarDadosIA(cnpj);
 
@@ -1435,18 +1387,14 @@ document.addEventListener('DOMContentLoaded', async function() {
         const btnEnviarCRMIA = document.getElementById('btn-enviar-crm-ia');
         if (btnEnviarCRMIA) {
             btnEnviarCRMIA.addEventListener('click', async () => {
-                const iaVendedor = document.getElementById('det-ia-vendedor-select')?.value;
                 const iaNome = document.getElementById('det-ia-crm-nome')?.value.trim();
                 const iaObs = document.getElementById('det-ia-crm-observacao')?.value.trim();
 
-                if (!iaVendedor || !iaNome) {
-                    showWarning("Preencha o 'Vendedor' e o 'Nome do Contato' no topo desta tela para enviar ao CRM.", "Atenção");
+                if (!iaNome) {
+                    showWarning("Preencha o 'Nome do Contato' no topo desta tela para enviar ao CRM.", "Atenção");
                     return;
                 }
 
-                const selectOriginal = document.getElementById('det-vendedor-select');
-                if (selectOriginal) selectOriginal.value = iaVendedor;
-                
                 const inputOriginal = document.getElementById('det-crm-nome');
                 if (inputOriginal) inputOriginal.value = iaNome;
                 
@@ -1494,10 +1442,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             btnRegistroCRM.addEventListener('click', async () => {
                 if (envioEmAndamento) return;
 
-                const vendedorIdStr = document.getElementById('det-vendedor-select')?.value;
-                if (!vendedorIdStr) return showWarning('Por favor, selecione um vendedor no topo da tela.', 'Atenção');
-                const vendedorId = parseInt(vendedorIdStr, 10);
-
                 const empresaId = obterEmpresaAtivaId();
                 if (!empresaId) return showWarning('Nenhuma empresa ativa selecionada.', 'Atenção');
                 
@@ -1523,7 +1467,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                 if (observacao === '') observacao = null;
 
                 const payload = {
-                    vendedorId,
                     idempotencyKey: getOrCreateIdempotencyKey(cnpjAtivoCRM),
                     nome
                 };
