@@ -29,7 +29,13 @@ document.addEventListener('DOMContentLoaded', () => {
         try { await esperarAppCoreReal(); }
         catch (err) { console.error('[vendedores] AppCore real nunca ficou pronto:', err.message); return; }
 
-        console.log('✅ [vendedores] módulo inicializando...');
+                console.log('✅ [vendedores] módulo inicializando...');
+
+        // ✅ NOVO: garante que o contexto (permissões) já foi carregado
+        // antes de checar, evitando race condition com o boot() do script.js
+        if (!window.AppCore.getContexto()) {
+            try { await window.AppCore.carregarContexto(); } catch (e) { console.warn('[vendedores] Falha ao aguardar contexto:', e); }
+        }
 
         // ✅ TRAVA DE SEGURANÇA: Só carrega se for admin
         if (!window.AppCore.isAdminGlobal() && !window.AppCore.temFuncionalidade('ADMINISTRAR_VENDEDORES')) {

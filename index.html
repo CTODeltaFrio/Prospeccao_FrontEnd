@@ -463,6 +463,18 @@
                 <div class="ia-section" style="margin-bottom: 20px; background: var(--bg-card);">
                     <h4><i class="fas fa-handshake"></i> Enviar Lead (CRM)</h4>
 
+                    <!-- ✅ NOVO — VENDEDOR RESPONSÁVEL (dropdown com pré-seleção automática) -->
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label for="det-crm-vendedor" style="display: flex; align-items: center; gap: 6px;">
+                            Vendedor responsável *
+                            <span class="info-tooltip" data-tooltip="O vendedor precisa ter perfil ativo no Ecossistema para o envio funcionar. Se um não funcionar, tente outro.">
+                                <i class="fas fa-info-circle"></i>
+                            </span>
+                        </label>
+                        <select id="det-crm-vendedor" class="input">
+                            <option value="">— Carregando vendedores... —</option>
+                        </select>
+                    </div>
 
                     <div class="form-row">
                         <div class="form-group" style="flex: 2;">
@@ -780,7 +792,6 @@
 
     <!-- ✅ MODAL DE DADOS DA IA -->
         <div id="ia-data-modal" class="modal-overlay">
-        <!-- ✅ Aumentamos a largura para 1000px e a altura para 90vh -->
         <div class="modal-content large-modal" style="max-width: 1000px; height: 90vh;">
             <span class="close-modal" id="close-ia-data-modal">&times;</span>
             <div class="modal-header" style="padding-bottom: 0; margin-bottom: 10px;">
@@ -788,9 +799,6 @@
                 <p id="ia-data-empresa">Carregando informações...</p>
             </div>
             
-            <!-- ✅ NOVOS CAMPOS PARA ENVIO DIRETO -->
-                        <!-- ✅ NOVOS CAMPOS PARA ENVIO DIRETO -->
-                        <!-- ✅ NOVOS CAMPOS PARA ENVIO DIRETO -->
             <div style="background: var(--bg-body); padding: 18px; border-radius: 10px; margin-bottom: 15px; border: 1px solid var(--border-color); flex-shrink: 0;">
                 <div style="display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 15px;">
                     <div class="form-group" style="margin-bottom: 0;">

@@ -305,6 +305,82 @@ document.addEventListener('DOMContentLoaded', async function() {
             return null;
         }
 
+        // ============================================================
+        // ✅ VENDEDORES DO CRM (dropdown no modal)
+        // Carrega os vendedores da empresa ativa, com pré-seleção
+        // automática baseada no nome/email do usuário logado.
+        // Só os que têm perfil no Ecossistema funcionam (senão 422).
+        // ============================================================
+        let vendedoresCRMCache = { porEmpresa: {} };
+
+        async function carregarVendedoresCRM(empresaId, forceRefresh = false) {
+            const key = String(empresaId);
+            if (!forceRefresh && vendedoresCRMCache.porEmpresa[key]) {
+                return vendedoresCRMCache.porEmpresa[key];
+            }
+            try {
+                const envelope = await apiGetEnvelope(`${API_URL}/prospeccao/leads-crm/vendedores?empresaId=${encodeURIComponent(empresaId)}`);
+                const lista = envelope?.registros || envelope?.dados || (Array.isArray(envelope) ? envelope : []);
+                vendedoresCRMCache.porEmpresa[key] = lista;
+                console.log(`✅ [CRM] ${lista.length} vendedor(es) carregado(s) para empresa ${empresaId}.`);
+                return lista;
+            } catch (e) {
+                console.warn('[CRM] Falha ao carregar vendedores:', e.message);
+                vendedoresCRMCache.porEmpresa[key] = [];
+                return [];
+            }
+        }
+
+        function tokenizarUsuario(usuario) {
+            const tokens = new Set();
+            const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+            if (usuario?.nome) norm(usuario.nome).split(/\s+/).forEach(t => { if (t.length >= 3) tokens.add(t); });
+            if (usuario?.email) {
+                const parte = usuario.email.split('@')[0];
+                parte.split(/[._\-+]/).forEach(t => { if (t.length >= 3) tokens.add(t); });
+            }
+            return Array.from(tokens);
+        }
+
+        function calcularScoreVendedor(nomeVendedor, tokensUsuario) {
+            const nomeNorm = String(nomeVendedor || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+            let score = 0;
+            for (const t of tokensUsuario) if (nomeNorm.includes(t)) score++;
+            return score;
+        }
+
+        async function popularSelectVendedoresCRM(empresaId) {
+            const select = document.getElementById('det-crm-vendedor');
+            if (!select) return;
+
+            select.innerHTML = '<option value="">— Carregando vendedores... —</option>';
+            refreshCustomSelect(select);
+
+            const lista = await carregarVendedoresCRM(empresaId);
+
+            if (!Array.isArray(lista) || lista.length === 0) {
+                select.innerHTML = '<option value="">— Nenhum vendedor disponível —</option>';
+                refreshCustomSelect(select);
+                return;
+            }
+
+            const tokensUsuario = tokenizarUsuario(sessaoCache?.usuario);
+            const comScore = lista.map(v => ({ ...v, _score: calcularScoreVendedor(v.nome, tokensUsuario) }))
+                                  .sort((a, b) => b._score - a._score);
+
+                        select.innerHTML = '<option value="">— Selecione o vendedor —</option>' +
+                comScore.map(v => `<option value="${v.id}">${v.nome}</option>`).join('');
+
+            if (comScore[0]._score > 0) {
+                select.value = String(comScore[0].id);
+                console.log('[CRM] Vendedor pré-selecionado por match:', comScore[0].nome, '(score', comScore[0]._score + ')');
+            }
+            refreshCustomSelect(select);
+        }
+        // ============================================================
+        // FIM DOS VENDEDORES DO CRM
+        // ============================================================
+
         function definirEmpresaAtivaId(id) {
             empresaAtivaId = id ? String(id) : null;
             atualizarSeletorEmpresa();
@@ -519,7 +595,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' }; const csrf = obterCsrf(); if (csrf) headers['X-CSRF-Token'] = csrf;
             const r = await fetch(url, { method: 'POST', credentials: 'include', headers, body: JSON.stringify(body) });
             const t = await r.text(); let json; try { json = t ? JSON.parse(t) : {}; } catch (e) { json = {}; }
-            if (!r.ok) { const e = extrairErroResposta(json, r.status); const err = new Error(e.mensagem); err.codigo = e.codigo; err.traceId = e.traceId; err.status = r.status; throw err; }
+            if (!r.ok) { const e = extrairErroResposta(json, r.status); const err = new Error(e.mensagem); err.codigo = e.codigo; err.traceId = e.traceId; err.status = r.status; err.__raw = json; throw err; }
             return { status: r.status, dados: json?.dados ?? json };
         }
 
@@ -984,7 +1060,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             iaDataContent.innerHTML = html;
             iaDataModal.style.display = 'flex';
             
-            // ✅ Preenche apenas o Nome do Contato e a Observação
             const iaNome = document.getElementById('det-ia-crm-nome');
             const iaObs = document.getElementById('det-ia-crm-observacao');
             
@@ -992,11 +1067,8 @@ document.addEventListener('DOMContentLoaded', async function() {
             const originalObs = document.getElementById('det-crm-observacao')?.value.trim() || '';
             
             if (iaNome) iaNome.value = originalNome;
-
-            // ✅ A caixa de observação visual recebe APENAS o que o usuário digitou antes. Os dados da IA ficam invisíveis!
             if (iaObs) iaObs.value = originalObs;
 
-            // ✅ Monta os dados da IA e guarda na variável invisível
             let extraInfo = [];
             if (res.site) extraInfo.push(`• Site: ${res.site}`);
             if (res.instagram) extraInfo.push(`• Instagram: ${res.instagram}`);
@@ -1064,9 +1136,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
         }
 
-        // ============================================================
-        // PORTE EMPRESA (mapeamento de código RFB para descrição)
-        // ============================================================
         const PORTE_MAP = {
             '00': 'Não informado',
             '01': 'Micro empresa',
@@ -1074,9 +1143,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             '05': 'Demais'
         };
 
-        // ============================================================
-        // BUSCAR E PREENCHER DETALHES DO BACKEND
-        // ============================================================
         async function buscarEPreencherDetalhes(cnpj) {
             const empresaId = obterEmpresaAtivaId();
             const camposDetalhados = ['det-natureza','det-porte','det-capital','det-inicio','det-data-sit','det-cnae','det-logradouro','det-numero','det-complemento','det-bairro','det-cep'];
@@ -1154,13 +1220,11 @@ document.addEventListener('DOMContentLoaded', async function() {
                     tipo.innerText = d.identificadorMatrizFilial === '1' ? 'MATRIZ' : 'FILIAL';
                 }
 
-                // ✅ Preenche os campos ocultos do CRM (Telefone e E-mail principais)
                 const telInput = document.getElementById('det-crm-telefone');
                 if (telInput && !telInput.value && tels[0]) telInput.value = `(${tels[0].ddd}) ${tels[0].numero}`;
                 const emailInput = document.getElementById('det-crm-email');
                 if (emailInput && !emailInput.value && d.email) emailInput.value = d.email;
 
-                // ✅ NOVO: Guarda contatos adicionais na variável invisível
                 let extras = [];
                 if (tels.length > 1) {
                     const outrosTels = tels.slice(1).map(t => `(${t.ddd}) ${t.numero}`).join(', ');
@@ -1172,7 +1236,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                     extras.push(`E-mail Adicional: ${outrosEmails}`);
                 }
                 
-                // Salva na variável invisível em vez de mostrar na tela
                 if (extras.length > 0) {
                     obsAutomaticaCRM += (obsAutomaticaCRM ? '\r\n\r\n' : '') + extras.join('\r\n');
                 }
@@ -1183,9 +1246,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
         }
 
-        // ============================================================
-        // ABRIR MODAL DE DETALHES (abre rápido + enriquece via API)
-        // ============================================================
         function openDetailsModal(cnpj, isIgn = false) {
             const list = isIgn ? ignorados : registros;
             const c = list.find(i => i.cnpj === cnpj);
@@ -1238,7 +1298,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             const obsEl = document.getElementById('det-crm-observacao');
             if (obsEl) obsEl.value = '';
 
-            // ✅ LIMPA AS VARIÁVEIS INVISÍVEIS AO ABRIR UMA NOVA EMPRESA
             obsAutomaticaCRM = ""; 
             obsIACRM = ""; 
 
@@ -1248,6 +1307,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             detailsModal.style.display = 'flex';
 
             buscarEPreencherDetalhes(cnpj);
+            popularSelectVendedoresCRM(obterEmpresaAtivaId());
         }
 
         async function classificar(cnpj, novoStatus, statusAtual, nome, cnpjFmt) {
@@ -1401,9 +1461,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                 const obsOriginal = document.getElementById('det-crm-observacao');
                 if (obsOriginal) obsOriginal.value = iaObs;
 
-                // ✅ NÃO LIMPAMOS obsAutomaticaCRM NEM obsIACRM AQUI. 
-                // Eles serão enviados juntos pelo botão principal!
-
                 iaDataModal.style.display = 'none';
 
                 const btnRegistroCRM = document.getElementById('btn-registro-crm');
@@ -1450,7 +1507,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                 let telefone = document.getElementById('det-crm-telefone')?.value.trim() || null;
                 let email = document.getElementById('det-crm-email')?.value.trim() || null;
                 
-                // ✅ Pega o que o usuário digitou e junta com os dados invisíveis
                 let obsUsuario = document.getElementById('det-crm-observacao')?.value.trim() || "";
                 let observacaoFinal = [obsUsuario, obsAutomaticaCRM, obsIACRM].filter(Boolean).join('\r\n\r\n');
                 let observacao = observacaoFinal || null;
@@ -1475,6 +1531,14 @@ document.addEventListener('DOMContentLoaded', async function() {
                 if (telefone) payload.telefone = telefone;
                 if (email) payload.email = email;
                 if (observacao) payload.observacao = observacao;
+
+                // ✅ Vendedor vem do select "Vendedor responsável" no topo do modal
+                const vendedorSelect = document.getElementById('det-crm-vendedor');
+                const vendedorId = vendedorSelect?.value ? Number(vendedorSelect.value) : null;
+                if (!vendedorId) {
+                    return showWarning('Selecione o vendedor responsável no topo do modal antes de enviar.', 'Atenção');
+                }
+                payload.vendedorId = vendedorId;
 
                 const originalText = btnRegistroCRM.innerHTML;
                 btnRegistroCRM.disabled = true;
@@ -1504,7 +1568,13 @@ document.addEventListener('DOMContentLoaded', async function() {
                     if (err.status === 409) {
                         showWarning('Este lead já foi enviado ou está em processamento.', 'Atenção');
                         resetIdempotencia();
-                    } 
+                    }
+                    else if (err.codigo === 'vendedor_sem_perfil_ecossistema') {
+                        showWarning(
+                            'O vendedor escolhido não corresponde a um perfil válido para envio. Selecione outro vendedor na lista e tente novamente.',
+                            'Selecione novamente o vendedor'
+                        );
+                    }
                     else if (err.codigo === 'autor_sem_perfil_ecossistema' || (err.message && err.message.includes('Ecossistema'))) {
                         showWarning(
                             'Não foi possível enviar o lead. O seu e-mail de acesso ao Prospect não está vinculado ao Ecossistema da empresa. Por favor, entre em contato com o administrador para solicitar a vinculação.', 
