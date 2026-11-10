@@ -73,6 +73,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         let cnpjAtivoCRM = null; 
         let obsAutomaticaCRM = "";
+        let obsIACRM = "";
         let idempotencyKeyAtual = null;
         let cnpjIdempotenciaAtual = null;
         let envioEmAndamento = false;
@@ -724,9 +725,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             return d ? `(${d}) ${n}` : n;
         }
 
-        // ============================================================
-        // ✅ FILTROS COM ESPECIFICIDADE: DDD > UF, CNAE > Segmento
-        // ============================================================
         function aplicarEstadoFiltros() {
             const ddd  = filterDdd ? filterDdd.value : '';
             const cnae = selectedCnaeCode;
@@ -815,7 +813,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (!cnae && filterCnaeInput.value.trim() !== '') { filterCnaeInput.value = ''; cnae = null; }
             const esc = filterTipoCnae ? filterTipoCnae.value : 'PRINCIPAL';
 
-            // ✅ Ordem de especificidade: DDD > UF | CNAE > Segmento
             const body = {
                 uf: ddd ? null : (uf || null),
                 ddd: ddd || null,
@@ -837,14 +834,13 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (pesquisaController) pesquisaController.abort(); 
             pesquisaController = new AbortController();
             
-            // ✅ TIMEOUT DE SEGURANÇA: Cancela a busca se o servidor demorar mais de 30 segundos
             const timeoutId = setTimeout(() => {
                 if (pesquisaController) pesquisaController.abort();
                 showWarning("A busca demorou muito e foi cancelada pelo servidor. Tente adicionar mais filtros (como CNAE) para refinar o resultado.", "Tempo Esgotado");
                 btn.disabled = false; 
                 btn.innerHTML = origB;
                 if (btn.classList.contains('page-btn')) pageIndicator.innerHTML = origP;
-            }, 30000); // 30 segundos
+            }, 30000);
 
             try {
                 const r = await fetch(`${API_URL}/prospeccao/pesquisar?empresaId=${encodeURIComponent(empresaId)}`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body), signal: pesquisaController.signal });
@@ -988,7 +984,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             iaDataContent.innerHTML = html;
             iaDataModal.style.display = 'flex';
             
-            // ✅ NOVO: Preenche os campos de envio direto do CRM na tela de IA
+            // ✅ Preenche Vendedor e Nome
             const iaNome = document.getElementById('det-ia-crm-nome');
             const iaVendedor = document.getElementById('det-ia-vendedor-select');
             const iaObs = document.getElementById('det-ia-crm-observacao');
@@ -1004,7 +1000,10 @@ document.addEventListener('DOMContentLoaded', async function() {
                 if (typeof refreshCustomSelect === 'function') refreshCustomSelect(iaVendedor);
             }
 
-            // ✅ NOVO: Monta o texto da IA e joga na caixa de observação junto com o que o usuário já tinha escrito
+            // ✅ A caixa de observação visual recebe APENAS o que o usuário digitou antes. Os dados da IA ficam invisíveis!
+            if (iaObs) iaObs.value = originalObs;
+
+            // ✅ Monta os dados da IA e guarda na variável invisível
             let extraInfo = [];
             if (res.site) extraInfo.push(`• Site: ${res.site}`);
             if (res.instagram) extraInfo.push(`• Instagram: ${res.instagram}`);
@@ -1017,12 +1016,9 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (res.informacoesAdicionais?.length) extraInfo.push(`• Info Adicional: ${res.informacoesAdicionais.join(' | ')}`);
             
             const textoObservacao = extraInfo.join('\r\n');
-            
-            // Junta o que já tinha (incluindo a variável invisível) com os novos dados da IA
-            const obsBase = [originalObs, obsAutomaticaCRM].filter(Boolean).join('\r\n\r\n');
-            const textoCompleto = [obsBase, `--- DADOS DA IA ---\r\n${textoObservacao}`].filter(Boolean).join('\r\n\r\n');
-            
-            if (iaObs) iaObs.value = textoCompleto;
+            if (textoObservacao) {
+                obsIACRM = `--- DADOS DA IA ---\r\n${textoObservacao}`;
+            }
         }
 
         async function copiarDadosIA() {
@@ -1244,7 +1240,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             const nomeExibicao = c.nomeFantasia || c.razaoSocial || 'sem nome';
             const cnpjExibicao = c.cnpjFormatado || c.cnpj || '';
 
-            // 1) Preenche o básico imediatamente
             document.getElementById('det-cnpj').innerText = cnpjExibicao;
             document.getElementById('det-razao').innerText = c.razaoSocial || '-';
             document.getElementById('det-fantasia').innerText = c.nomeFantasia || '-';
@@ -1254,7 +1249,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             sit.className = 'badge badge-green';
             document.getElementById('det-tipo').innerText = 'MATRIZ';
 
-            // Marca campos detalhados como "Carregando..."
             ['det-natureza','det-porte','det-capital','det-inicio','det-data-sit','det-cnae',
              'det-logradouro','det-numero','det-complemento','det-bairro','det-cep'].forEach(id => {
                 const el = document.getElementById(id);
@@ -1265,7 +1259,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             document.getElementById('det-tel2').innerText = formatarTelefone(c.ddd, c.telefone2);
             document.getElementById('det-email').innerText = c.email || '-';
 
-            // 2) Classificação
             const statusAtual = c.status || (isIgn ? 'X' : null);
             if (detClassificacao) detClassificacao.style.display = 'none';
             if (btnClassifyX) {
@@ -1283,7 +1276,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                 btnClassifyX.disabled = false;
             }
 
-            // 3) CRM (observação agora é visível no HTML)
             cnpjAtivoCRM = cnpj;
             document.getElementById('det-crm-nome').value = '';
             document.getElementById('det-crm-cargo').value = '';
@@ -1292,18 +1284,17 @@ document.addEventListener('DOMContentLoaded', async function() {
             const obsEl = document.getElementById('det-crm-observacao');
             if (obsEl) obsEl.value = '';
 
-            // ✅ LIMPA A VARIÁVEL INVISÍVEL AO ABRIR UMA NOVA EMPRESA
+            // ✅ LIMPA AS VARIÁVEIS INVISÍVEIS AO ABRIR UMA NOVA EMPRESA
             obsAutomaticaCRM = ""; 
+            obsIACRM = ""; 
 
             carregarVendedoresNoModal();
 
             const btnIA = document.getElementById('btn-dados-ia');
             if (btnIA) btnIA.onclick = () => solicitarDadosIA(cnpj);
 
-            // 4) Abre o modal já com o básico
             detailsModal.style.display = 'flex';
 
-            // 5) Dispara a busca dos detalhes completos (assíncrona)
             buscarEPreencherDetalhes(cnpj);
         }
 
@@ -1441,11 +1432,9 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         document.getElementById('close-ia-data-modal')?.addEventListener('click', () => iaDataModal.style.display = 'none');
         
-        // ✅ NOVO: Enviar dados da IA direto para o CRM
         const btnEnviarCRMIA = document.getElementById('btn-enviar-crm-ia');
         if (btnEnviarCRMIA) {
             btnEnviarCRMIA.addEventListener('click', async () => {
-                // ✅ Verifica se preencheu no próprio modal da IA
                 const iaVendedor = document.getElementById('det-ia-vendedor-select')?.value;
                 const iaNome = document.getElementById('det-ia-crm-nome')?.value.trim();
                 const iaObs = document.getElementById('det-ia-crm-observacao')?.value.trim();
@@ -1455,7 +1444,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                     return;
                 }
 
-                // ✅ Sincroniza os dados preenchidos na IA com a tela de detalhes original
                 const selectOriginal = document.getElementById('det-vendedor-select');
                 if (selectOriginal) selectOriginal.value = iaVendedor;
                 
@@ -1465,13 +1453,11 @@ document.addEventListener('DOMContentLoaded', async function() {
                 const obsOriginal = document.getElementById('det-crm-observacao');
                 if (obsOriginal) obsOriginal.value = iaObs;
 
-                // ✅ Limpa a variável invisível para não duplicar o texto no envio
-                obsAutomaticaCRM = "";
+                // ✅ NÃO LIMPAMOS obsAutomaticaCRM NEM obsIACRM AQUI. 
+                // Eles serão enviados juntos pelo botão principal!
 
-                // Fecha o modal da IA
                 iaDataModal.style.display = 'none';
 
-                // Dispara o botão original de envio do CRM
                 const btnRegistroCRM = document.getElementById('btn-registro-crm');
                 if (btnRegistroCRM) {
                     btnRegistroCRM.click();
@@ -1522,7 +1508,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 
                 // ✅ Pega o que o usuário digitou e junta com os dados invisíveis
                 let obsUsuario = document.getElementById('det-crm-observacao')?.value.trim() || "";
-                let observacaoFinal = [obsUsuario, obsAutomaticaCRM].filter(Boolean).join('\r\n\r\n');
+                let observacaoFinal = [obsUsuario, obsAutomaticaCRM, obsIACRM].filter(Boolean).join('\r\n\r\n');
                 let observacao = observacaoFinal || null;
 
                 if (!nome) return showWarning('Por favor, informe o nome da pessoa que atende na empresa.', 'Atenção');
@@ -1743,7 +1729,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         btnPrev.addEventListener('click', function() { if (currentPage > 1 && historicoCursors.length > 1) { historicoCursors.pop(); currentPage--; cursorAtual = historicoCursors[historicoCursors.length - 1]; pesquisarProspeccao(this, cursorAtual); } else showWarning('Você já está na primeira página.', 'Aviso'); });
         btnNext.addEventListener('click', function() { if (temMais) { historicoCursors.push(cursorAtual); currentPage++; pesquisarProspeccao(this, cursorAtual); } else showWarning('Você já está na última página.', 'Aviso'); });
 
-        // ✅ LISTENERS PARA APLICAR ESPECIFICIDADE DE FILTROS
         if (filterUf)       filterUf.addEventListener('change', aplicarEstadoFiltros);
         if (filterDdd)      filterDdd.addEventListener('change', aplicarEstadoFiltros);
         if (filterSegmento) filterSegmento.addEventListener('change', aplicarEstadoFiltros);

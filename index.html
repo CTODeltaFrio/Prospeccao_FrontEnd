@@ -450,8 +450,8 @@
 
     </main>
 
-    <div id="details-modal" class="modal-overlay">
-        <div class="modal-content large-modal">
+        <div id="details-modal" class="modal-overlay">
+        <div class="modal-content large-modal" style="max-width: 1000px; height: 90vh;">
             <span class="close-modal" id="close-details-modal">&times;</span>
             <div class="modal-header">
                 <h2>Detalhes do Estabelecimento</h2>
@@ -462,13 +462,7 @@
                 <!-- ✅ FORMULÁRIO CRM (NOME E CARGO VISÍVEIS) -->
                 <div class="ia-section" style="margin-bottom: 20px; background: var(--bg-card);">
                     <h4><i class="fas fa-handshake"></i> Enviar Lead (CRM)</h4>
-                    
-                    <div class="form-group" style="margin-bottom: 15px;">
-                        <label for="det-vendedor-select">Atribuir ao Vendedor *</label>
-                        <select id="det-vendedor-select" class="input">
-                            <option value="">— Carregando vendedores... —</option>
-                        </select>
-                    </div>
+
 
                     <div class="form-row">
                         <div class="form-group" style="flex: 2;">
@@ -489,7 +483,7 @@
                                 <i class="fas fa-info-circle"></i>
                             </span>
                         </label>
-                        <textarea id="det-crm-observacao" class="input" rows="2" placeholder="Ex: Prefere contato por WhatsApp no período da manhã..." maxlength="2000" style="resize: vertical; min-height: 60px; padding: 10px 12px; font-family: inherit; font-size: 13px;"></textarea>
+                        <textarea id="det-crm-observacao" class="input" rows="4" placeholder="Ex: Prefere contato por WhatsApp no período da manhã..." maxlength="2000" style="resize: vertical; min-height: 90px; padding: 12px 14px; font-family: inherit; font-size: 13px; line-height: 1.5;"></textarea>
                     </div>
 
                     <!-- CAMPOS OCULTOS (PREENCHIDOS AUTOMATICAMENTE PELO JS) -->
@@ -785,38 +779,37 @@
     </div>
 
     <!-- ✅ MODAL DE DADOS DA IA -->
-    <div id="ia-data-modal" class="modal-overlay">
-        <div class="modal-content large-modal" style="max-width: 800px; height: 80vh;">
+        <div id="ia-data-modal" class="modal-overlay">
+        <!-- ✅ Aumentamos a largura para 1000px e a altura para 90vh -->
+        <div class="modal-content large-modal" style="max-width: 1000px; height: 90vh;">
             <span class="close-modal" id="close-ia-data-modal">&times;</span>
-            <div class="modal-header">
+            <div class="modal-header" style="padding-bottom: 0; margin-bottom: 10px;">
                 <h2><i class="fas fa-robot" style="color: #2463eb;"></i> Dados Enriquecidos por IA</h2>
                 <p id="ia-data-empresa">Carregando informações...</p>
             </div>
+            
             <!-- ✅ NOVOS CAMPOS PARA ENVIO DIRETO -->
                         <!-- ✅ NOVOS CAMPOS PARA ENVIO DIRETO -->
-            <div style="background: var(--bg-body); padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid var(--border-color); flex-shrink: 0;">
-                <div class="form-row" style="margin-bottom: 10px;">
-                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                        <label for="det-ia-vendedor-select" style="font-size: 12px;">Atribuir ao Vendedor *</label>
-                        <select id="det-ia-vendedor-select" class="input" style="height: 36px;">
-                            <option value="">— Carregando... —</option>
-                        </select>
-                    </div>
-                    <div class="form-group" style="flex: 2; margin-bottom: 0;">
-                        <label for="det-ia-crm-nome" style="font-size: 12px;">Nome do Contato *</label>
-                        <input type="text" id="det-ia-crm-nome" class="input" placeholder="Ex: João Silva" maxlength="200" style="height: 36px;">
+                        <!-- ✅ NOVOS CAMPOS PARA ENVIO DIRETO -->
+            <div style="background: var(--bg-body); padding: 18px; border-radius: 10px; margin-bottom: 15px; border: 1px solid var(--border-color); flex-shrink: 0;">
+                <div style="display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 15px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="det-ia-crm-nome" style="font-size: 13px;">Nome do Contato *</label>
+                        <input type="text" id="det-ia-crm-nome" class="input" placeholder="Ex: João Silva" maxlength="200" style="height: 42px; width: 100%; font-size: 14px;">
                     </div>
                 </div>
+                
                 <div class="form-group" style="margin-bottom: 0;">
-                    <label for="det-ia-crm-observacao" style="font-size: 12px; display: flex; align-items: center; gap: 6px;">
-                        Observação (Dados da IA inclusos)
-                        <span class="info-tooltip" data-tooltip="Anotações internas sobre o contato. Os dados gerados pela IA já foram adicionados aqui.">
+                    <label for="det-ia-crm-observacao" style="font-size: 13px; display: flex; align-items: center; gap: 6px;">
+                        Observação
+                        <span class="info-tooltip" data-tooltip="Anotações internas. Os dados gerados pela IA serão anexados automaticamente ao enviar.">
                             <i class="fas fa-info-circle"></i>
                         </span>
                     </label>
-                    <textarea id="det-ia-crm-observacao" class="input" rows="3" maxlength="2000" style="resize: vertical; min-height: 60px; padding: 10px 12px; font-family: inherit; font-size: 13px;"></textarea>
+                    <textarea id="det-ia-crm-observacao" class="input" rows="3" maxlength="2000" placeholder="Escreva uma observação (opcional)..." style="resize: vertical; min-height: 80px; padding: 12px 14px; font-family: inherit; font-size: 14px; line-height: 1.5;"></textarea>
                 </div>
             </div>
+
             <div class="modal-scroll-area" id="ia-data-content" style="padding-right: 15px;">
                 <!-- O conteúdo será injetado pelo JavaScript -->
             </div>
