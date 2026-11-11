@@ -70,8 +70,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         let vendedoresMapa = [];
         let vendedoresMapaCarregados = false;
         let vendedoresMapaPromise = null;
-        
-        let cnpjAtivoCRM = null; 
+
+        let cnpjAtivoCRM = null;
         let obsAutomaticaCRM = "";
         let obsIACRM = "";
         let idempotencyKeyAtual = null;
@@ -84,7 +84,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         async function carregarVendedoresMapa() {
             if (vendedoresMapaCarregados) return vendedoresMapa;
             if (vendedoresMapaPromise) return vendedoresMapaPromise;
-            
+
             vendedoresMapaPromise = (async () => {
                 try {
                     const envelope = await apiGetEnvelope(`${API_URL}/prospeccao/vendedores`);
@@ -125,11 +125,11 @@ document.addEventListener('DOMContentLoaded', async function() {
                     })).then(lista => lista.filter(v => v.id));
 
                     vendedoresMapaCarregados = true;
-                } catch (e) { 
+                } catch (e) {
                     console.error('[mapa] Erro ao carregar vendedores:', e);
-                    vendedoresMapa = []; 
-                } finally { 
-                    vendedoresMapaPromise = null; 
+                    vendedoresMapa = [];
+                } finally {
+                    vendedoresMapaPromise = null;
                 }
                 return vendedoresMapa;
             })();
@@ -143,7 +143,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             const ativos = [];
             for (const v of vendedoresMapa) {
                 const cb = document.querySelector(`.vendedor-stat-checkbox[data-vendedor="${v.id}"]`);
-                if (!cb || !cb.checked) continue; 
+                if (!cb || !cb.checked) continue;
 
                 const match = v.cidades.find(c => c.codigoIbge === codigoIbge);
                 if (match) ativos.push({ vendedor: v, origem: match.origem });
@@ -151,9 +151,38 @@ document.addEventListener('DOMContentLoaded', async function() {
             return ativos;
         }
 
+        // ============================================================
+        // ✅ CHECK INICIAL DE SESSÃO — com refresh inline
+        // (precisa ser definido ANTES do fetch, então faz inline em vez
+        // de usar fetchComRefresh, que só existe mais abaixo no arquivo)
+        // ============================================================
         let sessaoCache = null;
         try {
-            const respostaSessao = await fetch(`${API_URL}/sessao`, { method: 'GET', credentials: 'include', headers: { 'Accept': 'application/json' } });
+            let respostaSessao = await fetch(`${API_URL}/sessao`, { method: 'GET', credentials: 'include', headers: { 'Accept': 'application/json' } });
+
+            if (respostaSessao.status === 401) {
+                console.warn('[sessão] /sessao retornou 401 — tentando refresh antes de redirecionar...');
+                try {
+                    const csrfCookie = document.cookie.split('; ').find(c => c.startsWith('login_delta_csrf='));
+                    const csrf = csrfCookie ? decodeURIComponent(csrfCookie.split('=')[1]) : '';
+                    if (csrf) {
+                        const rRef = await fetch(`${API_URL}/auth/v2/refresh`, {
+                            method: 'POST', credentials: 'include',
+                            headers: { 'X-CSRF-Token': csrf, 'Accept': 'application/json' }
+                        });
+                        console.log('[sessão] refresh retornou:', rRef.status);
+                        if (rRef.ok) {
+                            respostaSessao = await fetch(`${API_URL}/sessao`, { method: 'GET', credentials: 'include', headers: { 'Accept': 'application/json' } });
+                            console.log('[sessão] retry /sessao retornou:', respostaSessao.status);
+                        }
+                    } else {
+                        console.warn('[sessão] CSRF ausente — refresh impossível.');
+                    }
+                } catch (e) {
+                    console.warn('[sessão] erro no refresh inicial:', e.message);
+                }
+            }
+
             if (respostaSessao.status === 401) { window.location.replace('/index.html'); return; }
             if (respostaSessao.ok) { try { const json = await respostaSessao.json(); sessaoCache = json?.dados ?? json; } catch (e) {} }
         } catch (erro) {}
@@ -200,11 +229,11 @@ document.addEventListener('DOMContentLoaded', async function() {
             btnLogout.addEventListener('click', function () {
                 showConfirm('Sair do sistema', 'Deseja realmente sair?', async function() {
                     btnLogout.disabled = true; btnLogout.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saindo...';
-                    try { 
-                        const csrf = document.cookie.split('; ').find(c => c.startsWith('login_delta_csrf=')); 
-                        const csrfValor = csrf ? decodeURIComponent(csrf.split('=')[1]) : ''; 
-                        await fetch('/api/logout', { method: 'POST', credentials: 'include', headers: csrfValor ? { 'X-CSRF-Token': csrfValor } : {} }); 
-                    } catch (e) {} 
+                    try {
+                        const csrf = document.cookie.split('; ').find(c => c.startsWith('login_delta_csrf='));
+                        const csrfValor = csrf ? decodeURIComponent(csrf.split('=')[1]) : '';
+                        await fetch('/api/logout', { method: 'POST', credentials: 'include', headers: csrfValor ? { 'X-CSRF-Token': csrfValor } : {} });
+                    } catch (e) {}
                     window.location.href = 'https://www.sistemas.deltafrio.com.br/central.html';
                 });
             });
@@ -273,7 +302,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         const btnCopiarIA = document.getElementById('btn-copiar-ia');
         const globalLoadingTitle = document.querySelector('#global-loading h2');
         const globalLoadingDesc = document.querySelector('#global-loading p');
-        let currentIAData = null; 
+        let currentIAData = null;
 
         let editingSegmentId = null;
         let currentLinkedCnaes = [];
@@ -297,7 +326,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         function setDirty(v) { isDirty = v; }
 
         let contextoCache = null;
-        let empresaAtivaId = null; 
+        let empresaAtivaId = null;
 
         function obterEmpresaAtivaId() {
             if (empresaAtivaId) return empresaAtivaId;
@@ -307,9 +336,6 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         // ============================================================
         // ✅ VENDEDORES DO CRM (dropdown no modal)
-        // Carrega os vendedores da empresa ativa, com pré-seleção
-        // automática baseada no nome/email do usuário logado.
-        // Só os que têm perfil no Ecossistema funcionam (senão 422).
         // ============================================================
         let vendedoresCRMCache = { porEmpresa: {} };
 
@@ -368,7 +394,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             const comScore = lista.map(v => ({ ...v, _score: calcularScoreVendedor(v.nome, tokensUsuario) }))
                                   .sort((a, b) => b._score - a._score);
 
-                        select.innerHTML = '<option value="">— Selecione o vendedor —</option>' +
+            select.innerHTML = '<option value="">— Selecione o vendedor —</option>' +
                 comScore.map(v => `<option value="${v.id}">${v.nome}</option>`).join('');
 
             if (comScore[0]._score > 0) {
@@ -377,14 +403,11 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
             refreshCustomSelect(select);
         }
-        // ============================================================
-        // FIM DOS VENDEDORES DO CRM
-        // ============================================================
 
         function definirEmpresaAtivaId(id) {
             empresaAtivaId = id ? String(id) : null;
             atualizarSeletorEmpresa();
-            atualizarHeaderEmpresa(empresaAtivaId); 
+            atualizarHeaderEmpresa(empresaAtivaId);
         }
 
         function atualizarSeletorEmpresa() {
@@ -402,7 +425,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (elEmpresaMini) {
                 if (ativo) {
                     const emp = empresas.find(e => String(e.id) === String(ativo));
-                    if (emp) { const nomeEmp = emp.nome || emp.nomeFantasia || emp.razaoSocial || 'Empresa'; elEmpresaMini.innerHTML = `<i class="fas fa-building"></i> ${nomeEmp}`; elEmpresaMini.style.display = 'flex'; } 
+                    if (emp) { const nomeEmp = emp.nome || emp.nomeFantasia || emp.razaoSocial || 'Empresa'; elEmpresaMini.innerHTML = `<i class="fas fa-building"></i> ${nomeEmp}`; elEmpresaMini.style.display = 'flex'; }
                     else { elEmpresaMini.innerHTML = `<i class="fas fa-building"></i> Selecione uma empresa`; elEmpresaMini.style.display = 'flex'; }
                 } else { elEmpresaMini.innerHTML = `<i class="fas fa-building"></i> Selecione uma empresa`; elEmpresaMini.style.display = 'flex'; }
             }
@@ -445,39 +468,39 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         async function carregarContexto() {
             try {
-                const r = await fetch(`${API_URL}/prospeccao/contexto`, { method: 'GET', credentials: 'include', headers: { 'Accept': 'application/json' } });
+                const r = await fetchComRefresh(`${API_URL}/prospeccao/contexto`, { method: 'GET', credentials: 'include', headers: { 'Accept': 'application/json' } });
                 if (r.status === 403) { contextoCache = { administradorGlobal: false, empresas: [], funcionalidades: [], semAcesso: true }; atualizarSeletorEmpresa(); return contextoCache; }
                 if (!r.ok) return null;
                 const json = await r.json(); const ctx = json?.dados ?? json;
-                
+
                 contextoCache = ctx;
                 const isAdmin = isAdminGlobal();
 
                 if (!isAdmin) {
                     try {
-                        const sessaoResp = await fetch(`${API_URL}/sessao`, { method: 'GET', credentials: 'include', headers: { 'Accept': 'application/json' } });
+                        const sessaoResp = await fetchComRefresh(`${API_URL}/sessao`, { method: 'GET', credentials: 'include', headers: { 'Accept': 'application/json' } });
                         if (sessaoResp.ok) {
                             const sessaoJson = await sessaoResp.json();
                             const usuarioId = sessaoJson?.dados?.usuario?.id || sessaoJson?.usuario?.id;
-                            
+
                             if (usuarioId && (isAdminGlobal() || temFuncionalidade('ADMINISTRAR_VENDEDORES'))) {
-                                const vResp = await fetch(`${API_URL}/prospeccao/vendedores`, { method: 'GET', credentials: 'include', headers: { 'Accept': 'application/json' } });
+                                const vResp = await fetchComRefresh(`${API_URL}/prospeccao/vendedores`, { method: 'GET', credentials: 'include', headers: { 'Accept': 'application/json' } });
                                 if (vResp.ok) {
                                     const vJson = await vResp.json();
                                     const listaVend = Array.isArray(vJson) ? vJson : (vJson?.dados || vJson?.registros || vJson?.vendedores || vJson?.itens || []);
-                                    
-                                    const vendedor = listaVend.find(v => 
-                                        String(v.usuarioId) === String(usuarioId) || 
-                                        String(v.loginId) === String(usuarioId) || 
+
+                                    const vendedor = listaVend.find(v =>
+                                        String(v.usuarioId) === String(usuarioId) ||
+                                        String(v.loginId) === String(usuarioId) ||
                                         (Array.isArray(v.loginIds) && v.loginIds.map(String).includes(String(usuarioId)))
                                     );
-                                    
+
                                     if (vendedor) {
                                         let empIds = vendedor.empresaIds || [];
                                         if (Array.isArray(vendedor.empresas) && vendedor.empresas.length > 0) {
                                             empIds = vendedor.empresas.map(e => e.empresaId || e.id);
                                         }
-                                        
+
                                         if (empIds.length > 0 && ctx.empresas) {
                                             const filtradas = ctx.empresas.filter(e => empIds.map(String).includes(String(e.id)));
                                             if (filtradas.length > 0) {
@@ -496,7 +519,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 contextoCache = ctx;
                 const ativo = obterEmpresaAtivaId(); const ids = (ctx?.empresas || []).map(e => String(e.id));
                 if (ativo && !ids.includes(String(ativo))) definirEmpresaAtivaId(null);
-                atualizarSeletorEmpresa(); atualizarHeaderEmpresa(obterEmpresaAtivaId()); verificarSelecaoObrigatoria(); 
+                atualizarSeletorEmpresa(); atualizarHeaderEmpresa(obterEmpresaAtivaId()); verificarSelecaoObrigatoria();
                 return ctx;
             } catch (e) { return null; }
         }
@@ -532,15 +555,15 @@ document.addEventListener('DOMContentLoaded', async function() {
         function aplicarGuardrailsAdmin() {
             let algumMenuAdminVisivel = false;
             for (const [func, ids] of Object.entries(FUNC_MENUS)) {
-                const permitido = temFuncionalidade(func); 
+                const permitido = temFuncionalidade(func);
                 if (permitido) algumMenuAdminVisivel = true;
                 ids.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = permitido ? '' : 'none'; });
             }
-            const titulo = document.getElementById('gestao-menu-title'); 
+            const titulo = document.getElementById('gestao-menu-title');
             if (titulo) titulo.style.display = algumMenuAdminVisivel ? '' : 'none';
-            
-            const emTelaAdmin = (segmentScreen.style.display === 'block' && !temFuncionalidade('ADMINISTRAR_SEGMENTOS')) || 
-                                (vendedoresScreen?.style.display === 'block' && !temFuncionalidade('ADMINISTRAR_VENDEDORES')) || 
+
+            const emTelaAdmin = (segmentScreen.style.display === 'block' && !temFuncionalidade('ADMINISTRAR_SEGMENTOS')) ||
+                                (vendedoresScreen?.style.display === 'block' && !temFuncionalidade('ADMINISTRAR_VENDEDORES')) ||
                                 (mapScreen.style.display === 'block' && !temFuncionalidade('CONSULTAR_MAPAS'));
             if (emTelaAdmin) showScreen('main');
 
@@ -581,8 +604,60 @@ document.addEventListener('DOMContentLoaded', async function() {
         function normalizarTexto(t) { return t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
         function obterCsrf() { const m = document.cookie.split('; ').find(c => c.startsWith('login_delta_csrf=')); return m ? decodeURIComponent(m.split('=')[1]) : ''; }
 
+        // ============================================================
+        // ✅ REFRESH AUTOMÁTICO DE SESSÃO (para uso geral)
+        // ============================================================
+        let refreshEmAndamento = null;
+
+        async function tentarRenovarSessao() {
+            if (refreshEmAndamento) return refreshEmAndamento;
+            refreshEmAndamento = (async () => {
+                try {
+                    const csrf = obterCsrf();
+                    if (!csrf) return false;
+                    const r = await fetch(`${API_URL}/auth/v2/refresh`, {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'X-CSRF-Token': csrf, 'Accept': 'application/json' }
+                    });
+                    if (!r.ok) return false;
+                    try {
+                        const data = await r.json();
+                        if (data?.usuario && sessaoCache) {
+                            sessaoCache = { ...sessaoCache, usuario: data.usuario };
+                        }
+                    } catch {}
+                    console.log('🔄 [sessão] renovada com sucesso.');
+                    return true;
+                } catch (e) {
+                    console.warn('[sessão] falha ao renovar:', e.message);
+                    return false;
+                } finally {
+                    refreshEmAndamento = null;
+                }
+            })();
+            return refreshEmAndamento;
+        }
+
+        async function fetchComRefresh(url, options = {}) {
+            const opts = { ...options, credentials: options.credentials || 'include' };
+            let r = await fetch(url, opts);
+            if (r.status === 401) {
+                const renovou = await tentarRenovarSessao();
+                if (!renovou) {
+                    window.location.replace('/index.html');
+                    throw new Error('Sessão expirada');
+                }
+                r = await fetch(url, opts);
+            }
+            return r;
+        }
+        // ============================================================
+        // FIM DO REFRESH
+        // ============================================================
+
         async function apiGet(url) {
-            const r = await fetch(url, { method: 'GET', credentials: 'include', headers: { 'Accept': 'application/json' } });
+            const r = await fetchComRefresh(url, { method: 'GET', credentials: 'include', headers: { 'Accept': 'application/json' } });
             const t = await r.text(); if (!t) return {};
             let json; try { json = JSON.parse(t); } catch (e) { json = {}; }
             if (!r.ok) { const e = extrairErroResposta(json, r.status); const err = new Error(e.mensagem); err.codigo = e.codigo; err.traceId = e.traceId; throw err; }
@@ -593,7 +668,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         async function apiPost(url, body) {
             const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' }; const csrf = obterCsrf(); if (csrf) headers['X-CSRF-Token'] = csrf;
-            const r = await fetch(url, { method: 'POST', credentials: 'include', headers, body: JSON.stringify(body) });
+            const r = await fetchComRefresh(url, { method: 'POST', credentials: 'include', headers, body: JSON.stringify(body) });
             const t = await r.text(); let json; try { json = t ? JSON.parse(t) : {}; } catch (e) { json = {}; }
             if (!r.ok) { const e = extrairErroResposta(json, r.status); const err = new Error(e.mensagem); err.codigo = e.codigo; err.traceId = e.traceId; err.status = r.status; err.__raw = json; throw err; }
             return { status: r.status, dados: json?.dados ?? json };
@@ -601,7 +676,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         async function apiPut(url, body) {
             const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' }; const csrf = obterCsrf(); if (csrf) headers['X-CSRF-Token'] = csrf;
-            const r = await fetch(url, { method: 'PUT', credentials: 'include', headers, body: JSON.stringify(body) });
+            const r = await fetchComRefresh(url, { method: 'PUT', credentials: 'include', headers, body: JSON.stringify(body) });
             const t = await r.text(); let json; try { json = t ? JSON.parse(t) : {}; } catch (e) { json = {}; }
             if (!r.ok) { const e = extrairErroResposta(json, r.status); const err = new Error(e.mensagem); err.codigo = e.codigo; err.traceId = e.traceId; throw err; }
             return json;
@@ -609,28 +684,28 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         async function apiDelete(url) {
             const headers = { 'Accept': 'application/json' }; const csrf = obterCsrf(); if (csrf) headers['X-CSRF-Token'] = csrf;
-            const r = await fetch(url, { method: 'DELETE', credentials: 'include', headers });
+            const r = await fetchComRefresh(url, { method: 'DELETE', credentials: 'include', headers });
             if (!r.ok) { const t = await r.text(); let json; try { json = t ? JSON.parse(t) : {}; } catch (e) { json = {}; } const e = extrairErroResposta(json, r.status); const err = new Error(e.mensagem); err.codigo = e.codigo; err.traceId = e.traceId; throw err; }
             return r.status === 204 ? null : await r.json().catch(() => null);
         }
 
         async function fetchFromAPI(urls) {
-            for (const url of urls) { try { const r = await fetch(url, { method: 'GET', credentials: 'include', headers: { 'Accept': 'application/json' } }); if (!r.ok) throw new Error(`HTTP ${r.status}`); const d = await r.json(); return Array.isArray(d) ? d : (d.data || d.results || []); } catch (e) {} }
+            for (const url of urls) { try { const r = await fetchComRefresh(url, { method: 'GET', credentials: 'include', headers: { 'Accept': 'application/json' } }); if (!r.ok) throw new Error(`HTTP ${r.status}`); const d = await r.json(); return Array.isArray(d) ? d : (d.data || d.results || []); } catch (e) {} }
             return null;
         }
 
         async function carregarUFs() {
             const cache = cacheGet(CACHE.UFS);
-            if (cache) { 
-                ufData = cache; 
-                filterUf.innerHTML = '<option value="">Todos</option>' + ufData.map(u => `<option value="${u.sigla}">${u.sigla}</option>`).join(''); 
-                refreshCustomSelect(filterUf); 
-                return; 
+            if (cache) {
+                ufData = cache;
+                filterUf.innerHTML = '<option value="">Todos</option>' + ufData.map(u => `<option value="${u.sigla}">${u.sigla}</option>`).join('');
+                refreshCustomSelect(filterUf);
+                return;
             }
-            
-            try { 
-                const res = await apiGet(`${API_URL}/ufs`); 
-                
+
+            try {
+                const res = await apiGet(`${API_URL}/ufs`);
+
                 let data = [];
                 if (Array.isArray(res)) data = res;
                 else if (res && Array.isArray(res.dados)) data = res.dados;
@@ -641,10 +716,10 @@ document.addEventListener('DOMContentLoaded', async function() {
                 if (data.length === 0) throw new Error('Lista vazia');
 
                 ufData = data.map(i => ({ sigla: i.uf || i.sigla, nome: i.nome || i.descricao || '' })).filter(u => u.sigla);
-                
-                filterUf.innerHTML = '<option value="">Todos</option>' + ufData.map(u => `<option value="${u.sigla}">${u.sigla}</option>`).join(''); 
-                refreshCustomSelect(filterUf); 
-                cacheSet(CACHE.UFS, ufData); 
+
+                filterUf.innerHTML = '<option value="">Todos</option>' + ufData.map(u => `<option value="${u.sigla}">${u.sigla}</option>`).join('');
+                refreshCustomSelect(filterUf);
+                cacheSet(CACHE.UFS, ufData);
             } catch (e) {
                 console.warn('[UFs] Erro ao buscar da API. Usando fallback fixo:', e.message);
                 ufData = [
@@ -656,8 +731,8 @@ document.addEventListener('DOMContentLoaded', async function() {
                     {sigla:'RS', nome:'Rio Grande do Sul'}, {sigla:'RO', nome:'Rondônia'}, {sigla:'RR', nome:'Roraima'}, {sigla:'SC', nome:'Santa Catarina'},
                     {sigla:'SP', nome:'São Paulo'}, {sigla:'SE', nome:'Sergipe'}, {sigla:'TO', nome:'Tocantins'}
                 ];
-                filterUf.innerHTML = '<option value="">Todos</option>' + ufData.map(u => `<option value="${u.sigla}">${u.sigla}</option>`).join(''); 
-                refreshCustomSelect(filterUf); 
+                filterUf.innerHTML = '<option value="">Todos</option>' + ufData.map(u => `<option value="${u.sigla}">${u.sigla}</option>`).join('');
+                refreshCustomSelect(filterUf);
             }
         }
 
@@ -686,18 +761,18 @@ document.addEventListener('DOMContentLoaded', async function() {
             try {
                 const res = await apiGet(`${API_URL}/segmentos`);
                 const data = Array.isArray(res) ? res : (res?.dados || res?.registros || res?.content || res?.itens || []);
-                segmentData = data.map(i => ({ id: i.codigo ?? i.id, nome: i.descricao ?? i.nome })); 
+                segmentData = data.map(i => ({ id: i.codigo ?? i.id, nome: i.descricao ?? i.nome }));
                 segmentoCnaeLinks = [];
                 const cnaesVistos = new Set(allCnaesCache.map(x => String(x.codigo).trim()));
                 await executarEmLotesComPausa(segmentData, 3, 20, async (seg) => {
-                    try { 
-                        const resCnaes = await apiGet(`${API_URL}/segmentos/${seg.id}/cnaes`); 
+                    try {
+                        const resCnaes = await apiGet(`${API_URL}/segmentos/${seg.id}/cnaes`);
                         const cnaes = Array.isArray(resCnaes) ? resCnaes : (resCnaes?.dados || resCnaes?.registros || resCnaes?.content || resCnaes?.itens || []);
-                        cnaes.forEach(c => { 
-                            if (!segmentoCnaeLinks.some(l => l.segmentoId === seg.id && l.cnaeCodigo === c.codigo)) segmentoCnaeLinks.push({ segmentoId: seg.id, cnaeCodigo: c.codigo }); 
-                            const cv = String(c.codigo).trim(); 
-                            if (!cnaesVistos.has(cv)) { cnaesVistos.add(cv); allCnaesCache.push({ codigo: cv, descricao: c.descricao || '', full: c.descricao ? `${cv} - ${c.descricao}` : cv }); } 
-                        }); 
+                        cnaes.forEach(c => {
+                            if (!segmentoCnaeLinks.some(l => l.segmentoId === seg.id && l.cnaeCodigo === c.codigo)) segmentoCnaeLinks.push({ segmentoId: seg.id, cnaeCodigo: c.codigo });
+                            const cv = String(c.codigo).trim();
+                            if (!cnaesVistos.has(cv)) { cnaesVistos.add(cv); allCnaesCache.push({ codigo: cv, descricao: c.descricao || '', full: c.descricao ? `${cv} - ${c.descricao}` : cv }); }
+                        });
                     } catch (e) {}
                 });
                 updateSegmentFilter(); renderSegmentTable(); populateLinkSelect(); cacheSet(CACHE.SEGMENTOS, { segmentData, segmentoCnaeLinks }); cacheSet(CACHE.CNAES, allCnaesCache);
@@ -734,7 +809,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             try { localStorage.removeItem(CACHE.IGNORADOS.key); } catch (e) {}
             try {
                 const url = `${API_URL}/prospeccao/status-estabelecimentos?status=X&empresaId=${encodeURIComponent(empresaId)}`;
-                const r = await fetch(url, { credentials: 'include', headers: { 'Accept': 'application/json' } });
+                const r = await fetchComRefresh(url, { credentials: 'include', headers: { 'Accept': 'application/json' } });
                 const raw = await r.text(); if (!r.ok) { let json = {}; try { json = JSON.parse(raw); } catch (e) {} const erro = extrairErroResposta(json, r.status); throw new Error(erro.mensagem || `HTTP ${r.status}`); }
                 let d = {}; try { d = raw ? JSON.parse(raw) : {}; } catch (e) {} let lista = [];
                 if (Array.isArray(d)) lista = d; else if (Array.isArray(d.registros)) lista = d.registros; else if (Array.isArray(d.dados)) lista = d.dados; else if (Array.isArray(d.dados?.registros)) lista = d.dados.registros; else if (Array.isArray(d.itens)) lista = d.itens; else if (Array.isArray(d.content)) lista = d.content;
@@ -882,10 +957,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         let pesquisaController = null;
         async function pesquisarProspeccao(botao = null, cursor = null) {
             const btn = botao || btnSearch; const cursorEnv = (cursor !== undefined) ? cursor : cursorAtual;
-            const uf = filterUf.value.trim(); 
-            const ddd = filterDdd.value; 
+            const uf = filterUf.value.trim();
+            const ddd = filterDdd.value;
             const seg = filterSegmento.value;
-            let cnae = selectedCnaeCode; 
+            let cnae = selectedCnaeCode;
             if (!cnae && filterCnaeInput.value.trim() !== '') { filterCnaeInput.value = ''; cnae = null; }
             const esc = filterTipoCnae ? filterTipoCnae.value : 'PRINCIPAL';
 
@@ -906,56 +981,56 @@ document.addEventListener('DOMContentLoaded', async function() {
 
             btn.disabled = true; const origB = btn.innerHTML; const origP = pageIndicator.innerHTML;
             if (btn.classList.contains('page-btn')) pageIndicator.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; else btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Carregando...';
-            
-            if (pesquisaController) pesquisaController.abort(); 
+
+            if (pesquisaController) pesquisaController.abort();
             pesquisaController = new AbortController();
-            
+
             const timeoutId = setTimeout(() => {
                 if (pesquisaController) pesquisaController.abort();
                 showWarning("A busca demorou muito e foi cancelada pelo servidor. Tente adicionar mais filtros (como CNAE) para refinar o resultado.", "Tempo Esgotado");
-                btn.disabled = false; 
+                btn.disabled = false;
                 btn.innerHTML = origB;
                 if (btn.classList.contains('page-btn')) pageIndicator.innerHTML = origP;
             }, 30000);
 
             try {
-                const r = await fetch(`${API_URL}/prospeccao/pesquisar?empresaId=${encodeURIComponent(empresaId)}`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body), signal: pesquisaController.signal });
-                
+                const r = await fetchComRefresh(`${API_URL}/prospeccao/pesquisar?empresaId=${encodeURIComponent(empresaId)}`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body), signal: pesquisaController.signal });
+
                 clearTimeout(timeoutId);
-                
+
                 const t = await r.text(); let json; try { json = t ? JSON.parse(t) : {}; } catch (e) {}
-                if (!r.ok) { 
-                    const e = extrairErroResposta(json, r.status); 
-                    const err = new Error(e.mensagem); 
-                    err.codigo = e.codigo; 
-                    err.traceId = e.traceId; 
-                    err.status = r.status; 
-                    throw err; 
+                if (!r.ok) {
+                    const e = extrairErroResposta(json, r.status);
+                    const err = new Error(e.mensagem);
+                    err.codigo = e.codigo;
+                    err.traceId = e.traceId;
+                    err.status = r.status;
+                    throw err;
                 }
-                
-                const d = json?.dados ?? json; 
-                registros = d.registros || []; 
-                window.registros = registros; 
-                temMais = d.temMais || false; 
-                cursorAtual = d.ultimoCnpj || null; 
+
+                const d = json?.dados ?? json;
+                registros = d.registros || [];
+                window.registros = registros;
+                temMais = d.temMais || false;
+                cursorAtual = d.ultimoCnpj || null;
                 renderTable(registros);
 
-            } catch (e) { 
+            } catch (e) {
                 clearTimeout(timeoutId);
-                
+
                 if (e.name === 'AbortError') {
                     // O showWarning já foi exibido pelo setTimeout
                 } else if (e.status === 504 || (e.message && (e.message.includes('504') || e.message.includes('Gateway')))) {
                     showWarning("A busca por este filtro é muito ampla e o servidor demorou muito para responder. Tente buscar junto com um CNAE ou Segmento para filtrar mais!", "Tempo Esgotado");
                 } else {
-                    console.error(e); 
-                    showWarning("Erro ao pesquisar: " + (e.message || 'Tente novamente mais tarde.'), "Erro"); 
+                    console.error(e);
+                    showWarning("Erro ao pesquisar: " + (e.message || 'Tente novamente mais tarde.'), "Erro");
                 }
-            } finally { 
+            } finally {
                 if (btn.disabled) {
-                    btn.disabled = false; 
-                    btn.innerHTML = origB; 
-                    pesquisaController = null; 
+                    btn.disabled = false;
+                    btn.innerHTML = origB;
+                    pesquisaController = null;
                 }
             }
         }
@@ -969,7 +1044,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
                 try {
                     const url = `${API_URL}/prospeccao/estabelecimentos/${encodeURIComponent(cnpj)}/enriquecimento?empresaId=${encodeURIComponent(empresaId)}`;
-                    const resp = await apiPost(url, {}); 
+                    const resp = await apiPost(url, {});
                     const dados = resp?.dados ?? resp;
                     renderIAData(dados);
                 } catch (err) {
@@ -989,7 +1064,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (!iaDataContent || !iaDataModal) return;
 
             const res = data.resultado || {};
-            
+
             iaDataEmpresa.innerHTML = `<strong>${data.razaoSocial || '-'}</strong> • CNPJ: ${data.cnpj || '-'} • Consultado em: ${formatarData(data.consultadoEm)}`;
 
             let html = '';
@@ -1042,9 +1117,9 @@ document.addEventListener('DOMContentLoaded', async function() {
                     <h3 style="font-size: 18px; color: var(--text-main); margin-bottom: 8px;">Nenhum dado adicional encontrado</h3>
                     <p style="font-size: 14px; max-width: 400px; line-height: 1.5;">A Inteligência Artificial não encontrou novos contatos, sites ou informações públicas para esta empresa.</p>
                 </div>`;
-                if (btnCopiarIA) btnCopiarIA.style.display = 'none'; 
+                if (btnCopiarIA) btnCopiarIA.style.display = 'none';
             } else {
-                if (btnCopiarIA) btnCopiarIA.style.display = 'inline-flex'; 
+                if (btnCopiarIA) btnCopiarIA.style.display = 'inline-flex';
             }
 
             if (res.telefones && res.telefones.length > 0) {
@@ -1056,16 +1131,16 @@ document.addEventListener('DOMContentLoaded', async function() {
                 if (inputEmail && !inputEmail.value) inputEmail.value = res.emails[0];
             }
 
-            currentIAData = data; 
+            currentIAData = data;
             iaDataContent.innerHTML = html;
             iaDataModal.style.display = 'flex';
-            
+
             const iaNome = document.getElementById('det-ia-crm-nome');
             const iaObs = document.getElementById('det-ia-crm-observacao');
-            
+
             const originalNome = document.getElementById('det-crm-nome')?.value || '';
             const originalObs = document.getElementById('det-crm-observacao')?.value.trim() || '';
-            
+
             if (iaNome) iaNome.value = originalNome;
             if (iaObs) iaObs.value = originalObs;
 
@@ -1079,7 +1154,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (res.whatsapps?.length) extraInfo.push(`• WhatsApp IA: ${res.whatsapps.join(', ')}`);
             if (res.descricaoEmpresa) extraInfo.push(`• Sobre a Empresa: ${res.descricaoEmpresa}`);
             if (res.informacoesAdicionais?.length) extraInfo.push(`• Info Adicional: ${res.informacoesAdicionais.join(' | ')}`);
-            
+
             const textoObservacao = extraInfo.join('\r\n');
             if (textoObservacao) {
                 obsIACRM = `--- DADOS DA IA ---\r\n${textoObservacao}`;
@@ -1091,7 +1166,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
             const data = currentIAData;
             const res = data.resultado || {};
-            
+
             let texto = `🏢 *DADOS ENRIQUECIDOS POR IA*\n`;
             texto += `Empresa: ${data.razaoSocial || '-'}\n`;
             texto += `CNPJ: ${data.cnpj || '-'}\n`;
@@ -1174,34 +1249,34 @@ document.addEventListener('DOMContentLoaded', async function() {
                 };
 
                 const nat = d.naturezaJuridica;
-                document.getElementById('det-natureza').innerText = nat ? 
+                document.getElementById('det-natureza').innerText = nat ?
                     `${nat.codigo || ''}${nat.codigo && nat.descricao ? ' - ' : ''}${nat.descricao || ''}` : '-';
 
-                document.getElementById('det-porte').innerText = d.codigoPorte ? 
+                document.getElementById('det-porte').innerText = d.codigoPorte ?
                     (PORTE_MAP[d.codigoPorte] || `Código ${d.codigoPorte}`) : '-';
 
                 const capital = d.capitalSocial;
-                document.getElementById('det-capital').innerText = capital != null ? 
+                document.getElementById('det-capital').innerText = capital != null ?
                     `R$ ${Number(capital).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-';
 
                 document.getElementById('det-inicio').innerText   = fmtData(d.dataInicioAtividade);
                 document.getElementById('det-data-sit').innerText = fmtData(d.dataSituacaoCadastral);
 
                 const cnae = d.cnaePrincipal;
-                document.getElementById('det-cnae').innerText = cnae ? 
+                document.getElementById('det-cnae').innerText = cnae ?
                     `${cnae.codigo || ''}${cnae.codigo && cnae.descricao ? ' - ' : ''}${cnae.descricao || ''}` : '-';
 
                 const end = d.endereco || {};
-                document.getElementById('det-logradouro').innerText = end.logradouro ? 
+                document.getElementById('det-logradouro').innerText = end.logradouro ?
                     `${end.tipoLogradouro ? end.tipoLogradouro + ' ' : ''}${end.logradouro}` : '-';
                 document.getElementById('det-numero').innerText      = end.numero || '-';
                 document.getElementById('det-complemento').innerText = end.complemento || '-';
                 document.getElementById('det-bairro').innerText      = end.bairro || '-';
                 document.getElementById('det-cep').innerText         = fmtCep(end.cep);
-                
+
                 const mun = end.municipio || '-';
                 const uf = end.uf || '-';
-                document.getElementById('det-municipio').innerText = 
+                document.getElementById('det-municipio').innerText =
                     (mun !== '-' && uf !== '-') ? `${mun} / ${uf}` : (mun !== '-' ? mun : uf);
 
                 const tels = Array.isArray(d.telefones) ? d.telefones : [];
@@ -1235,7 +1310,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     const outrosEmails = emails.slice(1).join(', ');
                     extras.push(`E-mail Adicional: ${outrosEmails}`);
                 }
-                
+
                 if (extras.length > 0) {
                     obsAutomaticaCRM += (obsAutomaticaCRM ? '\r\n\r\n' : '') + extras.join('\r\n');
                 }
@@ -1298,8 +1373,8 @@ document.addEventListener('DOMContentLoaded', async function() {
             const obsEl = document.getElementById('det-crm-observacao');
             if (obsEl) obsEl.value = '';
 
-            obsAutomaticaCRM = ""; 
-            obsIACRM = ""; 
+            obsAutomaticaCRM = "";
+            obsIACRM = "";
 
             const btnIA = document.getElementById('btn-dados-ia');
             if (btnIA) btnIA.onclick = () => solicitarDadosIA(cnpj);
@@ -1330,7 +1405,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         window.novoSegmento = function() { if (isDirty) { showUnsavedChangesModal('Deseja salvar antes de criar um novo segmento?', function() { document.getElementById('segmentoForm').requestSubmit(); resetSegmentForm(); }, function() { resetSegmentForm(); }); } else resetSegmentForm(); };
         function resetSegmentForm() { segmentNome.value = ''; editingSegmentId = null; btnCancelSegment.style.display = 'none'; btnSaveSegment.innerText = 'Salvar segmento'; btnSaveSegment.classList.remove('editing-btn'); formTitle.innerText = 'Cadastro de segmento'; segmentFormCard.classList.remove('editing-mode'); linkedCnaeList.innerHTML = 'Nenhum CNAE vinculado.'; currentLinkedCnaes = []; originalLinkedCnaes = []; linkCnaeSelect.value = ''; refreshCustomSelect(linkCnaeSelect); setDirty(false); }
-        
+
         function renderSegmentTable(st = '') {
             segmentTableBody.innerHTML = ''; const term = st.toLowerCase().trim();
             segmentData.filter(s => s.nome.toLowerCase().includes(term)).forEach(seg => {
@@ -1360,34 +1435,34 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         function updateSegmentFilter() { let o = '<option value="">Todos</option>'; segmentData.forEach(s => o += `<option value="${s.id}">${s.nome}</option>`); if (filterSegmento) { filterSegmento.innerHTML = o; refreshCustomSelect(filterSegmento); } }
         function populateLinkSelect() { linkCnaeSelect.innerHTML = '<option value="">Selecione um CNAE...</option>'; allCnaesCache.forEach(c => { if (!currentLinkedCnaes.some(x => x.codigo === c.codigo)) { const opt = document.createElement('option'); opt.value = c.codigo; opt.innerText = c.full; linkCnaeSelect.appendChild(opt); } }); refreshCustomSelect(linkCnaeSelect); }
-        
+
         window.vincularCNAE = function() { const cc = String(linkCnaeSelect.value || '').trim(); if (!cc) { showWarning('Selecione um CNAE.'); return; } const c = allCnaesCache.find(x => String(x.codigo).trim() === cc); if (!c) { showWarning(`CNAE ${cc} não encontrado.`); return; } if (currentLinkedCnaes.some(x => String(x.codigo).trim() === cc)) { showWarning('Já vinculado.'); return; } currentLinkedCnaes.push(c); renderLinkedCnaes(); populateLinkSelect(); linkCnaeSelect.value = ''; refreshCustomSelect(linkCnaeSelect); setDirty(true); };
         function renderLinkedCnaes() { linkedCnaeList.innerHTML = ''; if (!currentLinkedCnaes.length) { linkedCnaeList.innerHTML = 'Nenhum CNAE vinculado.'; return; } currentLinkedCnaes.forEach((c, i) => { const d = document.createElement('div'); d.classList.add('linked-item'); d.innerHTML = `<span>${c.codigo} - ${c.descricao}</span><button onclick="removerCNAE(${i})"><i class="fas fa-times"></i></button>`; linkedCnaeList.appendChild(d); }); }
         window.removerCNAE = function(i) { currentLinkedCnaes.splice(i, 1); renderLinkedCnaes(); populateLinkSelect(); setDirty(true); };
-        
+
         document.getElementById('segmentoForm').addEventListener('submit', async function(e) {
             e.preventDefault(); const nome = segmentNome.value.trim(); if (!nome) { showWarning('Informe o nome do segmento.'); return; }
             try {
                 let segId = editingSegmentId;
-                if (editingSegmentId !== null) { 
-                    await apiPut(`${API_URL}/segmentos/${editingSegmentId}`, { descricao: nome }); 
-                    const s = segmentData.find(x => x.id === editingSegmentId); 
-                    if (s) s.nome = nome; 
+                if (editingSegmentId !== null) {
+                    await apiPut(`${API_URL}/segmentos/${editingSegmentId}`, { descricao: nome });
+                    const s = segmentData.find(x => x.id === editingSegmentId);
+                    if (s) s.nome = nome;
                 }
-                else { 
-                    const novo = await apiPost(`${API_URL}/segmentos`, { descricao: nome }); 
-                    segId = novo.codigo || novo.id; 
-                    segmentData.push({ id: segId, nome }); 
+                else {
+                    const novo = await apiPost(`${API_URL}/segmentos`, { descricao: nome });
+                    segId = novo.codigo || novo.id;
+                    segmentData.push({ id: segId, nome });
                 }
-                
+
                 if (segId) {
                     const atual = currentLinkedCnaes.map(c => c.codigo); const orig = originalLinkedCnaes.map(c => c.codigo);
                     for (const c of orig) if (!atual.includes(c)) { try { await apiDelete(`${API_URL}/segmentos/${segId}/cnaes/${c}`); } catch (e) {} }
                     for (const c of currentLinkedCnaes) { if (orig.includes(c.codigo)) continue; try { await apiPost(`${API_URL}/segmentos/${segId}/cnaes`, { cnae: c.codigo }); } catch (e) {} }
                 }
-                
+
                 setDirty(false); originalLinkedCnaes = [...currentLinkedCnaes]; resetSegmentForm(); localStorage.removeItem(CACHE.SEGMENTOS.key); segmentData = []; segmentoCnaeLinks = [];
-                
+
                 showWarning('Segmento salvo com sucesso!', 'Sucesso');
 
                 carregarSegmentos().then(() => {
@@ -1395,15 +1470,15 @@ document.addEventListener('DOMContentLoaded', async function() {
                     renderSegmentTable(segmentSearch.value);
                 });
 
-            } catch (err) { 
+            } catch (err) {
                 console.error('Erro ao salvar segmento:', err);
-                showWarning('Erro ao salvar segmento: ' + (err.message || 'Verifique os dados.'), 'Erro'); 
+                showWarning('Erro ao salvar segmento: ' + (err.message || 'Verifique os dados.'), 'Erro');
             }
         });
-        
+
         if (btnCancelSegment) btnCancelSegment.addEventListener('click', () => resetSegmentForm());
         segmentSearch.addEventListener('input', function() { renderSegmentTable(this.value); });
-        
+
         async function editarSegmento(id) {
             const seg = segmentData.find(s => s.id === id); if (!seg) return;
             editingSegmentId = id; segmentNome.value = seg.nome; btnSaveSegment.innerText = 'Atualizar segmento'; btnSaveSegment.classList.add('editing-btn'); btnCancelSegment.style.display = 'inline-block'; formTitle.innerText = 'Editar segmento'; segmentFormCard.classList.add('editing-mode');
@@ -1411,7 +1486,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             catch (e) { currentLinkedCnaes = []; originalLinkedCnaes = []; renderLinkedCnaes(); populateLinkSelect(); }
             setDirty(true);
         }
-        
+
         async function excluirSegmento(id) {
             const seg = segmentData.find(s => s.id === id); if (!seg) { showWarning('Segmento não encontrado.'); return; }
             showConfirm('Excluir Segmento', `Tem certeza que deseja excluir "${seg.nome}"?`, async function() {
@@ -1421,7 +1496,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                         try { await apiDelete(`${API_URL}/segmentos/${id}/cnaes/${c.codigo}`); } catch(err) {}
                     }
                     await apiDelete(`${API_URL}/segmentos/${id}`);
-                    
+
                     segmentData = segmentData.filter(s => s.id !== id);
                     segmentoCnaeLinks = segmentoCnaeLinks.filter(l => l.segmentoId !== id);
                     localStorage.removeItem(CACHE.SEGMENTOS.key);
@@ -1443,7 +1518,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (confirmModal) confirmModal.addEventListener('click', function(e) { if (e.target === this) { confirmModal.style.display = 'none'; restoreActiveMenuItem(); } });
 
         document.getElementById('close-ia-data-modal')?.addEventListener('click', () => iaDataModal.style.display = 'none');
-        
+
         const btnEnviarCRMIA = document.getElementById('btn-enviar-crm-ia');
         if (btnEnviarCRMIA) {
             btnEnviarCRMIA.addEventListener('click', async () => {
@@ -1457,7 +1532,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
                 const inputOriginal = document.getElementById('det-crm-nome');
                 if (inputOriginal) inputOriginal.value = iaNome;
-                
+
                 const obsOriginal = document.getElementById('det-crm-observacao');
                 if (obsOriginal) obsOriginal.value = iaObs;
 
@@ -1501,12 +1576,12 @@ document.addEventListener('DOMContentLoaded', async function() {
 
                 const empresaId = obterEmpresaAtivaId();
                 if (!empresaId) return showWarning('Nenhuma empresa ativa selecionada.', 'Atenção');
-                
+
                 let nome = document.getElementById('det-crm-nome')?.value.trim() || null;
                 let cargo = document.getElementById('det-crm-cargo')?.value.trim() || null;
                 let telefone = document.getElementById('det-crm-telefone')?.value.trim() || null;
                 let email = document.getElementById('det-crm-email')?.value.trim() || null;
-                
+
                 let obsUsuario = document.getElementById('det-crm-observacao')?.value.trim() || "";
                 let observacaoFinal = [obsUsuario, obsAutomaticaCRM, obsIACRM].filter(Boolean).join('\r\n\r\n');
                 let observacao = observacaoFinal || null;
@@ -1526,7 +1601,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     idempotencyKey: getOrCreateIdempotencyKey(cnpjAtivoCRM),
                     nome
                 };
-                
+
                 if (cargo) payload.cargo = cargo;
                 if (telefone) payload.telefone = telefone;
                 if (email) payload.email = email;
@@ -1547,7 +1622,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
                 try {
                     const url = `${API_URL}/prospeccao/leads-crm/${encodeURIComponent(cnpjAtivoCRM)}/envios?empresaId=${encodeURIComponent(empresaId)}`;
-                    
+
                     const response = await apiPost(url, payload);
                     const estado = response.dados?.estado;
                     const operacaoId = response.dados?.operacaoId;
@@ -1558,13 +1633,13 @@ document.addEventListener('DOMContentLoaded', async function() {
                         resetIdempotencia();
                         detailsModal.style.display = 'none';
                         showWarning('Lead enviado e concluído com sucesso!', 'Sucesso');
-                        pesquisarProspeccao(); 
+                        pesquisarProspeccao();
                     } else {
                         throw new Error('Estado desconhecido: ' + estado);
                     }
                 } catch (err) {
                     console.error('[CRM] Erro:', err);
-                    
+
                     if (err.status === 409) {
                         showWarning('Este lead já foi enviado ou está em processamento.', 'Atenção');
                         resetIdempotencia();
@@ -1577,10 +1652,10 @@ document.addEventListener('DOMContentLoaded', async function() {
                     }
                     else if (err.codigo === 'autor_sem_perfil_ecossistema' || (err.message && err.message.includes('Ecossistema'))) {
                         showWarning(
-                            'Não foi possível enviar o lead. O seu e-mail de acesso ao Prospect não está vinculado ao Ecossistema da empresa. Por favor, entre em contato com o administrador para solicitar a vinculação.', 
+                            'Não foi possível enviar o lead. O seu e-mail de acesso ao Prospect não está vinculado ao Ecossistema da empresa. Por favor, entre em contato com o administrador para solicitar a vinculação.',
                             'Atenção'
                         );
-                    } 
+                    }
                     else {
                         showWarning('Erro ao enviar: ' + (err.message || 'Tente novamente'), 'Erro');
                     }
@@ -1595,14 +1670,14 @@ document.addEventListener('DOMContentLoaded', async function() {
         function mostrarProcessamentoCRM(operacaoId) {
             if (!operacaoId) return;
             detailsModal.style.display = 'none';
-            
+
             if (globalLoadingTitle) globalLoadingTitle.innerText = 'Envio em processamento';
             if (globalLoadingDesc) globalLoadingDesc.innerText = 'O lead está sendo processado no CRM. Por favor, aguarde.';
             if (globalLoading) globalLoading.style.display = 'flex';
 
             tentativasPolling = 0;
             if (pollingTimeout) clearTimeout(pollingTimeout);
-            
+
             verificarStatusOperacao(operacaoId);
         }
 
@@ -1669,11 +1744,11 @@ document.addEventListener('DOMContentLoaded', async function() {
         let debounceTimer;
         filterCnaeInput.addEventListener('input', function() {
             clearTimeout(debounceTimer); const t = this.value.trim();
-            if (!t) { 
-                cnaeSuggestions.classList.remove('active'); 
-                selectedCnaeCode = null; 
-                aplicarEstadoFiltros(); 
-                return; 
+            if (!t) {
+                cnaeSuggestions.classList.remove('active');
+                selectedCnaeCode = null;
+                aplicarEstadoFiltros();
+                return;
             }
             debounceTimer = setTimeout(async () => { const r = await buscarCnaes(t); renderSuggestions(r); }, 250);
         });
@@ -1790,12 +1865,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         async function carregarUfsGeoJSON() {
             if (ufsGeojsonCache) return ufsGeojsonCache;
             try { const c = localStorage.getItem(UFS_CACHE_KEY); if (c) { ufsGeojsonCache = JSON.parse(c); return ufsGeojsonCache; } } catch (e) {}
-            try { const r = await fetch(`${API_MAPAS}/ufs`, { credentials: 'include', headers: { 'Accept': 'application/json' } }); if (!r.ok) throw new Error(`HTTP ${r.status}`); ufsGeojsonCache = await r.json(); try { localStorage.setItem(UFS_CACHE_KEY, JSON.stringify(ufsGeojsonCache)); } catch (e) {} return ufsGeojsonCache; } catch (e) { return null; }
+            try { const r = await fetchComRefresh(`${API_MAPAS}/ufs`, { credentials: 'include', headers: { 'Accept': 'application/json' } }); if (!r.ok) throw new Error(`HTTP ${r.status}`); ufsGeojsonCache = await r.json(); try { localStorage.setItem(UFS_CACHE_KEY, JSON.stringify(ufsGeojsonCache)); } catch (e) {} return ufsGeojsonCache; } catch (e) { return null; }
         }
         async function carregarMunicipiosGeoJSON() {
             if (municipiosGeojsonCache) return municipiosGeojsonCache;
             try { const c = localStorage.getItem(MUN_CACHE_KEY); if (c) { municipiosGeojsonCache = JSON.parse(c); return municipiosGeojsonCache; } } catch (e) {}
-            try { const r = await fetch(`${API_MAPAS}/municipios`, { credentials: 'include', headers: { 'Accept': 'application/json' } }); if (!r.ok) throw new Error(`HTTP ${r.status}`); municipiosGeojsonCache = await r.json(); try { localStorage.setItem(MUN_CACHE_KEY, JSON.stringify(municipiosGeojsonCache)); } catch (e) {} return municipiosGeojsonCache; } catch (e) { return null; }
+            try { const r = await fetchComRefresh(`${API_MAPAS}/municipios`, { credentials: 'include', headers: { 'Accept': 'application/json' } }); if (!r.ok) throw new Error(`HTTP ${r.status}`); municipiosGeojsonCache = await r.json(); try { localStorage.setItem(MUN_CACHE_KEY, JSON.stringify(municipiosGeojsonCache)); } catch (e) {} return municipiosGeojsonCache; } catch (e) { return null; }
         }
 
         function criarCamadaTerra(g) { return g ? L.geoJSON(g, { style: () => getTerraStyle(), interactive: false }) : null; }
@@ -1854,11 +1929,11 @@ document.addEventListener('DOMContentLoaded', async function() {
             return L.geoJSON({ type: 'FeatureCollection', features }, {
                 onEachFeature: (f, l) => {
                     atualizarEstiloFeature(l, v, window.mapInstance);
-                    l.on('mouseover', function() { 
+                    l.on('mouseover', function() {
                         if (window.mapInstance) window.mapInstance.eachLayer(function(layer) { if (layer.closeTooltip && layer !== this) layer.closeTooltip(); });
                         const ativos = getVendedoresAtivosDaCidade(String(l.feature.properties?.codigoIbge || l.feature.properties?.codigo || '').trim());
-                        if (ativos.length > 1) this.setStyle({ weight: 3, color: '#ffffff' }); else this.setStyle(getVendedorHoverStyle(v)); 
-                        this.bringToFront(); this.openTooltip(); 
+                        if (ativos.length > 1) this.setStyle({ weight: 3, color: '#ffffff' }); else this.setStyle(getVendedorHoverStyle(v));
+                        this.bringToFront(); this.openTooltip();
                     });
                     l.on('mouseout', function() { atualizarEstiloFeature(l, v, window.mapInstance); this.closeTooltip(); });
                 }
