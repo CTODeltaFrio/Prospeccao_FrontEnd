@@ -1144,7 +1144,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (iaNome) iaNome.value = originalNome;
             if (iaObs) iaObs.value = originalObs;
 
-            let extraInfo = [];
+                        let extraInfo = [];
             if (res.site) extraInfo.push(`• Site: ${res.site}`);
             if (res.instagram) extraInfo.push(`• Instagram: ${res.instagram}`);
             if (res.linkedin) extraInfo.push(`• LinkedIn: ${res.linkedin}`);
@@ -1152,8 +1152,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (res.telefones?.length) extraInfo.push(`• Telefones IA: ${res.telefones.join(', ')}`);
             if (res.emails?.length) extraInfo.push(`• E-mails IA: ${res.emails.join(', ')}`);
             if (res.whatsapps?.length) extraInfo.push(`• WhatsApp IA: ${res.whatsapps.join(', ')}`);
-            if (res.descricaoEmpresa) extraInfo.push(`• Sobre a Empresa: ${res.descricaoEmpresa}`);
-            if (res.informacoesAdicionais?.length) extraInfo.push(`• Info Adicional: ${res.informacoesAdicionais.join(' | ')}`);
 
             const textoObservacao = extraInfo.join('\r\n');
             if (textoObservacao) {
