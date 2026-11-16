@@ -153,8 +153,6 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         // ============================================================
         // ✅ CHECK INICIAL DE SESSÃO — com refresh inline
-        // (precisa ser definido ANTES do fetch, então faz inline em vez
-        // de usar fetchComRefresh, que só existe mais abaixo no arquivo)
         // ============================================================
         let sessaoCache = null;
         try {
@@ -910,6 +908,26 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
         }
 
+        // ✅ NOVA FUNÇÃO: Desabilita o botão se os filtros obrigatórios não estiverem preenchidos
+        function verificarEstadoBotaoPesquisa() {
+            if (!btnSearch) return;
+            const temLoc = (filterUf && filterUf.value) || (filterDdd && filterDdd.value);
+            const inputCnaeVal = filterCnaeInput && filterCnaeInput.value.trim();
+            const temClass = (selectedCnaeCode) || (filterSegmento && filterSegmento.value) || inputCnaeVal;
+
+            if (!temLoc || !temClass) {
+                btnSearch.disabled = true;
+                btnSearch.style.opacity = '0.5';
+                btnSearch.style.cursor = 'not-allowed';
+                btnSearch.title = 'Preencha Localização (UF/DDD) e CNAE/Segmento.';
+            } else {
+                btnSearch.disabled = false;
+                btnSearch.style.opacity = '1';
+                btnSearch.style.cursor = 'pointer';
+                btnSearch.title = 'Pesquisar';
+            }
+        }
+
         async function salvarStatus(cnpj, status) {
             const empresaId = obterEmpresaAtivaId();
             if (!empresaId) throw new Error('Selecione uma empresa ativa antes de classificar.');
@@ -974,7 +992,22 @@ document.addEventListener('DOMContentLoaded', async function() {
                 limite: 50
             };
 
-            if (!body.uf && !body.ddd && !body.segmento && !body.cnae) { showWarning("Informe pelo menos um filtro para realizar a pesquisa.", "Atenção"); return; }
+            // ✅ NOVA REGRA: Obriga Localização (UF ou DDD) E Classificação (CNAE ou Segmento)
+            const temLocalizacao = body.uf || body.ddd;
+            const temClassificacao = body.cnae || body.segmento;
+
+            if (!temLocalizacao && !temClassificacao) {
+                showWarning("Selecione uma Localização (UF ou DDD) e uma Classificação (CNAE ou Segmento) para pesquisar.", "Atenção");
+                return;
+            }
+            if (!temLocalizacao) {
+                showWarning("Selecione uma UF ou um DDD. A pesquisa sem localização é muito ampla.", "Atenção");
+                return;
+            }
+            if (!temClassificacao) {
+                showWarning("Selecione um CNAE ou um Segmento para refinar a busca.", "Atenção");
+                return;
+            }
 
             const empresaId = obterEmpresaAtivaId();
             if (!empresaId) { showWarning("Selecione uma empresa ativa na barra lateral antes de pesquisar.", "Atenção"); return; }
@@ -1031,6 +1064,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     btn.disabled = false;
                     btn.innerHTML = origB;
                     pesquisaController = null;
+                    verificarEstadoBotaoPesquisa(); // Restaura o estado correto do botão após a busca
                 }
             }
         }
@@ -1144,7 +1178,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (iaNome) iaNome.value = originalNome;
             if (iaObs) iaObs.value = originalObs;
 
-                        let extraInfo = [];
+            let extraInfo = [];
             if (res.site) extraInfo.push(`• Site: ${res.site}`);
             if (res.instagram) extraInfo.push(`• Instagram: ${res.instagram}`);
             if (res.linkedin) extraInfo.push(`• LinkedIn: ${res.linkedin}`);
@@ -1746,13 +1780,26 @@ document.addEventListener('DOMContentLoaded', async function() {
                 cnaeSuggestions.classList.remove('active');
                 selectedCnaeCode = null;
                 aplicarEstadoFiltros();
+                verificarEstadoBotaoPesquisa(); // NOVO
                 return;
             }
             debounceTimer = setTimeout(async () => { const r = await buscarCnaes(t); renderSuggestions(r); }, 250);
         });
         function renderSuggestions(r) {
             cnaeSuggestions.innerHTML = ''; if (!r.length) { cnaeSuggestions.classList.remove('active'); return; }
-            r.forEach(i => { const d = document.createElement('div'); d.classList.add('autocomplete-item'); d.innerHTML = `<span class="code">${i.codigo}</span> <span class="desc">- ${i.descricao}</span>`; d.addEventListener('click', function() { filterCnaeInput.value = `${i.codigo} - ${i.descricao}`; selectedCnaeCode = i.codigo; cnaeSuggestions.classList.remove('active'); aplicarEstadoFiltros(); }); cnaeSuggestions.appendChild(d); });
+            r.forEach(i => { 
+                const d = document.createElement('div'); 
+                d.classList.add('autocomplete-item'); 
+                d.innerHTML = `<span class="code">${i.codigo}</span> <span class="desc">- ${i.descricao}</span>`; 
+                d.addEventListener('click', function() { 
+                    filterCnaeInput.value = `${i.codigo} - ${i.descricao}`; 
+                    selectedCnaeCode = i.codigo; 
+                    cnaeSuggestions.classList.remove('active'); 
+                    aplicarEstadoFiltros(); 
+                    verificarEstadoBotaoPesquisa(); // NOVO
+                }); 
+                cnaeSuggestions.appendChild(d); 
+            });
             cnaeSuggestions.classList.add('active');
         }
         document.addEventListener('click', e => { if (!e.target.closest('.autocomplete-container')) cnaeSuggestions.classList.remove('active'); });
@@ -1776,9 +1823,9 @@ document.addEventListener('DOMContentLoaded', async function() {
             const isOk = e.target.classList.contains('card-btn') || e.target.closest('.card-btn'); if (!isOk) return;
             const i = parseInt(li.dataset.index); const item = currentItems[i]; genericModal.style.display = 'none';
             switch (currentGenericContext) {
-                case 'cnae': if (item?.codigo) { filterCnaeInput.value = item.full; selectedCnaeCode = item.codigo; cnaeSuggestions.classList.remove('active'); aplicarEstadoFiltros(); showScreen('main'); } break;
-                case 'uf': if (item?.sigla) { filterUf.value = item.sigla; refreshCustomSelect(filterUf); showScreen('main'); } break;
-                case 'municipio': if (typeof item === 'string') { const idx = item.lastIndexOf(' - '); if (idx !== -1) { filterDdd.value = item.substring(idx + 3).trim(); refreshCustomSelect(filterDdd); aplicarEstadoFiltros(); if (filterMunicipio) { filterMunicipio.value = ''; refreshCustomSelect(filterMunicipio); } showScreen('main'); } } break;
+                case 'cnae': if (item?.codigo) { filterCnaeInput.value = item.full; selectedCnaeCode = item.codigo; cnaeSuggestions.classList.remove('active'); aplicarEstadoFiltros(); showScreen('main'); verificarEstadoBotaoPesquisa(); } break;
+                case 'uf': if (item?.sigla) { filterUf.value = item.sigla; refreshCustomSelect(filterUf); showScreen('main'); verificarEstadoBotaoPesquisa(); } break;
+                case 'municipio': if (typeof item === 'string') { const idx = item.lastIndexOf(' - '); if (idx !== -1) { filterDdd.value = item.substring(idx + 3).trim(); refreshCustomSelect(filterDdd); aplicarEstadoFiltros(); if (filterMunicipio) { filterMunicipio.value = ''; refreshCustomSelect(filterMunicipio); } showScreen('main'); verificarEstadoBotaoPesquisa(); } } break;
                 default: showScreen('main');
             }
         });
@@ -1806,6 +1853,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             refreshCustomSelect(filterUf); refreshCustomSelect(filterDdd); refreshCustomSelect(filterSegmento); refreshCustomSelect(filterTipoCnae);
             currentPage = 1; historicoCursors = [null]; cursorAtual = null; registros = []; window.registros = registros; temMais = false; renderTable([]);
             aplicarEstadoFiltros();
+            verificarEstadoBotaoPesquisa(); // NOVO
             if (window.mapInstance && typeof window.loadMapData === 'function') { window.mapFilters.uf = null; window.loadMapData(); }
         }
         function checkAndCollapseSidebar() { if (window.innerWidth >= 769 && window.innerWidth <= 1366) sidebar.classList.add('collapsed'); }
@@ -1815,13 +1863,15 @@ document.addEventListener('DOMContentLoaded', async function() {
         btnPrev.addEventListener('click', function() { if (currentPage > 1 && historicoCursors.length > 1) { historicoCursors.pop(); currentPage--; cursorAtual = historicoCursors[historicoCursors.length - 1]; pesquisarProspeccao(this, cursorAtual); } else showWarning('Você já está na primeira página.', 'Aviso'); });
         btnNext.addEventListener('click', function() { if (temMais) { historicoCursors.push(cursorAtual); currentPage++; pesquisarProspeccao(this, cursorAtual); } else showWarning('Você já está na última página.', 'Aviso'); });
 
-        if (filterUf)       filterUf.addEventListener('change', aplicarEstadoFiltros);
-        if (filterDdd)      filterDdd.addEventListener('change', aplicarEstadoFiltros);
-        if (filterSegmento) filterSegmento.addEventListener('change', aplicarEstadoFiltros);
+        // ✅ Atualiza o estado do botão sempre que um filtro mudar
+        if (filterUf)       filterUf.addEventListener('change', () => { aplicarEstadoFiltros(); verificarEstadoBotaoPesquisa(); });
+        if (filterDdd)      filterDdd.addEventListener('change', () => { aplicarEstadoFiltros(); verificarEstadoBotaoPesquisa(); });
+        if (filterSegmento) filterSegmento.addEventListener('change', () => { aplicarEstadoFiltros(); verificarEstadoBotaoPesquisa(); });
 
         if (campoMunicipio) campoMunicipio.style.display = 'none';
         initializeCustomSelects();
         aplicarEstadoFiltros();
+        verificarEstadoBotaoPesquisa(); // NOVO: Verifica o estado inicial do botão
         showScreen('main');
 
         (async function boot() {
@@ -1837,6 +1887,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 }
                 await Promise.all([carregarUFs(), carregarDDDs(), carregarCnaesIniciais()]);
                 await carregarSegmentos(); updateSegmentFilter(); await carregarIgnorados(); carregarMunicipiosDaAPI().catch(() => {});
+                verificarEstadoBotaoPesquisa(); // NOVO: Garante que o botão inicie desabilitado se necessário
             } catch (e) { console.error('❌ Erro no boot:', e); }
         })();
 
